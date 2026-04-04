@@ -33,31 +33,6 @@ export async function generateCode(model, field, prefix, padLength = 4) {
 }
 
 /**
- * Sinh mã biên nhận: {VP_GUI}{VP_NHAN}-XXXX
- * Sử dụng findFirst(orderBy: desc) + unique constraint retry
- */
-export async function generateBienNhanCode(maVpGui, maVpNhan) {
-  const prefix = `${maVpGui}${maVpNhan}`;
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const last = await prisma.bienNhan.findFirst({
-      where: { ma_so: { startsWith: `${prefix}-` } },
-      orderBy: { ma_so: 'desc' },
-      select: { ma_so: true },
-    });
-
-    let nextNum = 1;
-    if (last) {
-      const num = parseInt(last.ma_so.split('-').pop(), 10);
-      if (!isNaN(num)) nextNum = num + 1;
-    }
-
-    const code = `${prefix}-${String(nextNum + attempt).padStart(4, '0')}`;
-    return code;
-  }
-}
-
-/**
  * Sinh mã phiếu thu/chi/bảng kê an toàn (atomic create with retry)
  * Wrap create operation để catch unique violation và retry
  * 
