@@ -52,6 +52,7 @@ export default async function khachHangRoutes(fastify) {
           ma_so_thue: { type: 'string' },
           ghi_chu: { type: 'string' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request, reply) => {

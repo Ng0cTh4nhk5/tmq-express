@@ -20,18 +20,7 @@ const fonts = {
 
 const printer = new PdfPrinter(fonts);
 
-const TRANG_THAI_LABELS = {
-  cho_vc: 'Chờ VC', dang_vc: 'Đang VC', da_den_kho: 'Đã đến kho',
-  da_bao_khach: 'Đã báo khách', khach_da_nhan: 'Khách đã nhận',
-};
 
-const THU_LABELS = {
-  da_thu: 'Đã thu', chua_thu: 'Chưa thu', cong_no: 'Công nợ',
-};
-
-const GIAO_LABELS = {
-  tan_noi: 'Tận nơi', goi_dien: 'Gọi điện', tu_toi: 'Tự tới',
-};
 
 function fmtCurrency(val) {
   if (!val || Number(val) === 0) return '0';
@@ -44,9 +33,26 @@ function chk(condition) {
 }
 
 /**
- * Tạo PDF biên nhận — khổ A5 ngang, giống mẫu giấy thực tế TMQ Express
+ * S-08: Tạo watermark object cho PDF
  */
-export async function generateBienNhanPDF(bienNhanId) {
+function makeWatermark(nhanVienTen) {
+  if (!nhanVienTen) return undefined;
+  return {
+    text: `${nhanVienTen} — ${new Date().toLocaleString('vi-VN')}`,
+    color: '#999999',
+    opacity: 0.08,
+    bold: true,
+    italics: false,
+    fontSize: 14,
+    angle: -45,
+  };
+}
+
+/**
+ * Tạo PDF biên nhận — khổ A5 ngang, giống mẫu giấy thực tế TMQ Express
+ * S-08: Watermark with NV name + timestamp
+ */
+export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
   const bn = await prisma.bienNhan.findUnique({
     where: { id: bienNhanId },
     include: {
@@ -354,6 +360,7 @@ export async function generateBienNhanPDF(bienNhanId) {
     defaultStyle: {
       font: 'Roboto',
     },
+    watermark: makeWatermark(nhan_vien_ten),
   };
 
   return new Promise((resolve, reject) => {
@@ -367,14 +374,13 @@ export async function generateBienNhanPDF(bienNhanId) {
 }
 
 // ---- Phiếu Thu PDF ----
-export async function generatePhieuThuPDF(phieuThuId) {
+export async function generatePhieuThuPDF(phieuThuId, { nhan_vien_ten } = {}) {
   const pt = await prisma.phieuThu.findUnique({
     where: { id: phieuThuId },
     include: { nhan_vien: { select: { ten: true } } },
   });
   if (!pt) throw Object.assign(new Error('Không tìm thấy phiếu thu'), { statusCode: 404 });
 
-  const printer = new PdfPrinter(fonts);
   const fmt = (n) => Number(n).toLocaleString('vi-VN');
 
   const docDefinition = {
@@ -382,21 +388,22 @@ export async function generatePhieuThuPDF(phieuThuId) {
     pageMargins: [25, 20, 25, 20],
     content: [
       { text: 'TMQ EXPRESS', fontSize: 12, bold: true, color: '#1E40AF', alignment: 'center' },
-      { text: 'PHIẾU THU', fontSize: 16, bold: true, alignment: 'center', margin: [0, 8, 0, 4] },
-      { text: `Số: ${pt.ma_phieu}`, alignment: 'center', fontSize: 10, color: '#666' },
-      { text: `Ngày: ${new Date(pt.ngay_thu).toLocaleDateString('vi-VN')}`, alignment: 'center', fontSize: 9, color: '#888', margin: [0, 2, 0, 12] },
-      { text: `Đối tượng: ${pt.doi_tuong}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Lý do: ${pt.ly_do}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Số tiền: ${fmt(pt.so_tien)} đ`, fontSize: 12, bold: true, margin: [0, 0, 0, 4] },
-      { text: `Hình thức: ${pt.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản'}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Người lập: ${pt.nhan_vien.ten}`, fontSize: 9, color: '#666', margin: [0, 8, 0, 0] },
+      { text: 'PHI\u1EBEU THU', fontSize: 16, bold: true, alignment: 'center', margin: [0, 8, 0, 4] },
+      { text: `S\u1ED1: ${pt.ma_phieu}`, alignment: 'center', fontSize: 10, color: '#666' },
+      { text: `Ng\u00E0y: ${new Date(pt.ngay_thu).toLocaleDateString('vi-VN')}`, alignment: 'center', fontSize: 9, color: '#888', margin: [0, 2, 0, 12] },
+      { text: `\u0110\u1ED1i t\u01B0\u1EE3ng: ${pt.doi_tuong}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `L\u00FD do: ${pt.ly_do}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `S\u1ED1 ti\u1EC1n: ${fmt(pt.so_tien)} \u0111`, fontSize: 12, bold: true, margin: [0, 0, 0, 4] },
+      { text: `H\u00ECnh th\u1EE9c: ${pt.hinh_thuc === 'tien_mat' ? 'Ti\u1EC1n m\u1EB7t' : 'Chuy\u1EC3n kho\u1EA3n'}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `Ng\u01B0\u1EDDi l\u1EADp: ${pt.nhan_vien.ten}`, fontSize: 9, color: '#666', margin: [0, 8, 0, 0] },
       {
         columns: [
-          { text: 'Người nộp\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
-          { text: 'Người lập phiếu\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
+          { text: 'Ng\u01B0\u1EDDi n\u1ED9p\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
+          { text: 'Ng\u01B0\u1EDDi l\u1EADp phi\u1EBFu\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
         ],
       },
     ],
+    watermark: makeWatermark(nhan_vien_ten),
   };
 
   return new Promise((resolve, reject) => {
@@ -410,14 +417,13 @@ export async function generatePhieuThuPDF(phieuThuId) {
 }
 
 // ---- Phiếu Chi PDF ----
-export async function generatePhieuChiPDF(phieuChiId) {
+export async function generatePhieuChiPDF(phieuChiId, { nhan_vien_ten } = {}) {
   const pc = await prisma.phieuChi.findUnique({
     where: { id: phieuChiId },
     include: { nhan_vien: { select: { ten: true } } },
   });
   if (!pc) throw Object.assign(new Error('Không tìm thấy phiếu chi'), { statusCode: 404 });
 
-  const printer = new PdfPrinter(fonts);
   const fmt = (n) => Number(n).toLocaleString('vi-VN');
 
   const docDefinition = {
@@ -425,21 +431,22 @@ export async function generatePhieuChiPDF(phieuChiId) {
     pageMargins: [25, 20, 25, 20],
     content: [
       { text: 'TMQ EXPRESS', fontSize: 12, bold: true, color: '#1E40AF', alignment: 'center' },
-      { text: 'PHIẾU CHI', fontSize: 16, bold: true, alignment: 'center', margin: [0, 8, 0, 4] },
-      { text: `Số: ${pc.ma_phieu}`, alignment: 'center', fontSize: 10, color: '#666' },
-      { text: `Ngày: ${new Date(pc.ngay_chi).toLocaleDateString('vi-VN')}`, alignment: 'center', fontSize: 9, color: '#888', margin: [0, 2, 0, 12] },
-      { text: `Người nhận: ${pc.nguoi_nhan}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Lý do: ${pc.ly_do}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Số tiền: ${fmt(pc.so_tien)} đ`, fontSize: 12, bold: true, margin: [0, 0, 0, 4] },
-      { text: `Hình thức: ${pc.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản'}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Người lập: ${pc.nhan_vien.ten}`, fontSize: 9, color: '#666', margin: [0, 8, 0, 0] },
+      { text: 'PHI\u1EBEU CHI', fontSize: 16, bold: true, alignment: 'center', margin: [0, 8, 0, 4] },
+      { text: `S\u1ED1: ${pc.ma_phieu}`, alignment: 'center', fontSize: 10, color: '#666' },
+      { text: `Ng\u00E0y: ${new Date(pc.ngay_chi).toLocaleDateString('vi-VN')}`, alignment: 'center', fontSize: 9, color: '#888', margin: [0, 2, 0, 12] },
+      { text: `Ng\u01B0\u1EDDi nh\u1EADn: ${pc.nguoi_nhan}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `L\u00FD do: ${pc.ly_do}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `S\u1ED1 ti\u1EC1n: ${fmt(pc.so_tien)} \u0111`, fontSize: 12, bold: true, margin: [0, 0, 0, 4] },
+      { text: `H\u00ECnh th\u1EE9c: ${pc.hinh_thuc === 'tien_mat' ? 'Ti\u1EC1n m\u1EB7t' : 'Chuy\u1EC3n kho\u1EA3n'}`, fontSize: 10, margin: [0, 0, 0, 4] },
+      { text: `Ng\u01B0\u1EDDi l\u1EADp: ${pc.nhan_vien.ten}`, fontSize: 9, color: '#666', margin: [0, 8, 0, 0] },
       {
         columns: [
-          { text: 'Người nhận\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
-          { text: 'Người lập phiếu\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
+          { text: 'Ng\u01B0\u1EDDi nh\u1EADn\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
+          { text: 'Ng\u01B0\u1EDDi l\u1EADp phi\u1EBFu\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
         ],
       },
     ],
+    watermark: makeWatermark(nhan_vien_ten),
   };
 
   return new Promise((resolve, reject) => {

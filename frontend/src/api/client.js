@@ -17,14 +17,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response: handle 401
+// Response: handle 401 (expired/revoked)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const authStore = useAuthStore();
-      authStore.logout();
-      router.push('/login');
+      const code = error.response?.data?.error?.code;
+      // TOKEN_REVOKED or expired — force logout
+      if (code === 'TOKEN_REVOKED' || code === 'UNAUTHORIZED') {
+        const authStore = useAuthStore();
+        authStore.logout();
+        router.push('/login');
+      }
     }
     return Promise.reject(error);
   },

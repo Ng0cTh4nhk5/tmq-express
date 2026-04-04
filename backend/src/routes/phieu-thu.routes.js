@@ -76,7 +76,9 @@ export default async function phieuThuRoutes(fastify) {
   fastify.get('/:id/pdf-preview', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
     handler: async (request) => {
-      const pdfBuffer = await generatePhieuThuPDF(Number(request.params.id));
+      const pdfBuffer = await generatePhieuThuPDF(Number(request.params.id), {
+        nhan_vien_ten: request.user.ten || 'N/A',
+      });
       return { success: true, data: { base64: pdfBuffer.toString('base64') } };
     },
   });

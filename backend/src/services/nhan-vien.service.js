@@ -58,21 +58,29 @@ export async function updateNhanVien(id, data) {
   });
 }
 
+// S-04: Increment token_version to force logout when deactivating
 export async function toggleActive(id, active) {
+  const updateData = { active };
+  if (!active) {
+    updateData.token_version = { increment: 1 }; // Force logout
+  }
   return prisma.nhanVien.update({
     where: { id },
-    data: { active },
+    data: updateData,
   });
 }
 
+// S-04: Increment token_version on password reset to force re-login
 export async function resetPassword(id) {
-  // Sinh mật khẩu tạm ngẫu nhiên thay vì hardcoded
   const tempPassword = crypto.randomBytes(4).toString('hex'); // 8 chars hex
   const password_hash = await bcrypt.hash(tempPassword, 10);
   await prisma.nhanVien.update({
     where: { id },
-    data: { password_hash, require_password_change: true },
+    data: {
+      password_hash,
+      require_password_change: true,
+      token_version: { increment: 1 }, // Force logout
+    },
   });
   return { tempPassword };
 }
-

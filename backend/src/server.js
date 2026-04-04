@@ -6,6 +6,7 @@ import prisma from './config/database.js';
 
 import env from './config/env.js';
 import errorHandler from './plugins/error-handler.js';
+import requestContextPlugin from './plugins/request-context.js';
 import authPlugin from './plugins/auth.js';
 import rbacPlugin from './plugins/rbac.js';
 
@@ -49,6 +50,7 @@ await fastify.register(rateLimit, {
 });
 
 await fastify.register(errorHandler);
+await fastify.register(requestContextPlugin);
 await fastify.register(authPlugin);
 await fastify.register(rbacPlugin);
 

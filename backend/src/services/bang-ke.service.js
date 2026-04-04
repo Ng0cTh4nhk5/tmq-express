@@ -11,11 +11,11 @@ export async function getBienNhanCho({ ngay }) {
     da_vao_bang_ke: false,
   };
   if (ngay) {
-    const d = new Date(ngay);
-    where.ngay_nhan = {
-      gte: new Date(d.setHours(0, 0, 0, 0)),
-      lte: new Date(d.setHours(23, 59, 59, 999)),
-    };
+    const start = new Date(ngay);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(ngay);
+    end.setHours(23, 59, 59, 999);
+    where.ngay_nhan = { gte: start, lte: end };
   }
   return prisma.bienNhan.findMany({
     where,

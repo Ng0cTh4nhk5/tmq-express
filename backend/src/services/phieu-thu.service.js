@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { createWithCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
 
 export async function listPhieuThu({ page = 1, limit = 20, from, to, van_phong_id, hinh_thuc, search }) {
   const where = { da_huy: false };
@@ -62,7 +63,7 @@ export async function createPhieuThu(data, user) {
   }
 
   // Sử dụng createWithCode để tránh race condition (retry on unique violation)
-  return createWithCode(
+  const result = await createWithCode(
     (ma_phieu) => prisma.phieuThu.create({
       data: {
         ma_phieu,
@@ -77,6 +78,9 @@ export async function createPhieuThu(data, user) {
     }),
     'phieuThu', 'ma_phieu', 'PT',
   );
+
+  writeAuditLog({ action: 'CREATE', entity: 'phieu_thu', entityId: result.id, newData: result });
+  return result;
 }
 
 export async function updatePhieuThu(id, data, user) {

@@ -95,6 +95,7 @@ export default async function bienNhanRoutes(fastify) {
           hang_hu_khong_den: { type: 'boolean' },
           hinh_thuc_giao: { type: 'string', enum: ['tan_noi', 'goi_dien', 'tu_toi'] },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request, reply) => {
@@ -158,7 +159,9 @@ export default async function bienNhanRoutes(fastify) {
   fastify.get('/:id/pdf', {
     preHandler: [fastify.authenticate],
     handler: async (request, reply) => {
-      const pdfBuffer = await generateBienNhanPDF(Number(request.params.id));
+      const pdfBuffer = await generateBienNhanPDF(Number(request.params.id), {
+        nhan_vien_ten: request.user.ten || 'N/A',
+      });
       reply.header('Content-Type', 'application/pdf');
       reply.header('Content-Length', pdfBuffer.length);
       reply.header('Content-Disposition', `inline; filename="bien-nhan-${request.params.id}.pdf"`);
@@ -171,7 +174,9 @@ export default async function bienNhanRoutes(fastify) {
   fastify.get('/:id/pdf-preview', {
     preHandler: [fastify.authenticate],
     handler: async (request) => {
-      const pdfBuffer = await generateBienNhanPDF(Number(request.params.id));
+      const pdfBuffer = await generateBienNhanPDF(Number(request.params.id), {
+        nhan_vien_ten: request.user.ten || 'N/A',
+      });
       return {
         success: true,
         data: { base64: pdfBuffer.toString('base64') },

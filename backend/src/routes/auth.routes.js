@@ -14,13 +14,30 @@ export default async function authRoutes(fastify) {
           username: { type: 'string', minLength: 1 },
           password: { type: 'string', minLength: 1 },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request, reply) => {
       const { username, password } = request.body;
-      const user = await login(username, password);
+      const result = await login(username, password, {
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
 
-      if (!user) {
+      // S-03: Account locked
+      if (result && result.error === 'ACCOUNT_LOCKED') {
+        return reply.status(423).send({
+          success: false,
+          error: {
+            code: 'ACCOUNT_LOCKED',
+            message: 'Tài khoản đã bị khóa tạm thời do đăng nhập sai nhiều lần.',
+            locked_until: result.locked_until,
+          },
+        });
+      }
+
+      // Wrong credentials or inactive
+      if (!result) {
         return reply.status(401).send({
           success: false,
           error: {
@@ -30,13 +47,17 @@ export default async function authRoutes(fastify) {
         });
       }
 
-      const token = fastify.jwt.sign(
-        { id: user.id, role: user.role, van_phong_id: user.van_phong.id },
-      );
+      // S-04: Include token_version in JWT payload
+      const token = fastify.jwt.sign({
+        id: result.id,
+        role: result.role,
+        van_phong_id: result.van_phong.id,
+        tv: result.token_version,
+      });
 
       return {
         success: true,
-        data: { token, user },
+        data: { token, user: result },
       };
     },
   });
@@ -64,12 +85,13 @@ export default async function authRoutes(fastify) {
           current_password: { type: 'string', minLength: 1 },
           new_password: { type: 'string', minLength: 6 },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {
       const { current_password, new_password } = request.body;
       await changePassword(request.user.id, current_password, new_password);
-      return { success: true, message: 'Đổi mật khẩu thành công' };
+      return { success: true, message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' };
     },
   });
 }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth.store';
 import { useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
 import Button from 'primevue/button';
 import PageHeader from '../components/shared/PageHeader.vue';
 import StatCard from '../components/shared/StatCard.vue';
@@ -9,6 +10,7 @@ import api from '../api/client';
 
 const auth = useAuthStore();
 const router = useRouter();
+const toast = useToast();
 
 const stats = ref({ bn_hom_nay: 0, tong_bn: 0, doanh_thu_thang: 0, cong_no_ton: 0, so_cong_no: 0 });
 const recentBN = ref([]);
@@ -104,7 +106,8 @@ async function fetchData() {
     stats.value = statsRes.data.data;
     recentBN.value = bnRes.data.data;
   } catch (e) {
-    console.error('Home fetch error:', e);
+    console.warn('Home fetch error:', e);
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải dữ liệu tổng quan', life: 4000 });
   } finally {
     loading.value = false;
   }

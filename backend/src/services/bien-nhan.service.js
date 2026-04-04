@@ -1,5 +1,15 @@
 import prisma from '../config/database.js';
-import { generateBienNhanCode, generateCode } from '../utils/ma-so-generator.js';
+import { createWithCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
+
+// S-02: Whitelist of fields allowed for update
+const ALLOWED_UPDATE_FIELDS = [
+  'don_vi_gui', 'nguoi_gui', 'dien_thoai_gui', 'dia_chi_gui',
+  'don_vi_nhan', 'nguoi_nhan', 'dien_thoai_nhan', 'dia_chi_nhan',
+  'so_cccd', 'ten_hang_hoa', 'gia_tri_hang', 'trong_luong',
+  'thu_ho', 'gia_cuoc', 'trang_thai_thu', 'can_xuat_hddt',
+  'hinh_thuc_giao',
+];
 
 /**
  * Danh sách biên nhận (filter, search, pagination)
@@ -27,7 +37,6 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
   }
 
   if (search) {
-    // Nếu đã có OR từ staff filter, compose thêm
     const searchOr = [
       { ma_so: { contains: search, mode: 'insensitive' } },
       { don_vi_gui: { contains: search, mode: 'insensitive' } },
@@ -38,7 +47,6 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
     ];
 
     if (where.OR) {
-      // Staff + search: cần AND
       const staffFilter = where.OR;
       delete where.OR;
       where.AND = [
@@ -87,35 +95,42 @@ export async function getBienNhan(id) {
 }
 
 /**
- * Lấy mã biên nhận tiếp theo (preview)
+ * Lấy mã biên nhận tiếp theo (preview) — chỉ để hiển thị, không đảm bảo unique
  */
 export async function getNextMaSo(vpGuiId, vpNhanId) {
   const vpGui = await prisma.vanPhong.findUnique({ where: { id: vpGuiId }, select: { ma_vp: true } });
   const vpNhan = await prisma.vanPhong.findUnique({ where: { id: vpNhanId }, select: { ma_vp: true } });
   if (!vpGui || !vpNhan) throw Object.assign(new Error('VP không tồn tại'), { statusCode: 400 });
-  return generateBienNhanCode(vpGui.ma_vp, vpNhan.ma_vp);
+
+  const prefix = `${vpGui.ma_vp}${vpNhan.ma_vp}`;
+  const last = await prisma.bienNhan.findFirst({
+    where: { ma_so: { startsWith: `${prefix}-` } },
+    orderBy: { ma_so: 'desc' },
+    select: { ma_so: true },
+  });
+
+  let nextNum = 1;
+  if (last) {
+    const num = parseInt(last.ma_so.split('-').pop(), 10);
+    if (!isNaN(num)) nextNum = num + 1;
+  }
+
+  return `${prefix}-${String(nextNum).padStart(4, '0')}`;
 }
 
 /**
  * Tự tạo KH nếu chưa tồn tại.
- * Quy tắc:
- *   - Không có tên → bỏ qua (thông tin không đủ)
- *   - Không có SĐT → bỏ qua (khách vãng lai)
- *   - SĐT đã tồn tại trong KH → bỏ qua (cùng người)
- *   - Tạo mới với loai_kh = 'ca_nhan' (default)
  */
-async function autoCreateKhachHang(tx, tenDonVi, nguoiLienHe, dienThoai, diaChi) {
+async function autoCreateKhachHang(tx, tenDonVi, nguoiLienHe, dienThoai, diaChi, generateKHCode) {
   if (!tenDonVi?.trim() || !dienThoai?.trim()) return null;
 
   const normalizedDT = dienThoai.trim();
-
-  // Lookup bằng SĐT — yếu tố duy nhất đáng tin
   const existing = await tx.khachHang.findFirst({
     where: { dien_thoai: normalizedDT },
   });
   if (existing) return null;
 
-  const ma_kh = await generateCode('khachHang', 'ma_kh', 'KH');
+  const ma_kh = await generateKHCode();
   await tx.khachHang.create({
     data: {
       ma_kh,
@@ -131,82 +146,111 @@ async function autoCreateKhachHang(tx, tenDonVi, nguoiLienHe, dienThoai, diaChi)
 }
 
 /**
- * Tạo biên nhận mới
+ * Tạo biên nhận mới — B-02: dùng createWithCode pattern để tránh race condition
  */
 export async function createBienNhan(data, userId) {
   const vpGui = await prisma.vanPhong.findUnique({ where: { id: data.van_phong_gui_id }, select: { ma_vp: true } });
   const vpNhan = await prisma.vanPhong.findUnique({ where: { id: data.van_phong_nhan_id }, select: { ma_vp: true } });
   if (!vpGui || !vpNhan) throw Object.assign(new Error('VP không tồn tại'), { statusCode: 400 });
 
-  const ma_so = await generateBienNhanCode(vpGui.ma_vp, vpNhan.ma_vp);
+  const prefix = `${vpGui.ma_vp}${vpNhan.ma_vp}`;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const bn = await tx.bienNhan.create({
-      data: {
-        ma_so,
-        van_phong_gui_id: data.van_phong_gui_id,
-        van_phong_nhan_id: data.van_phong_nhan_id,
-        don_vi_gui: data.don_vi_gui || null,
-        nguoi_gui: data.nguoi_gui || null,
-        dien_thoai_gui: data.dien_thoai_gui || null,
-        dia_chi_gui: data.dia_chi_gui || null,
-        don_vi_nhan: data.don_vi_nhan || null,
-        nguoi_nhan: data.nguoi_nhan || null,
-        dien_thoai_nhan: data.dien_thoai_nhan || null,
-        dia_chi_nhan: data.dia_chi_nhan || null,
-        so_cccd: data.so_cccd || null,
-        ten_hang_hoa: data.ten_hang_hoa,
-        nhan_vien_nhap_id: userId,
-        gia_tri_hang: data.gia_tri_hang || null,
-        trong_luong: data.trong_luong || null,
-        thu_ho: data.thu_ho || 0,
-        gia_cuoc: data.gia_cuoc || 0,
-        trang_thai_thu: data.trang_thai_thu || 'da_thu',
-        can_xuat_hddt: data.can_xuat_hddt || false,
-        hinh_thuc_giao: data.hinh_thuc_giao || 'goi_dien',
-      },
-    });
+  // B-02: Use createWithCode to handle race condition with retry on unique violation
+  const result = await createWithCode(
+    async (ma_so) => {
+      return prisma.$transaction(async (tx) => {
+        const bn = await tx.bienNhan.create({
+          data: {
+            ma_so,
+            van_phong_gui_id: data.van_phong_gui_id,
+            van_phong_nhan_id: data.van_phong_nhan_id,
+            don_vi_gui: data.don_vi_gui || null,
+            nguoi_gui: data.nguoi_gui || null,
+            dien_thoai_gui: data.dien_thoai_gui || null,
+            dia_chi_gui: data.dia_chi_gui || null,
+            don_vi_nhan: data.don_vi_nhan || null,
+            nguoi_nhan: data.nguoi_nhan || null,
+            dien_thoai_nhan: data.dien_thoai_nhan || null,
+            dia_chi_nhan: data.dia_chi_nhan || null,
+            so_cccd: data.so_cccd || null,
+            ten_hang_hoa: data.ten_hang_hoa,
+            nhan_vien_nhap_id: userId,
+            gia_tri_hang: data.gia_tri_hang || null,
+            trong_luong: data.trong_luong || null,
+            thu_ho: data.thu_ho || 0,
+            gia_cuoc: data.gia_cuoc || 0,
+            trang_thai_thu: data.trang_thai_thu || 'da_thu',
+            can_xuat_hddt: data.can_xuat_hddt || false,
+            hinh_thuc_giao: data.hinh_thuc_giao || 'goi_dien',
+          },
+        });
 
-    // Lịch sử trạng thái đầu tiên
-    await tx.lichSuTrangThai.create({
-      data: {
-        bien_nhan_id: bn.id,
-        trang_thai_moi: 'cho_vc',
-        nhan_vien_id: userId,
-        phuong_thuc: 'manual',
-        ghi_chu: 'Tạo biên nhận mới',
-      },
-    });
+        // Lịch sử trạng thái đầu tiên
+        await tx.lichSuTrangThai.create({
+          data: {
+            bien_nhan_id: bn.id,
+            trang_thai_moi: 'cho_vc',
+            nhan_vien_id: userId,
+            phuong_thuc: 'manual',
+            ghi_chu: 'Tạo biên nhận mới',
+          },
+        });
 
-    // Tự tạo công nợ nếu cần
-    if (data.trang_thai_thu === 'cong_no') {
-      await tx.congNo.create({
-        data: {
-          bien_nhan_id: bn.id,
-          doi_tuong: data.don_vi_gui || data.nguoi_gui || 'N/A',
-          so_tien_no: data.gia_cuoc || 0,
-          trang_thai: 'chua_thu',
-        },
+        // Tự tạo công nợ nếu cần
+        if (data.trang_thai_thu === 'cong_no') {
+          await tx.congNo.create({
+            data: {
+              bien_nhan_id: bn.id,
+              doi_tuong: data.don_vi_gui || data.nguoi_gui || 'N/A',
+              so_tien_no: data.gia_cuoc || 0,
+              trang_thai: 'chua_thu',
+            },
+          });
+        }
+
+        // Auto-create KH
+        const autoCreated = [];
+        try {
+          // Simple code generator for KH within transaction
+          const generateKHCode = async () => {
+            const last = await tx.khachHang.findFirst({
+              where: { ma_kh: { startsWith: 'KH-' } },
+              orderBy: { ma_kh: 'desc' },
+              select: { ma_kh: true },
+            });
+            let nextNum = 1;
+            if (last) {
+              const num = parseInt(last.ma_kh.split('-').pop(), 10);
+              if (!isNaN(num)) nextNum = num + 1;
+            }
+            return `KH-${String(nextNum).padStart(4, '0')}`;
+          };
+
+          const khGui = await autoCreateKhachHang(
+            tx, data.don_vi_gui, data.nguoi_gui, data.dien_thoai_gui, data.dia_chi_gui, generateKHCode,
+          );
+          if (khGui) autoCreated.push(khGui);
+
+          const khNhan = await autoCreateKhachHang(
+            tx, data.don_vi_nhan, data.nguoi_nhan, data.dien_thoai_nhan, data.dia_chi_nhan, generateKHCode,
+          );
+          if (khNhan) autoCreated.push(khNhan);
+        } catch (err) {
+          console.warn('[Auto-create KH]', err.message);
+        }
+
+        return { bn, autoCreated };
       });
-    }
+    },
+    'bienNhan', 'ma_so', prefix,
+  );
 
-    // Auto-create KH nếu chưa tồn tại (chỉ khi có SĐT — không tạo cho vãng lai)
-    const autoCreated = [];
-    try {
-      const khGui = await autoCreateKhachHang(
-        tx, data.don_vi_gui, data.nguoi_gui, data.dien_thoai_gui, data.dia_chi_gui
-      );
-      if (khGui) autoCreated.push(khGui);
-
-      const khNhan = await autoCreateKhachHang(
-        tx, data.don_vi_nhan, data.nguoi_nhan, data.dien_thoai_nhan, data.dia_chi_nhan
-      );
-      if (khNhan) autoCreated.push(khNhan);
-    } catch (err) {
-      console.warn('[Auto-create KH]', err.message);
-    }
-
-    return { bn, autoCreated };
+  // Audit log: CREATE
+  writeAuditLog({
+    action: 'CREATE',
+    entity: 'bien_nhan',
+    entityId: result.bn.id,
+    newData: result.bn,
   });
 
   return result;
@@ -214,6 +258,8 @@ export async function createBienNhan(data, userId) {
 
 /**
  * Cập nhật biên nhận
+ * S-02: Whitelist fields (no blacklist spread)
+ * S-07: Staff chỉ sửa trong 24h
  * Staff: chỉ sửa BN do mình tạo
  */
 export async function updateBienNhan(id, data, userId, userRole) {
@@ -225,8 +271,33 @@ export async function updateBienNhan(id, data, userId, userRole) {
     throw Object.assign(new Error('Bạn chỉ được sửa biên nhận do mình tạo'), { statusCode: 403 });
   }
 
-  // Không cho sửa ma_so
-  const { ma_so, nhan_vien_nhap_id, ...updateData } = data;
+  // S-07: Staff chỉ sửa trong 24h
+  if (userRole === 'staff') {
+    const hoursSinceCreated = (Date.now() - new Date(existing.created_at).getTime()) / 3600000;
+    if (hoursSinceCreated > 24) {
+      throw Object.assign(
+        new Error('Biên nhận đã quá 24 giờ. Liên hệ Admin để sửa.'),
+        { statusCode: 403 },
+      );
+    }
+  }
 
-  return prisma.bienNhan.update({ where: { id }, data: updateData });
+  // S-02: Whitelist — only pick allowed fields from request body
+  const updateData = {};
+  for (const key of ALLOWED_UPDATE_FIELDS) {
+    if (data[key] !== undefined) updateData[key] = data[key];
+  }
+
+  const updated = await prisma.bienNhan.update({ where: { id }, data: updateData });
+
+  // Audit log: UPDATE
+  writeAuditLog({
+    action: 'UPDATE',
+    entity: 'bien_nhan',
+    entityId: id,
+    oldData: existing,
+    newData: updateData,
+  });
+
+  return updated;
 }

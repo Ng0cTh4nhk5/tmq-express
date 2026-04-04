@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -13,6 +14,7 @@ import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 
 const toast = useToast();
+const confirm = useConfirm();
 const list = ref([]);
 const loading = ref(false);
 const dialogVisible = ref(false);
@@ -77,19 +79,27 @@ async function toggleActive(row) {
 }
 
 async function resetPw(row) {
-  if (!confirm(`Reset mật khẩu cho ${row.ten}?`)) return;
-  try {
-    const res = await api.post(`/nhan-vien/${row.id}/reset-password`);
-    const tempPw = res.data.data.tempPassword;
-    toast.add({
-      severity: 'success',
-      summary: 'Đã reset mật khẩu',
-      detail: `Mật khẩu tạm: ${tempPw} — Hãy ghi lại và gửi cho nhân viên`,
-      life: 15000,
-    });
-  } catch (e) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || e.message, life: 3000 });
-  }
+  confirm.require({
+    message: `Reset mật khẩu cho ${row.ten}?`,
+    header: 'Xác nhận reset mật khẩu',
+    icon: 'pi pi-key',
+    acceptLabel: 'Reset',
+    rejectLabel: 'Không',
+    accept: async () => {
+      try {
+        const res = await api.post(`/nhan-vien/${row.id}/reset-password`);
+        const tempPw = res.data.data.tempPassword;
+        toast.add({
+          severity: 'success',
+          summary: 'Đã reset mật khẩu',
+          detail: `Mật khẩu tạm: ${tempPw} — Hãy ghi lại và gửi cho nhân viên`,
+          life: 15000,
+        });
+      } catch (e) {
+        toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || e.message, life: 3000 });
+      }
+    },
+  });
 }
 
 function roleSeverity(role) {

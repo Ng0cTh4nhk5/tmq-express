@@ -94,6 +94,9 @@ model NhanVien {
   password_hash String   @db.VarChar(255)
   active        Boolean  @default(true)
   require_password_change Boolean @default(false)
+  failed_login_count  Int       @default(0)
+  locked_until        DateTime?
+  token_version       Int       @default(0)
   created_at    DateTime @default(now())
 
   van_phong          VanPhong           @relation(fields: [van_phong_id], references: [id])
@@ -287,4 +290,38 @@ model CongNo {
   @@index([trang_thai])
   @@index([ngay_phat_sinh])
   @@map("cong_no")
+}
+
+/// Login Activity Log (S-02)
+model LoginLog {
+  id            Int      @id @default(autoincrement())
+  nhan_vien_id  Int?
+  username      String   @db.VarChar(100)
+  action        String   @db.VarChar(20)     // login_success | login_failed | logout
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?  @db.VarChar(500)
+  timestamp     DateTime @default(now())
+
+  @@index([nhan_vien_id])
+  @@index([timestamp])
+  @@map("login_log")
+}
+
+/// Audit Log — ghi lại MỌI thao tác thay đổi dữ liệu (S-01)
+model AuditLog {
+  id            Int      @id @default(autoincrement())
+  timestamp     DateTime @default(now())
+  nhan_vien_id  Int
+  action        String   @db.VarChar(20)    // CREATE | UPDATE | DELETE | EXPORT
+  entity        String   @db.VarChar(50)    // bien_nhan | phieu_thu | ...
+  entity_id     Int?
+  old_data      Json?
+  new_data      Json?
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?  @db.VarChar(500)
+
+  @@index([nhan_vien_id])
+  @@index([entity, entity_id])
+  @@index([timestamp])
+  @@map("audit_log")
 }

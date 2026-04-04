@@ -26,7 +26,17 @@ async function handleLogin() {
     await auth.login(username.value, password.value);
     router.push('/');
   } catch (err) {
-    error.value = err.response?.data?.error?.message || 'Đăng nhập thất bại';
+    if (err.response?.status === 423) {
+      const lockedUntil = err.response?.data?.error?.locked_until;
+      if (lockedUntil) {
+        const remaining = Math.ceil((new Date(lockedUntil) - Date.now()) / 60000);
+        error.value = `Tài khoản bị khóa tạm thời. Vui lòng thử lại sau ${remaining} phút.`;
+      } else {
+        error.value = err.response?.data?.error?.message || 'Tài khoản đã bị khóa tạm thời.';
+      }
+    } else {
+      error.value = err.response?.data?.error?.message || 'Đăng nhập thất bại';
+    }
   } finally {
     loading.value = false;
   }

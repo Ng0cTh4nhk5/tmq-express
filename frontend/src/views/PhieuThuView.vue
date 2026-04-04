@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 import { useAuthStore } from '../stores/auth.store';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -16,6 +17,7 @@ import { handleApiError } from '../utils/error-handler';
 
 const auth = useAuthStore();
 const toast = useToast();
+const confirm = useConfirm();
 const list = ref([]);
 const totalRecords = ref(0);
 const page = ref(1);
@@ -73,12 +75,20 @@ async function save() {
 }
 
 async function huy(row) {
-  if (!confirm(`Hủy phiếu ${row.ma_phieu}?`)) return;
-  try {
-    await api.patch(`/phieu-thu/${row.id}/huy`);
-    toast.add({ severity: 'warn', summary: 'Đã hủy', life: 2000 });
-    fetchData();
-  } catch (err) { handleApiError(err, toast, 'Không thể hủy phiếu thu'); }
+  confirm.require({
+    message: `Hủy phiếu ${row.ma_phieu}?`,
+    header: 'Xác nhận hủy',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Hủy phiếu',
+    rejectLabel: 'Không',
+    accept: async () => {
+      try {
+        await api.patch(`/phieu-thu/${row.id}/huy`);
+        toast.add({ severity: 'warn', summary: 'Đã hủy', life: 2000 });
+        fetchData();
+      } catch (err) { handleApiError(err, toast, 'Không thể hủy phiếu thu'); }
+    },
+  });
 }
 
 function openPDF(id) {

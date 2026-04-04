@@ -70,6 +70,8 @@ async function loadData() {
     const { data: res } = await api.get('/bien-nhan', { params });
     items.value = res.data;
     totalRecords.value = res.pagination.total;
+  } catch (err) {
+    handleApiError(err, toast, 'Không thể tải danh sách biên nhận');
   } finally {
     loading.value = false;
   }

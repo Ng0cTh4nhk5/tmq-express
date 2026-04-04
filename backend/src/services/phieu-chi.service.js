@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { createWithCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
 
 export async function listPhieuChi({ page = 1, limit = 20, from, to, van_phong_id, search }) {
   const where = { da_huy: false };
@@ -32,7 +33,7 @@ export async function listPhieuChi({ page = 1, limit = 20, from, to, van_phong_i
 
 export async function createPhieuChi(data, user) {
   // Sử dụng createWithCode để tránh race condition
-  return createWithCode(
+  const result = await createWithCode(
     (ma_phieu) => prisma.phieuChi.create({
       data: {
         ma_phieu,
@@ -46,6 +47,9 @@ export async function createPhieuChi(data, user) {
     }),
     'phieuChi', 'ma_phieu', 'PC',
   );
+
+  writeAuditLog({ action: 'CREATE', entity: 'phieu_chi', entityId: result.id, newData: result });
+  return result;
 }
 
 export async function updatePhieuChi(id, data, user) {
@@ -67,5 +71,11 @@ export async function updatePhieuChi(id, data, user) {
 }
 
 export async function huyPhieuChi(id) {
-  return prisma.phieuChi.update({ where: { id }, data: { da_huy: true } });
+  const pc = await prisma.phieuChi.findUnique({ where: { id } });
+  if (!pc) throw Object.assign(new Error('Không tìm thấy phiếu chi'), { statusCode: 404 });
+  if (pc.da_huy) throw Object.assign(new Error('Phiếu đã hủy trước đó'), { statusCode: 400 });
+
+  const result = await prisma.phieuChi.update({ where: { id }, data: { da_huy: true } });
+  writeAuditLog({ action: 'DELETE', entity: 'phieu_chi', entityId: id, oldData: pc });
+  return result;
 }
