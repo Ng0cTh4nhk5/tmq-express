@@ -1,0 +1,301 @@
+{
+  "info": {
+    "name": "05. Khach Hang",
+    "description": "Quan ly khach hang",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List KH",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has pagination\", () => pm.expect(pm.response.json().pagination).to.be.an(\"object\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search KH",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang?search=Tam",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "Tam"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Autocomplete KH",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang/autocomplete?q=Cty",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang",
+            "autocomplete"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Cty"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Data is array\", () => pm.expect(pm.response.json().data).to.be.an(\"array\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create KH",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten_don_vi\": \"KH Test Postman\",\n  \"nguoi_lien_he\": \"Postman User\",\n  \"dien_thoai\": \"0888888888\",\n  \"dia_chi\": \"789 Test Ave\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"Save ID\", () => pm.environment.set(\"khach_hang_id\", pm.response.json().data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get KH Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang/{{khach_hang_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang",
+            "{{khach_hang_id}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update KH",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang/{{khach_hang_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang",
+            "{{khach_hang_id}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten_don_vi\": \"KH Test Updated\",\n  \"email\": \"test@postman.com\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Toggle KH Active (Staff -> 403)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staff_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/khach-hang/{{khach_hang_id}}/active",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "khach-hang",
+            "{{khach_hang_id}}",
+            "active"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"active\": false\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

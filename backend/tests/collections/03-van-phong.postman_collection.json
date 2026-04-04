@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "03. Van Phong",
+    "description": "Quan ly van phong / chi nhanh",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List VP",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has data array\", () => pm.expect(pm.response.json().data).to.be.an(\"array\"));",
+              "pm.test(\"At least 3 VPs\", () => pm.expect(pm.response.json().data.length).to.be.at.least(3));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List VP Active Only",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong?active=true",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong"
+          ],
+          "query": [
+            {
+              "key": "active",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"All active\", () => pm.response.json().data.forEach(vp => pm.expect(vp.active).to.be.true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create VP (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ma_vp\": \"TEST\",\n  \"ten\": \"VP Test Postman\",\n  \"dia_chi\": \"123 Test St\",\n  \"dien_thoai\": \"0999999999\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+              "pm.test(\"Save ID\", () => pm.environment.set(\"van_phong_id\", pm.response.json().data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update VP",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong/{{van_phong_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong",
+            "{{van_phong_id}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten\": \"VP Test Updated\",\n  \"dia_chi\": \"456 Updated St\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Toggle VP Active",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong/{{van_phong_id}}/active",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong",
+            "{{van_phong_id}}",
+            "active"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"active\": false\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Create VP (Staff -> 403)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staff_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ma_vp\": \"FAIL\",\n  \"ten\": \"Should Fail\",\n  \"dia_chi\": \"N/A\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Update VP (Staff -> 403)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staff_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/van-phong/{{van_phong_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "van-phong",
+            "{{van_phong_id}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten\": \"Should Fail\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

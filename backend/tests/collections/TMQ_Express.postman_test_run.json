@@ -1,0 +1,2681 @@
+{
+	"id": "86b68a95-ac73-4fdb-9aa4-f2575275f5d5",
+	"name": "TMQ_Express",
+	"timestamp": "2026-04-01T20:05:31.905Z",
+	"collection_id": "52186911-b8cfde94-0e6b-4d9c-b6dd-227fc9d6fc5b",
+	"folder_id": 0,
+	"environment_id": "52186911-730f7035-af92-44c6-b8ec-de0af13817a0",
+	"totalPass": 113,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2026-04-01T20:05:23.348Z",
+	"totalFail": 1,
+	"results": [
+		{
+			"id": "7a03b0f9-efb1-4400-9f55-4d40b200879b",
+			"name": "Health Check",
+			"url": "http://localhost:3000/api/health",
+			"time": 12,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"success is true": true,
+				"status ok": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"success is true": {
+					"pass": 1,
+					"fail": 0
+				},
+				"status ok": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				12
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"success is true": true,
+					"status ok": true
+				}
+			]
+		},
+		{
+			"id": "c61c6ba5-b2f5-4998-9ece-7b394d10f2a3",
+			"name": "Login Admin",
+			"url": "http://localhost:3000/api/auth/login",
+			"time": 144,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has token": true,
+				"Role is admin": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has token": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Role is admin": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				144
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has token": true,
+					"Role is admin": true
+				}
+			]
+		},
+		{
+			"id": "a55bcab0-2e77-43c0-a53e-e997c2c79922",
+			"name": "Login Staff",
+			"url": "http://localhost:3000/api/auth/login",
+			"time": 98,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Save token": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Save token": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				98
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Save token": true
+				}
+			]
+		},
+		{
+			"id": "111fb56a-d9a0-44a4-bec5-a329b4bfa1d3",
+			"name": "Login Accountant",
+			"url": "http://localhost:3000/api/auth/login",
+			"time": 91,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Save token": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Save token": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				91
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Save token": true
+				}
+			]
+		},
+		{
+			"id": "1eeac364-3a9d-46aa-ada9-e3598cb80a1f",
+			"name": "[FAIL] Login Wrong Password",
+			"url": "http://localhost:3000/api/auth/login",
+			"time": 96,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true,
+				"Error code": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Error code": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				96
+			],
+			"allTests": [
+				{
+					"Status 401": true,
+					"Error code": true
+				}
+			]
+		},
+		{
+			"id": "0a156f80-50bd-4702-aeae-887ee1a8455b",
+			"name": "Get Profile",
+			"url": "http://localhost:3000/api/auth/me",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has role": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has role": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has role": true
+				}
+			]
+		},
+		{
+			"id": "a27396e8-258d-48b9-8614-66e616c69341",
+			"name": "[FAIL] Change Password - Wrong Current",
+			"url": "http://localhost:3000/api/auth/change-password",
+			"time": 93,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Should fail": true
+			},
+			"testPassFailCounts": {
+				"Should fail": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				93
+			],
+			"allTests": [
+				{
+					"Should fail": true
+				}
+			]
+		},
+		{
+			"id": "eeb09db0-5872-4272-bb66-e0d7f98118f2",
+			"name": "[FAIL] Request with Invalid Token",
+			"url": "http://localhost:3000/api/auth/me",
+			"time": 2,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "9e3868f0-52db-401b-ab81-51759068c1d0",
+			"name": "List VP",
+			"url": "http://localhost:3000/api/van-phong",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has data array": true,
+				"At least 3 VPs": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has data array": {
+					"pass": 1,
+					"fail": 0
+				},
+				"At least 3 VPs": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has data array": true,
+					"At least 3 VPs": true
+				}
+			]
+		},
+		{
+			"id": "e3e52614-d92d-4fe6-9edf-9f7de06a1a92",
+			"name": "List VP Active Only",
+			"url": "http://localhost:3000/api/van-phong?active=true",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"All active": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"All active": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"All active": true
+				}
+			]
+		},
+		{
+			"id": "1da72303-159b-4dcf-9cf3-15140145c6b0",
+			"name": "Create VP (Admin)",
+			"url": "http://localhost:3000/api/van-phong",
+			"time": 14,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true,
+				"Save ID": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Save ID": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				14
+			],
+			"allTests": [
+				{
+					"Status 201": true,
+					"Save ID": true
+				}
+			]
+		},
+		{
+			"id": "f2a9aa47-14bc-4b1c-b77c-7cae69371670",
+			"name": "Update VP",
+			"url": "http://localhost:3000/api/van-phong/4",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "8b5b3590-5c9e-4e53-8172-71275d0f31c1",
+			"name": "Toggle VP Active",
+			"url": "http://localhost:3000/api/van-phong/4/active",
+			"time": 42,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				42
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "d13b20c2-5ee7-4585-b428-edb108d1d5db",
+			"name": "[FAIL] Create VP (Staff -> 403)",
+			"url": "http://localhost:3000/api/van-phong",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "a6862c28-48fd-4014-8a20-6f15e798ba1d",
+			"name": "[FAIL] Update VP (Staff -> 403)",
+			"url": "http://localhost:3000/api/van-phong/4",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "860b4c05-e158-4ea0-b230-c45ddc067bd3",
+			"name": "List NV (Admin)",
+			"url": "http://localhost:3000/api/nhan-vien",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "404b4687-3bd5-4820-8a0a-7b6138529649",
+			"name": "[FAIL] List NV (Staff -> 403)",
+			"url": "http://localhost:3000/api/nhan-vien",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "ad2370c2-b374-4ac5-86b2-1c562fdf27b5",
+			"name": "Create NV",
+			"url": "http://localhost:3000/api/nhan-vien",
+			"time": 95,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Save ID": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Save ID": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				95
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Save ID": true
+				}
+			]
+		},
+		{
+			"id": "87feb30a-267a-4a79-9719-f887924c60b0",
+			"name": "[FAIL] Create NV Duplicate Username",
+			"url": "http://localhost:3000/api/nhan-vien",
+			"time": 4,
+			"responseCode": {
+				"code": 409,
+				"name": "Conflict"
+			},
+			"tests": {
+				"Should fail (unique)": true
+			},
+			"testPassFailCounts": {
+				"Should fail (unique)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Should fail (unique)": true
+				}
+			]
+		},
+		{
+			"id": "15915d00-b076-41cf-be19-199e75c4f62c",
+			"name": "Update NV",
+			"url": "http://localhost:3000/api/nhan-vien/7",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "2b64b9cf-9a4d-4bca-94ec-6b54b95123e7",
+			"name": "Toggle NV Active",
+			"url": "http://localhost:3000/api/nhan-vien/7/active",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "56d67521-1160-46f4-9344-ac0d82004d69",
+			"name": "Reset Password",
+			"url": "http://localhost:3000/api/nhan-vien/7/reset-password",
+			"time": 98,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has tempPassword": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has tempPassword": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				98
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has tempPassword": true
+				}
+			]
+		},
+		{
+			"id": "f76119d6-5459-473c-9670-2df3b135b91e",
+			"name": "List KH",
+			"url": "http://localhost:3000/api/khach-hang",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has pagination": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has pagination": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has pagination": true
+				}
+			]
+		},
+		{
+			"id": "5d3a4850-ba0f-46ec-a1bb-74c7718a6855",
+			"name": "Search KH",
+			"url": "http://localhost:3000/api/khach-hang?search=Tam",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "b80aed7a-6785-481e-934c-6c1c6fe87b41",
+			"name": "Autocomplete KH",
+			"url": "http://localhost:3000/api/khach-hang/autocomplete?q=Cty",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Data is array": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Data is array": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Data is array": true
+				}
+			]
+		},
+		{
+			"id": "4a607be9-a52a-4a9b-a7e9-c940f27d399f",
+			"name": "Create KH",
+			"url": "http://localhost:3000/api/khach-hang",
+			"time": 14,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true,
+				"Save ID": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Save ID": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				14
+			],
+			"allTests": [
+				{
+					"Status 201": true,
+					"Save ID": true
+				}
+			]
+		},
+		{
+			"id": "b155e158-c239-46da-93f3-fe230a8cd65d",
+			"name": "Get KH Detail",
+			"url": "http://localhost:3000/api/khach-hang/11",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "78145f75-c06f-4d75-aa3a-684ed36d126d",
+			"name": "Update KH",
+			"url": "http://localhost:3000/api/khach-hang/11",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "52658cd0-b6f5-429b-a9ed-8eea3cd01ba2",
+			"name": "[FAIL] Toggle KH Active (Staff -> 403)",
+			"url": "http://localhost:3000/api/khach-hang/11/active",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "2d49f365-6ba5-423d-b4ee-69bc9598bf93",
+			"name": "List BN",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 12,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has pagination": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has pagination": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				12
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has pagination": true
+				}
+			]
+		},
+		{
+			"id": "1f2a2ede-81ab-41ee-b532-b0216974cc0c",
+			"name": "Filter BN by Status",
+			"url": "http://localhost:3000/api/bien-nhan?trang_thai=cho_vc",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"All cho_vc": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"All cho_vc": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"All cho_vc": true
+				}
+			]
+		},
+		{
+			"id": "df781da2-fbe6-4b64-af48-6cf2ad97f842",
+			"name": "Search BN",
+			"url": "http://localhost:3000/api/bien-nhan?search=SG",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "eac969eb-433e-4c33-b7bf-04ca9657be95",
+			"name": "Preview Ma BN",
+			"url": "http://localhost:3000/api/bien-nhan/next-ma-so?vp_gui_id=1&vp_nhan_id=2",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "f94b2b80-934a-43d7-8b4b-6429eb2dba0e",
+			"name": "Create BN (Da Thu)",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 12,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				12
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "b6fe96d8-dce6-4e82-84a0-5183076538ce",
+			"name": "Create BN (Cong No)",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 14,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				14
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "5a24d2d6-d411-41ab-8010-b94fdf22d8e1",
+			"name": "[FAIL] Create BN Missing Field",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 3,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 400": true
+				}
+			]
+		},
+		{
+			"id": "b5c89589-65bb-442c-87e7-24e4adca414d",
+			"name": "[FAIL] Create BN (Accountant -> 403)",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "fb807cd8-efaa-41cb-a6d4-f4d7ea708f2d",
+			"name": "Get BN Detail",
+			"url": "http://localhost:3000/api/bien-nhan/31",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has relations": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has relations": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has relations": true
+				}
+			]
+		},
+		{
+			"id": "d6409f52-ec30-48eb-9f9c-eb9b7d2dd71b",
+			"name": "Update BN",
+			"url": "http://localhost:3000/api/bien-nhan/31",
+			"time": 16,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				16
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "2a81ceed-000a-4000-9f4e-94fadb03d155",
+			"name": "Update Status cho_vc -> dang_vc",
+			"url": "http://localhost:3000/api/bien-nhan/31/trang-thai",
+			"time": 9,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				9
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "c2151459-3ac3-43ca-99c4-f27187dace5c",
+			"name": "[FAIL] Skip Status dang_vc -> da_bao_khach",
+			"url": "http://localhost:3000/api/bien-nhan/31/trang-thai",
+			"time": 3,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400 (skip not allowed)": true
+			},
+			"testPassFailCounts": {
+				"Status 400 (skip not allowed)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 400 (skip not allowed)": true
+				}
+			]
+		},
+		{
+			"id": "bf0dc9d5-768d-412c-b568-8e6390bc3de1",
+			"name": "PDF Preview",
+			"url": "http://localhost:3000/api/bien-nhan/31/pdf-preview",
+			"time": 175,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has base64": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has base64": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				175
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has base64": true
+				}
+			]
+		},
+		{
+			"id": "5bc8079d-12ae-49c4-af8c-d079c69aba88",
+			"name": "PDF Download (binary)",
+			"url": "http://localhost:3000/api/bien-nhan/31/pdf",
+			"time": 79,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Content-Type is PDF": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Content-Type is PDF": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				79
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Content-Type is PDF": true
+				}
+			]
+		},
+		{
+			"id": "0d2e9c41-1e83-4e2a-994a-e8c8388769cb",
+			"name": "[FAIL] Create BN Same VP gui = VP nhan",
+			"url": "http://localhost:3000/api/bien-nhan",
+			"time": 10,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 400": false
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 0,
+					"fail": 1
+				}
+			},
+			"times": [
+				10
+			],
+			"allTests": [
+				{
+					"Status 400": false
+				}
+			]
+		},
+		{
+			"id": "e4f1ab73-a99b-4dc5-8adf-242c2ccdb06d",
+			"name": "[FAIL] Accountant cap nhat trang thai -> 403",
+			"url": "http://localhost:3000/api/bien-nhan/31/trang-thai",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "101f2115-6f30-45b9-bdfb-09e7a7720ac4",
+			"name": "Batch cap nhat trang thai",
+			"url": "http://localhost:3000/api/bien-nhan/batch-trang-thai",
+			"time": 10,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has success message": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has success message": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				10
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has success message": true
+				}
+			]
+		},
+		{
+			"id": "69b2e9a4-f759-4d59-a18b-e8df513eed94",
+			"name": "[FAIL] Batch trang thai - ids rong",
+			"url": "http://localhost:3000/api/bien-nhan/batch-trang-thai",
+			"time": 2,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 400": true
+				}
+			]
+		},
+		{
+			"id": "b5d2c633-19fd-440e-8432-a9eb2f75204a",
+			"name": "List PT (Admin)",
+			"url": "http://localhost:3000/api/phieu-thu",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "58b3d3b9-b1e8-44d8-855e-71cf093b1e0b",
+			"name": "[FAIL] List PT (Staff -> 403)",
+			"url": "http://localhost:3000/api/phieu-thu",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "685fb1b2-d4f3-407f-a1f9-d5002af73ffb",
+			"name": "Create PT",
+			"url": "http://localhost:3000/api/phieu-thu",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "087ea345-19c6-4596-964b-146cc2d99c10",
+			"name": "Get PT Detail",
+			"url": "http://localhost:3000/api/phieu-thu/11",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "014031f8-2b69-47fb-9ebe-472a5edf94ca",
+			"name": "Update PT",
+			"url": "http://localhost:3000/api/phieu-thu/11",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "6f0422e2-a0bf-4fcc-ae3b-089bf9432e1f",
+			"name": "PT PDF Preview",
+			"url": "http://localhost:3000/api/phieu-thu/11/pdf-preview",
+			"time": 57,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has base64": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has base64": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				57
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has base64": true
+				}
+			]
+		},
+		{
+			"id": "04864030-5e08-420f-9538-c099266f04b2",
+			"name": "Cancel PT (Admin)",
+			"url": "http://localhost:3000/api/phieu-thu/11/huy",
+			"time": 10,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				10
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "3b228d71-dab1-4c83-a2e9-0e5439785b82",
+			"name": "List PC",
+			"url": "http://localhost:3000/api/phieu-chi",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "6a4a94e3-f075-4956-a9b9-c02693241f83",
+			"name": "Create PC",
+			"url": "http://localhost:3000/api/phieu-chi",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "468f79bc-118e-441b-b8ff-b5f969a81a5d",
+			"name": "Update PC",
+			"url": "http://localhost:3000/api/phieu-chi/7",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "9a6064b7-bce4-4269-8509-c6b567c1d10b",
+			"name": "Cancel PC (Admin)",
+			"url": "http://localhost:3000/api/phieu-chi/7/huy",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "19c5580e-85d0-486f-b3e5-bada4ace6bfe",
+			"name": "PC PDF Preview",
+			"url": "http://localhost:3000/api/phieu-chi/7/pdf-preview",
+			"time": 39,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has base64": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has base64": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				39
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has base64": true
+				}
+			]
+		},
+		{
+			"id": "41b5e509-8522-4505-935f-9f76a432f623",
+			"name": "List CN",
+			"url": "http://localhost:3000/api/cong-no",
+			"time": 45,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has summary": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has summary": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				45
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has summary": true
+				}
+			]
+		},
+		{
+			"id": "0b02a806-24f0-43a0-8782-dc68668fb85f",
+			"name": "Filter CN Chua Thu",
+			"url": "http://localhost:3000/api/cong-no?trang_thai=chua_thu",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "ef733036-866a-4b75-9b22-0616c11ac32c",
+			"name": "Xac Nhan Thanh Toan",
+			"url": "http://localhost:3000/api/cong-no/9/xac-nhan-thanh-toan",
+			"time": 13,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"PT created": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"PT created": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				13
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"PT created": true
+				}
+			]
+		},
+		{
+			"id": "6dabcaf0-8808-4244-ad5e-31d51e97c74c",
+			"name": "[FAIL] Xac Nhan Lai (Da Thu)",
+			"url": "http://localhost:3000/api/cong-no/9/xac-nhan-thanh-toan",
+			"time": 4,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {
+				"Status 400": true
+			},
+			"testPassFailCounts": {
+				"Status 400": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 400": true
+				}
+			]
+		},
+		{
+			"id": "359b49cd-c289-4bdd-99ea-5c8a13c1d4ea",
+			"name": "[FAIL] Staff xac nhan cong no -> 403",
+			"url": "http://localhost:3000/api/cong-no/9/xac-nhan-thanh-toan",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "a71777f9-2350-4210-adf2-bda7c8c89941",
+			"name": "BN Cho Bang Ke",
+			"url": "http://localhost:3000/api/bang-ke/bien-nhan-cho",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "4836bd7b-cab4-4e8d-91a5-2277622b45df",
+			"name": "Xuat Bang Ke",
+			"url": "http://localhost:3000/api/bang-ke",
+			"time": 57,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has file": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has file": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				57
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has file": true
+				}
+			]
+		},
+		{
+			"id": "fc40f1af-50ba-443a-80a9-81a4841e2f6c",
+			"name": "List Bang Ke",
+			"url": "http://localhost:3000/api/bang-ke",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "1625639e-6dfd-4d20-b794-ce247a14ee07",
+			"name": "Download Bang Ke",
+			"url": "http://localhost:3000/api/bang-ke/2/download",
+			"time": 17,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has file": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has file": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				17
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has file": true
+				}
+			]
+		},
+		{
+			"id": "10866c9b-e87e-4ea7-ad7a-29e9ae46dba0",
+			"name": "Stats",
+			"url": "http://localhost:3000/api/dashboard/stats",
+			"time": 43,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Has stats fields": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has stats fields": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				43
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Has stats fields": true
+				}
+			]
+		},
+		{
+			"id": "ba4f44c0-d27b-464b-a1ad-80d17f11cfdf",
+			"name": "Doanh Thu 7 Ngay",
+			"url": "http://localhost:3000/api/dashboard/doanh-thu-7-ngay",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"7 entries": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"7 entries": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"7 entries": true
+				}
+			]
+		},
+		{
+			"id": "eeb9072c-4455-4269-8d6f-a09d4f1b0b9d",
+			"name": "Ty Le Tuyen",
+			"url": "http://localhost:3000/api/dashboard/ty-le-tuyen",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Data is array": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Data is array": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Data is array": true
+				}
+			]
+		},
+		{
+			"id": "1c2a6271-824b-4f25-8aa6-56c759da9c65",
+			"name": "Thu Chi Theo Thang",
+			"url": "http://localhost:3000/api/dashboard/thu-chi-theo-thang",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"6 months": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"6 months": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"6 months": true
+				}
+			]
+		},
+		{
+			"id": "3040d7b4-1cf1-48d0-9dd8-d999830adc27",
+			"name": "BC Doanh Thu",
+			"url": "http://localhost:3000/api/bao-cao/doanh-thu?from=2026-03-25&to=2026-04-01",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "7a5909dd-c550-4ded-ad73-4ee25937feb1",
+			"name": "BC So Quy",
+			"url": "http://localhost:3000/api/bao-cao/so-quy?from=2026-03-25&to=2026-04-01",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "ca713380-21b8-4c0d-a5fe-15c28cc27598",
+			"name": "BC BN Theo Tuyen",
+			"url": "http://localhost:3000/api/bao-cao/bien-nhan?from=2026-03-25&to=2026-04-01",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "02e67268-4d55-4231-b2bc-400dfb74b403",
+			"name": "BC Cong No",
+			"url": "http://localhost:3000/api/bao-cao/cong-no",
+			"time": 9,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				9
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "cae81209-39b9-4bf8-bd14-2e1c97d14ef1",
+			"name": "[FAIL] Staff xem bao cao -> 403",
+			"url": "http://localhost:3000/api/bao-cao/doanh-thu?from=2026-03-25&to=2026-04-01",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "feecf2b3-9f4e-4c87-8b61-e1a4acd05a79",
+			"name": "Scan BN Valid",
+			"url": "http://localhost:3000/api/scan/SGCT-0006",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"No gia_cuoc exposed": true,
+				"Has lich_su": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"No gia_cuoc exposed": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Has lich_su": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"No gia_cuoc exposed": true,
+					"Has lich_su": true
+				}
+			]
+		},
+		{
+			"id": "cb24eece-d083-4891-8f76-0e9f8c735c12",
+			"name": "[FAIL] Scan Invalid Code",
+			"url": "http://localhost:3000/api/scan/INVALID-CODE-XYZ",
+			"time": 4,
+			"responseCode": {
+				"code": 404,
+				"name": "Not Found"
+			},
+			"tests": {
+				"Status 404": true
+			},
+			"testPassFailCounts": {
+				"Status 404": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 404": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 1676,
+	"collection": {
+		"requests": [
+			{
+				"id": "7a03b0f9-efb1-4400-9f55-4d40b200879b",
+				"method": "GET"
+			},
+			{
+				"id": "c61c6ba5-b2f5-4998-9ece-7b394d10f2a3",
+				"method": "POST"
+			},
+			{
+				"id": "a55bcab0-2e77-43c0-a53e-e997c2c79922",
+				"method": "POST"
+			},
+			{
+				"id": "111fb56a-d9a0-44a4-bec5-a329b4bfa1d3",
+				"method": "POST"
+			},
+			{
+				"id": "1eeac364-3a9d-46aa-ada9-e3598cb80a1f",
+				"method": "POST"
+			},
+			{
+				"id": "0a156f80-50bd-4702-aeae-887ee1a8455b",
+				"method": "GET"
+			},
+			{
+				"id": "a27396e8-258d-48b9-8614-66e616c69341",
+				"method": "POST"
+			},
+			{
+				"id": "eeb09db0-5872-4272-bb66-e0d7f98118f2",
+				"method": "GET"
+			},
+			{
+				"id": "9e3868f0-52db-401b-ab81-51759068c1d0",
+				"method": "GET"
+			},
+			{
+				"id": "e3e52614-d92d-4fe6-9edf-9f7de06a1a92",
+				"method": "GET"
+			},
+			{
+				"id": "1da72303-159b-4dcf-9cf3-15140145c6b0",
+				"method": "POST"
+			},
+			{
+				"id": "f2a9aa47-14bc-4b1c-b77c-7cae69371670",
+				"method": "PUT"
+			},
+			{
+				"id": "8b5b3590-5c9e-4e53-8172-71275d0f31c1",
+				"method": "PATCH"
+			},
+			{
+				"id": "d13b20c2-5ee7-4585-b428-edb108d1d5db",
+				"method": "POST"
+			},
+			{
+				"id": "a6862c28-48fd-4014-8a20-6f15e798ba1d",
+				"method": "PUT"
+			},
+			{
+				"id": "860b4c05-e158-4ea0-b230-c45ddc067bd3",
+				"method": "GET"
+			},
+			{
+				"id": "404b4687-3bd5-4820-8a0a-7b6138529649",
+				"method": "GET"
+			},
+			{
+				"id": "ad2370c2-b374-4ac5-86b2-1c562fdf27b5",
+				"method": "POST"
+			},
+			{
+				"id": "87feb30a-267a-4a79-9719-f887924c60b0",
+				"method": "POST"
+			},
+			{
+				"id": "15915d00-b076-41cf-be19-199e75c4f62c",
+				"method": "PUT"
+			},
+			{
+				"id": "2b64b9cf-9a4d-4bca-94ec-6b54b95123e7",
+				"method": "PATCH"
+			},
+			{
+				"id": "56d67521-1160-46f4-9344-ac0d82004d69",
+				"method": "POST"
+			},
+			{
+				"id": "f76119d6-5459-473c-9670-2df3b135b91e",
+				"method": "GET"
+			},
+			{
+				"id": "5d3a4850-ba0f-46ec-a1bb-74c7718a6855",
+				"method": "GET"
+			},
+			{
+				"id": "b80aed7a-6785-481e-934c-6c1c6fe87b41",
+				"method": "GET"
+			},
+			{
+				"id": "4a607be9-a52a-4a9b-a7e9-c940f27d399f",
+				"method": "POST"
+			},
+			{
+				"id": "b155e158-c239-46da-93f3-fe230a8cd65d",
+				"method": "GET"
+			},
+			{
+				"id": "78145f75-c06f-4d75-aa3a-684ed36d126d",
+				"method": "PUT"
+			},
+			{
+				"id": "52658cd0-b6f5-429b-a9ed-8eea3cd01ba2",
+				"method": "PATCH"
+			},
+			{
+				"id": "2d49f365-6ba5-423d-b4ee-69bc9598bf93",
+				"method": "GET"
+			},
+			{
+				"id": "1f2a2ede-81ab-41ee-b532-b0216974cc0c",
+				"method": "GET"
+			},
+			{
+				"id": "df781da2-fbe6-4b64-af48-6cf2ad97f842",
+				"method": "GET"
+			},
+			{
+				"id": "eac969eb-433e-4c33-b7bf-04ca9657be95",
+				"method": "GET"
+			},
+			{
+				"id": "f94b2b80-934a-43d7-8b4b-6429eb2dba0e",
+				"method": "POST"
+			},
+			{
+				"id": "b6fe96d8-dce6-4e82-84a0-5183076538ce",
+				"method": "POST"
+			},
+			{
+				"id": "5a24d2d6-d411-41ab-8010-b94fdf22d8e1",
+				"method": "POST"
+			},
+			{
+				"id": "b5c89589-65bb-442c-87e7-24e4adca414d",
+				"method": "POST"
+			},
+			{
+				"id": "fb807cd8-efaa-41cb-a6d4-f4d7ea708f2d",
+				"method": "GET"
+			},
+			{
+				"id": "d6409f52-ec30-48eb-9f9c-eb9b7d2dd71b",
+				"method": "PUT"
+			},
+			{
+				"id": "2a81ceed-000a-4000-9f4e-94fadb03d155",
+				"method": "PATCH"
+			},
+			{
+				"id": "c2151459-3ac3-43ca-99c4-f27187dace5c",
+				"method": "PATCH"
+			},
+			{
+				"id": "bf0dc9d5-768d-412c-b568-8e6390bc3de1",
+				"method": "GET"
+			},
+			{
+				"id": "5bc8079d-12ae-49c4-af8c-d079c69aba88",
+				"method": "GET"
+			},
+			{
+				"id": "0d2e9c41-1e83-4e2a-994a-e8c8388769cb",
+				"method": "POST"
+			},
+			{
+				"id": "e4f1ab73-a99b-4dc5-8adf-242c2ccdb06d",
+				"method": "PATCH"
+			},
+			{
+				"id": "101f2115-6f30-45b9-bdfb-09e7a7720ac4",
+				"method": "PATCH"
+			},
+			{
+				"id": "69b2e9a4-f759-4d59-a18b-e8df513eed94",
+				"method": "PATCH"
+			},
+			{
+				"id": "b5d2c633-19fd-440e-8432-a9eb2f75204a",
+				"method": "GET"
+			},
+			{
+				"id": "58b3d3b9-b1e8-44d8-855e-71cf093b1e0b",
+				"method": "GET"
+			},
+			{
+				"id": "685fb1b2-d4f3-407f-a1f9-d5002af73ffb",
+				"method": "POST"
+			},
+			{
+				"id": "087ea345-19c6-4596-964b-146cc2d99c10",
+				"method": "GET"
+			},
+			{
+				"id": "014031f8-2b69-47fb-9ebe-472a5edf94ca",
+				"method": "PUT"
+			},
+			{
+				"id": "6f0422e2-a0bf-4fcc-ae3b-089bf9432e1f",
+				"method": "GET"
+			},
+			{
+				"id": "04864030-5e08-420f-9538-c099266f04b2",
+				"method": "PATCH"
+			},
+			{
+				"id": "3b228d71-dab1-4c83-a2e9-0e5439785b82",
+				"method": "GET"
+			},
+			{
+				"id": "6a4a94e3-f075-4956-a9b9-c02693241f83",
+				"method": "POST"
+			},
+			{
+				"id": "468f79bc-118e-441b-b8ff-b5f969a81a5d",
+				"method": "PUT"
+			},
+			{
+				"id": "9a6064b7-bce4-4269-8509-c6b567c1d10b",
+				"method": "PATCH"
+			},
+			{
+				"id": "19c5580e-85d0-486f-b3e5-bada4ace6bfe",
+				"method": "GET"
+			},
+			{
+				"id": "41b5e509-8522-4505-935f-9f76a432f623",
+				"method": "GET"
+			},
+			{
+				"id": "0b02a806-24f0-43a0-8782-dc68668fb85f",
+				"method": "GET"
+			},
+			{
+				"id": "ef733036-866a-4b75-9b22-0616c11ac32c",
+				"method": "POST"
+			},
+			{
+				"id": "6dabcaf0-8808-4244-ad5e-31d51e97c74c",
+				"method": "POST"
+			},
+			{
+				"id": "359b49cd-c289-4bdd-99ea-5c8a13c1d4ea",
+				"method": "POST"
+			},
+			{
+				"id": "a71777f9-2350-4210-adf2-bda7c8c89941",
+				"method": "GET"
+			},
+			{
+				"id": "4836bd7b-cab4-4e8d-91a5-2277622b45df",
+				"method": "POST"
+			},
+			{
+				"id": "fc40f1af-50ba-443a-80a9-81a4841e2f6c",
+				"method": "GET"
+			},
+			{
+				"id": "1625639e-6dfd-4d20-b794-ce247a14ee07",
+				"method": "GET"
+			},
+			{
+				"id": "10866c9b-e87e-4ea7-ad7a-29e9ae46dba0",
+				"method": "GET"
+			},
+			{
+				"id": "ba4f44c0-d27b-464b-a1ad-80d17f11cfdf",
+				"method": "GET"
+			},
+			{
+				"id": "eeb9072c-4455-4269-8d6f-a09d4f1b0b9d",
+				"method": "GET"
+			},
+			{
+				"id": "1c2a6271-824b-4f25-8aa6-56c759da9c65",
+				"method": "GET"
+			},
+			{
+				"id": "3040d7b4-1cf1-48d0-9dd8-d999830adc27",
+				"method": "GET"
+			},
+			{
+				"id": "7a5909dd-c550-4ded-ad73-4ee25937feb1",
+				"method": "GET"
+			},
+			{
+				"id": "ca713380-21b8-4c0d-a5fe-15c28cc27598",
+				"method": "GET"
+			},
+			{
+				"id": "02e67268-4d55-4231-b2bc-400dfb74b403",
+				"method": "GET"
+			},
+			{
+				"id": "cae81209-39b9-4bf8-bd14-2e1c97d14ef1",
+				"method": "GET"
+			},
+			{
+				"id": "feecf2b3-9f4e-4c87-8b61-e1a4acd05a79",
+				"method": "GET"
+			},
+			{
+				"id": "cb24eece-d083-4891-8f76-0e9f8c735c12",
+				"method": "GET"
+			}
+		]
+	}
+}

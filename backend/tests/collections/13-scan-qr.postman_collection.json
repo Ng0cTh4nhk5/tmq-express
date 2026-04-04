@@ -1,0 +1,71 @@
+{
+  "info": {
+    "name": "13. Scan QR (Public)",
+    "description": "Tra cuu cong khai qua QR",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Scan BN Valid",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scan/{{bien_nhan_ma_so}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scan",
+            "{{bien_nhan_ma_so}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"No gia_cuoc exposed\", () => pm.expect(pm.response.json().data).to.not.have.property(\"gia_cuoc\"));",
+              "pm.test(\"Has lich_su\", () => pm.expect(pm.response.json().data.lich_su).to.be.an(\"array\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Scan Invalid Code",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scan/INVALID-CODE-XYZ",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scan",
+            "INVALID-CODE-XYZ"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

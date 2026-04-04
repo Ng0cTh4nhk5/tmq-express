@@ -1,0 +1,229 @@
+{
+  "info": {
+    "name": "12. Bao Cao",
+    "description": "Bao cao tong hop",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "BC Doanh Thu",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bao-cao/doanh-thu?from=2026-03-25&to=2026-04-01",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bao-cao",
+            "doanh-thu"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-03-25"
+            },
+            {
+              "key": "to",
+              "value": "2026-04-01"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "BC So Quy",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bao-cao/so-quy?from=2026-03-25&to=2026-04-01",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bao-cao",
+            "so-quy"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-03-25"
+            },
+            {
+              "key": "to",
+              "value": "2026-04-01"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "BC BN Theo Tuyen",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bao-cao/bien-nhan?from=2026-03-25&to=2026-04-01",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bao-cao",
+            "bien-nhan"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-03-25"
+            },
+            {
+              "key": "to",
+              "value": "2026-04-01"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "BC Cong No",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bao-cao/cong-no",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bao-cao",
+            "cong-no"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Staff xem bao cao -> 403",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staff_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bao-cao/doanh-thu?from=2026-03-25&to=2026-04-01",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bao-cao",
+            "doanh-thu"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-03-25"
+            },
+            {
+              "key": "to",
+              "value": "2026-04-01"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,805 @@
+{
+  "info": {
+    "name": "06. Bien Nhan",
+    "description": "Quan ly bien nhan - module loi",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List BN",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has pagination\", () => pm.expect(pm.response.json().pagination).to.be.an(\"object\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Filter BN by Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan?trang_thai=cho_vc",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ],
+          "query": [
+            {
+              "key": "trang_thai",
+              "value": "cho_vc"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"All cho_vc\", () => pm.response.json().data.forEach(bn => pm.expect(bn.trang_thai).to.eql(\"cho_vc\")));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search BN",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan?search=SG",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "SG"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Preview Ma BN",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/next-ma-so?vp_gui_id=1&vp_nhan_id=2",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "next-ma-so"
+          ],
+          "query": [
+            {
+              "key": "vp_gui_id",
+              "value": "1"
+            },
+            {
+              "key": "vp_nhan_id",
+              "value": "2"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create BN (Da Thu)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"van_phong_gui_id\": 1,\n  \"van_phong_nhan_id\": 2,\n  \"ten_hang_hoa\": \"Hang test Postman\",\n  \"don_vi_gui\": \"Cty Test Gui\",\n  \"nguoi_gui\": \"Nguoi Gui\",\n  \"dien_thoai_gui\": \"0111111111\",\n  \"don_vi_nhan\": \"Cty Test Nhan\",\n  \"nguoi_nhan\": \"Nguoi Nhan\",\n  \"dien_thoai_nhan\": \"0222222222\",\n  \"gia_cuoc\": 150000,\n  \"trang_thai_thu\": \"da_thu\",\n  \"can_xuat_hddt\": true\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+              "const bn = pm.response.json().data;",
+              "pm.environment.set(\"bien_nhan_id\", bn.id);",
+              "pm.environment.set(\"bien_nhan_ma_so\", bn.ma_so);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create BN (Cong No)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"van_phong_gui_id\": 1,\n  \"van_phong_nhan_id\": 3,\n  \"ten_hang_hoa\": \"Hang cong no test\",\n  \"don_vi_gui\": \"Cty Cong No\",\n  \"nguoi_gui\": \"Nguoi CN\",\n  \"gia_cuoc\": 500000,\n  \"trang_thai_thu\": \"cong_no\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+              "pm.environment.set(\"bien_nhan_cong_no_id\", pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Create BN Missing Field",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"van_phong_gui_id\": 1,\n  \"van_phong_nhan_id\": 2\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Create BN (Accountant -> 403)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accountant_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"van_phong_gui_id\": 1,\n  \"van_phong_nhan_id\": 2,\n  \"ten_hang_hoa\": \"Should fail\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get BN Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has relations\", () => { const d = pm.response.json().data; pm.expect(d.van_phong_gui).to.be.an(\"object\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update BN",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten_hang_hoa\": \"Hang test updated\",\n  \"gia_cuoc\": 200000\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Status cho_vc -> dang_vc",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}/trang-thai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}",
+            "trang-thai"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"trang_thai\": \"dang_vc\",\n  \"ghi_chu\": \"Test chuyen trang thai\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Skip Status dang_vc -> da_bao_khach",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}/trang-thai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}",
+            "trang-thai"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"trang_thai\": \"da_bao_khach\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 400 (skip not allowed)\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PDF Preview",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}/pdf-preview",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}",
+            "pdf-preview"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has base64\", () => pm.expect(pm.response.json().data.base64).to.be.a(\"string\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PDF Download (binary)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}/pdf",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}",
+            "pdf"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Content-Type is PDF\", () => pm.expect(pm.response.headers.get(\"content-type\")).to.include(\"application/pdf\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Create BN Same VP gui = VP nhan",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"van_phong_gui_id\": 1,\n  \"van_phong_nhan_id\": 1,\n  \"ten_hang_hoa\": \"Same VP test\",\n  \"gia_cuoc\": 100000\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Accountant cap nhat trang thai -> 403",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accountant_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/{{bien_nhan_id}}/trang-thai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "{{bien_nhan_id}}",
+            "trang-thai"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"trang_thai\": \"da_den_kho\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Batch cap nhat trang thai",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/batch-trang-thai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "batch-trang-thai"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ids\": [\n    1,\n    2,\n    3,\n    4,\n    5,\n    6\n  ],\n  \"trang_thai\": \"dang_vc\",\n  \"ghi_chu\": \"Batch test Postman\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Lay cac BN dang cho_vc tu seed data",
+              "const url = pm.environment.get(\"base_url\") + \"/api/bien-nhan?trang_thai=cho_vc&limit=5\";",
+              "pm.sendRequest({ url, method: \"GET\", header: { \"Authorization\": \"Bearer \" + pm.environment.get(\"admin_token\") } }, (err, res) => {",
+              "  if (!err && res.code === 200) {",
+              "    const ids = res.json().data.map(bn => bn.id);",
+              "    if (ids.length > 0) {",
+              "      const body = JSON.parse(pm.request.body.raw);",
+              "      body.ids = ids;",
+              "      pm.request.body.raw = JSON.stringify(body);",
+              "    }",
+              "  }",
+              "});"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has success message\", () => pm.expect(pm.response.json().success).to.be.true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Batch trang thai - ids rong",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bien-nhan/batch-trang-thai",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bien-nhan",
+            "batch-trang-thai"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ids\": [],\n  \"trang_thai\": \"dang_vc\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

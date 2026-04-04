@@ -1,0 +1,40 @@
+{
+  "info": {
+    "name": "01. Health Check",
+    "description": "Health check endpoint",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"success is true\", () => pm.expect(pm.response.json().success).to.be.true);",
+              "pm.test(\"status ok\", () => pm.expect(pm.response.json().data.status).to.eql(\"ok\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,232 @@
+import prisma from '../config/database.js';
+import { generateBienNhanCode, generateCode } from '../utils/ma-so-generator.js';
+
+/**
+ * Danh sách biên nhận (filter, search, pagination)
+ */
+export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_gui, vp_nhan, from, to, page = 1, limit = 20 }) {
+  const where = {};
+
+  // Staff: chỉ thấy BN liên quan đến VP mình
+  if (role === 'staff' && van_phong_id) {
+    where.OR = [
+      { van_phong_gui_id: van_phong_id },
+      { van_phong_nhan_id: van_phong_id },
+    ];
+  }
+
+  // Filters
+  if (trang_thai) where.trang_thai = trang_thai;
+  if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
+  if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
+
+  if (from || to) {
+    where.ngay_nhan = {};
+    if (from) where.ngay_nhan.gte = new Date(from);
+    if (to) where.ngay_nhan.lte = new Date(to + 'T23:59:59.999Z');
+  }
+
+  if (search) {
+    // Nếu đã có OR từ staff filter, compose thêm
+    const searchOr = [
+      { ma_so: { contains: search, mode: 'insensitive' } },
+      { don_vi_gui: { contains: search, mode: 'insensitive' } },
+      { don_vi_nhan: { contains: search, mode: 'insensitive' } },
+      { nguoi_gui: { contains: search, mode: 'insensitive' } },
+      { nguoi_nhan: { contains: search, mode: 'insensitive' } },
+      { ten_hang_hoa: { contains: search, mode: 'insensitive' } },
+    ];
+
+    if (where.OR) {
+      // Staff + search: cần AND
+      const staffFilter = where.OR;
+      delete where.OR;
+      where.AND = [
+        { OR: staffFilter },
+        { OR: searchOr },
+      ];
+    } else {
+      where.OR = searchOr;
+    }
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.bienNhan.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { created_at: 'desc' },
+      include: {
+        van_phong_gui: { select: { ma_vp: true, ten: true } },
+        van_phong_nhan: { select: { ma_vp: true, ten: true } },
+        nhan_vien_nhap: { select: { ten: true } },
+      },
+    }),
+    prisma.bienNhan.count({ where }),
+  ]);
+
+  return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}
+
+/**
+ * Chi tiết biên nhận
+ */
+export async function getBienNhan(id) {
+  return prisma.bienNhan.findUnique({
+    where: { id },
+    include: {
+      van_phong_gui: true,
+      van_phong_nhan: true,
+      nhan_vien_nhap: { select: { ten: true, ma_nv: true } },
+      lich_su_trang_thai: {
+        orderBy: { created_at: 'desc' },
+        include: { nhan_vien: { select: { ten: true } } },
+      },
+    },
+  });
+}
+
+/**
+ * Lấy mã biên nhận tiếp theo (preview)
+ */
+export async function getNextMaSo(vpGuiId, vpNhanId) {
+  const vpGui = await prisma.vanPhong.findUnique({ where: { id: vpGuiId }, select: { ma_vp: true } });
+  const vpNhan = await prisma.vanPhong.findUnique({ where: { id: vpNhanId }, select: { ma_vp: true } });
+  if (!vpGui || !vpNhan) throw Object.assign(new Error('VP không tồn tại'), { statusCode: 400 });
+  return generateBienNhanCode(vpGui.ma_vp, vpNhan.ma_vp);
+}
+
+/**
+ * Tự tạo KH nếu chưa tồn tại.
+ * Quy tắc:
+ *   - Không có tên → bỏ qua (thông tin không đủ)
+ *   - Không có SĐT → bỏ qua (khách vãng lai)
+ *   - SĐT đã tồn tại trong KH → bỏ qua (cùng người)
+ *   - Tạo mới với loai_kh = 'ca_nhan' (default)
+ */
+async function autoCreateKhachHang(tx, tenDonVi, nguoiLienHe, dienThoai, diaChi) {
+  if (!tenDonVi?.trim() || !dienThoai?.trim()) return null;
+
+  const normalizedDT = dienThoai.trim();
+
+  // Lookup bằng SĐT — yếu tố duy nhất đáng tin
+  const existing = await tx.khachHang.findFirst({
+    where: { dien_thoai: normalizedDT },
+  });
+  if (existing) return null;
+
+  const ma_kh = await generateCode('khachHang', 'ma_kh', 'KH');
+  await tx.khachHang.create({
+    data: {
+      ma_kh,
+      loai_kh: 'ca_nhan',
+      ten_don_vi: tenDonVi.trim(),
+      nguoi_lien_he: nguoiLienHe?.trim() || null,
+      dien_thoai: normalizedDT,
+      dia_chi: diaChi?.trim() || null,
+    },
+  });
+
+  return { ma_kh, ten_don_vi: tenDonVi.trim() };
+}
+
+/**
+ * Tạo biên nhận mới
+ */
+export async function createBienNhan(data, userId) {
+  const vpGui = await prisma.vanPhong.findUnique({ where: { id: data.van_phong_gui_id }, select: { ma_vp: true } });
+  const vpNhan = await prisma.vanPhong.findUnique({ where: { id: data.van_phong_nhan_id }, select: { ma_vp: true } });
+  if (!vpGui || !vpNhan) throw Object.assign(new Error('VP không tồn tại'), { statusCode: 400 });
+
+  const ma_so = await generateBienNhanCode(vpGui.ma_vp, vpNhan.ma_vp);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const bn = await tx.bienNhan.create({
+      data: {
+        ma_so,
+        van_phong_gui_id: data.van_phong_gui_id,
+        van_phong_nhan_id: data.van_phong_nhan_id,
+        don_vi_gui: data.don_vi_gui || null,
+        nguoi_gui: data.nguoi_gui || null,
+        dien_thoai_gui: data.dien_thoai_gui || null,
+        dia_chi_gui: data.dia_chi_gui || null,
+        don_vi_nhan: data.don_vi_nhan || null,
+        nguoi_nhan: data.nguoi_nhan || null,
+        dien_thoai_nhan: data.dien_thoai_nhan || null,
+        dia_chi_nhan: data.dia_chi_nhan || null,
+        so_cccd: data.so_cccd || null,
+        ten_hang_hoa: data.ten_hang_hoa,
+        nhan_vien_nhap_id: userId,
+        gia_tri_hang: data.gia_tri_hang || null,
+        trong_luong: data.trong_luong || null,
+        thu_ho: data.thu_ho || 0,
+        gia_cuoc: data.gia_cuoc || 0,
+        trang_thai_thu: data.trang_thai_thu || 'da_thu',
+        can_xuat_hddt: data.can_xuat_hddt || false,
+        hinh_thuc_giao: data.hinh_thuc_giao || 'goi_dien',
+      },
+    });
+
+    // Lịch sử trạng thái đầu tiên
+    await tx.lichSuTrangThai.create({
+      data: {
+        bien_nhan_id: bn.id,
+        trang_thai_moi: 'cho_vc',
+        nhan_vien_id: userId,
+        phuong_thuc: 'manual',
+        ghi_chu: 'Tạo biên nhận mới',
+      },
+    });
+
+    // Tự tạo công nợ nếu cần
+    if (data.trang_thai_thu === 'cong_no') {
+      await tx.congNo.create({
+        data: {
+          bien_nhan_id: bn.id,
+          doi_tuong: data.don_vi_gui || data.nguoi_gui || 'N/A',
+          so_tien_no: data.gia_cuoc || 0,
+          trang_thai: 'chua_thu',
+        },
+      });
+    }
+
+    // Auto-create KH nếu chưa tồn tại (chỉ khi có SĐT — không tạo cho vãng lai)
+    const autoCreated = [];
+    try {
+      const khGui = await autoCreateKhachHang(
+        tx, data.don_vi_gui, data.nguoi_gui, data.dien_thoai_gui, data.dia_chi_gui
+      );
+      if (khGui) autoCreated.push(khGui);
+
+      const khNhan = await autoCreateKhachHang(
+        tx, data.don_vi_nhan, data.nguoi_nhan, data.dien_thoai_nhan, data.dia_chi_nhan
+      );
+      if (khNhan) autoCreated.push(khNhan);
+    } catch (err) {
+      console.warn('[Auto-create KH]', err.message);
+    }
+
+    return { bn, autoCreated };
+  });
+
+  return result;
+}
+
+/**
+ * Cập nhật biên nhận
+ * Staff: chỉ sửa BN do mình tạo
+ */
+export async function updateBienNhan(id, data, userId, userRole) {
+  const existing = await prisma.bienNhan.findUnique({ where: { id } });
+  if (!existing) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
+
+  // Staff chỉ sửa BN mình tạo
+  if (userRole === 'staff' && existing.nhan_vien_nhap_id !== userId) {
+    throw Object.assign(new Error('Bạn chỉ được sửa biên nhận do mình tạo'), { statusCode: 403 });
+  }
+
+  // Không cho sửa ma_so
+  const { ma_so, nhan_vien_nhap_id, ...updateData } = data;
+
+  return prisma.bienNhan.update({ where: { id }, data: updateData });
+}

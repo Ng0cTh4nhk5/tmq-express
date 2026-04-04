@@ -1,0 +1,297 @@
+{
+  "info": {
+    "name": "04. Nhan Vien",
+    "description": "Quan ly nhan vien & phan quyen",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "List NV (Admin)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] List NV (Staff -> 403)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staff_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create NV",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ma_nv\": \"NV-TEST-001\",\n  \"ten\": \"Test User Postman\",\n  \"username\": \"test_postman\",\n  \"password\": \"Test@1234\",\n  \"role\": \"staff\",\n  \"van_phong_id\": 1\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Save ID\", () => pm.environment.set(\"nhan_vien_id\", pm.response.json().data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "[FAIL] Create NV Duplicate Username",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ma_nv\": \"NV-TEST-002\",\n  \"ten\": \"Dup User\",\n  \"username\": \"test_postman\",\n  \"password\": \"Test@1234\",\n  \"role\": \"staff\",\n  \"van_phong_id\": 1\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Should fail (unique)\", () => pm.expect(pm.response.code).to.be.oneOf([400, 409, 500]));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update NV",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien/{{nhan_vien_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien",
+            "{{nhan_vien_id}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ten\": \"Test User Updated\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Toggle NV Active",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien/{{nhan_vien_id}}/active",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien",
+            "{{nhan_vien_id}}",
+            "active"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"active\": false\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/nhan-vien/{{nhan_vien_id}}/reset-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "nhan-vien",
+            "{{nhan_vien_id}}",
+            "reset-password"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has tempPassword\", () => pm.expect(pm.response.json().data.tempPassword).to.be.a(\"string\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

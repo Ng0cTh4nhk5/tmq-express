@@ -1,0 +1,176 @@
+{
+  "info": {
+    "name": "10. Bang Ke HDDT",
+    "description": "Quan ly bang ke hoa don dien tu",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "BN Cho Bang Ke",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bang-ke/bien-nhan-cho",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bang-ke",
+            "bien-nhan-cho"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "if (data && data.length >= 2) { pm.environment.set(\"hddt_bien_nhan_ids\", JSON.stringify([data[0].id, data[1].id])); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Xuat Bang Ke",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bang-ke",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bang-ke"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bien_nhan_ids\": [\n    1,\n    2\n  ]\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const ids = pm.environment.get(\"hddt_bien_nhan_ids\");",
+              "if (ids) { const body = JSON.parse(pm.request.body.raw); body.bien_nhan_ids = JSON.parse(ids); pm.request.body.raw = JSON.stringify(body); }"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has file\", () => pm.expect(pm.response.json().data.file.base64).to.be.a(\"string\"));",
+              "pm.environment.set(\"bang_ke_id\", pm.response.json().data.bang_ke.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Bang Ke",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bang-ke",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bang-ke"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Download Bang Ke",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/bang-ke/{{bang_ke_id}}/download",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "bang-ke",
+            "{{bang_ke_id}}",
+            "download"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Has file\", () => pm.expect(pm.response.json().data.file.base64).to.be.a(\"string\"));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
