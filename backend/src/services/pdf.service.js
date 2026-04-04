@@ -38,9 +38,9 @@ function fmtCurrency(val) {
   return Number(val).toLocaleString('vi-VN');
 }
 
-// Checkbox helper: [X] hoặc [  ]
+// Checkbox helper: X hoặc rỗng
 function chk(condition) {
-  return condition ? '  X' : '   ';
+  return condition ? 'X' : ' ';
 }
 
 /**
@@ -70,7 +70,30 @@ export async function generateBienNhanPDF(bienNhanId) {
   const docDefinition = {
     pageSize: 'A5',
     pageOrientation: 'landscape',
-    pageMargins: [18, 14, 18, 10],
+    pageMargins: [18, 14, 18, 35], // chừa 35pt ở cuối trang cho content không bị đè
+
+    // ══════════════ FOOTER — Điều khoản (cố định sát cuối trang) ══════════════
+    footer: {
+      margin: [0, 15, 0, 0], // đẩy footer xuống sát đáy (15pt từ đỉnh của khu vực bottom margin)
+      stack: [
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 560, y2: 0, lineWidth: 0.5, lineColor: '#999' }], margin: [18, 0, 18, 3] },
+        {
+          text: [
+            'Biên nhận chỉ có giá trị trong vòng 10 ngày. Quá thời hạn mọi khiếu nại sẽ không được giải quyết. ',
+            'Khi nhận hàng, quý khách phải mang theo giấy CMND / Giấy giới thiệu. ',
+            'Hàng hóa quý khách phải khai báo trị giá. Nếu có rủi ro DN bồi thường 100% trị giá khai báo. ',
+            'Nếu không khai báo trị giá, nếu có rủi ro DN bồi thường 10 lần giá cước đã thu. ',
+            'Doanh nghiệp không chịu trách nhiệm với mặt hàng dễ cháy nổ, tiền, kim loại quý và hàng Quốc cấm, hàng lậu trong kiện hàng đã niêm phong.',
+          ],
+          fontSize: 5,
+          color: '#666',
+          italics: true,
+          lineHeight: 1.2,
+          margin: [18, 0, 18, 0],
+        },
+      ],
+    },
+
     content: [
       // ══════════════ HEADER ══════════════
       {
@@ -88,7 +111,7 @@ export async function generateBienNhanPDF(bienNhanId) {
               },
               { text: 'ĐỊA CHỈ GỬI VÀ NHẬN HÀNG:', bold: true, italics: true, fontSize: 7, margin: [0, 2, 0, 1] },
               { text: `491 Lê Hồng Phong - P.Vườn Lài - TP.HCM - ĐT: ${bn.van_phong_gui?.dien_thoai || '(028) 383.338.79'}`, fontSize: 6.5, color: '#333' },
-              { text: '33 Hùng Vương - P. Ninh Kiều - TP.Cần Thơ - ĐT: (0292) 37.687.39', fontSize: 6.5, color: '#333' },
+              { text: '33 Hùng Vương - P.Ninh Kiều - TP.Cần Thơ - ĐT: (0292) 37.687.39', fontSize: 6.5, color: '#333' },
               { text: '39 Nguyễn Văn Trỗi - P.Rạch Giá - An Giang - ĐT: (0297) 39.622.26', fontSize: 6.5, color: '#333' },
             ],
           },
@@ -106,14 +129,13 @@ export async function generateBienNhanPDF(bienNhanId) {
       // ══════════════ DÒNG KẺ ══════════════
       { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 560, y2: 3, lineWidth: 1 }], margin: [0, 2, 0, 3] },
 
-      // ══════════════ BODY CHÍNH — 3 cột ══════════════
+      // ══════════════ MÃ SỐ / GIÁ CƯỚC + TT THU + QR ══════════════
       {
         columns: [
-          // ── CỘT 1: Người gửi ──
+          // ── Cột 1: Mã số + Giá cước ──
           {
             width: '38%',
             stack: [
-              // Mã số + Giá cước (box)
               {
                 table: {
                   widths: [45, '*'],
@@ -138,33 +160,13 @@ export async function generateBienNhanPDF(bienNhanId) {
                   ],
                 },
                 layout: { paddingLeft: () => 2, paddingRight: () => 2, paddingTop: () => 1, paddingBottom: () => 1 },
-                margin: [0, 0, 0, 4],
               },
-
-              { text: [{ text: 'Đơn vị gửi: ', fontSize: 8 }, { text: bn.don_vi_gui || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Họ tên người gửi: ', fontSize: 8 }, { text: bn.nguoi_gui || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Điện thoại: ', fontSize: 8 }, { text: bn.dien_thoai_gui || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Địa chỉ: ', fontSize: 8 }, { text: bn.dia_chi_gui || '', fontSize: 8 }], margin: [0, 0, 0, 0] },
             ],
           },
-          // ── CỘT 2: Người nhận ──
+          // ── Cột 2: TT thu (checkboxes) ──
           {
             width: '32%',
             stack: [
-              { text: ' ', fontSize: 3 },
-              { text: [{ text: 'Đơn vị nhận: ', fontSize: 8 }, { text: bn.don_vi_nhan || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Họ tên người nhận: ', fontSize: 8 }, { text: bn.nguoi_nhan || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Điện thoại: ', fontSize: 8 }, { text: bn.dien_thoai_nhan || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Địa chỉ: ', fontSize: 8 }, { text: bn.dia_chi_nhan || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Số CCCD: ', fontSize: 8 }, { text: bn.so_cccd || '', fontSize: 8 }], margin: [0, 0, 0, 0] },
-            ],
-            margin: [6, 0, 0, 0],
-          },
-          // ── CỘT 3: TT thu + QR ──
-          {
-            width: '30%',
-            stack: [
-              // Checkboxes TT Thu
               {
                 table: {
                   widths: ['*', 16],
@@ -184,10 +186,15 @@ export async function generateBienNhanPDF(bienNhanId) {
                   ],
                 },
                 layout: { paddingLeft: () => 1, paddingRight: () => 1, paddingTop: () => 0, paddingBottom: () => 0 },
-                margin: [0, 0, 0, 4],
               },
-              // QR code
-              { image: qrDataUrl, width: 58, height: 58, alignment: 'center', margin: [0, 2, 0, 1] },
+            ],
+            margin: [6, 0, 0, 0],
+          },
+          // ── Cột 3: QR code ──
+          {
+            width: '30%',
+            stack: [
+              { image: qrDataUrl, width: 55, height: 55, alignment: 'center', margin: [0, 0, 0, 1] },
               { text: 'Quét QR tra cứu', fontSize: 5.5, color: '#888', alignment: 'center' },
             ],
             margin: [6, 0, 0, 0],
@@ -196,37 +203,80 @@ export async function generateBienNhanPDF(bienNhanId) {
       },
 
       // ══════════════ DÒNG KẺ ══════════════
-      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 560, y2: 2, lineWidth: 0.5 }], margin: [0, 4, 0, 3] },
+      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 560, y2: 2, lineWidth: 0.5 }], margin: [0, 4, 0, 4] },
 
-      // ══════════════ HÀNG HÓA + FOOTER — 3 cột ══════════════
+      // ══════════════ NGƯỜI GỬI + NGƯỜI NHẬN (nằm ngang nhau) ══════════════
       {
         columns: [
-          // ── Cột 1: Hàng hóa ──
+          // ── Cột trái: Người gửi ──
           {
-            width: '38%',
+            width: '50%',
             stack: [
-              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 8 }, { text: bn.ten_hang_hoa || '', bold: true, fontSize: 8 }] },
-              { text: `Thu hộ: ${fmtCurrency(bn.thu_ho)} (đồng).`, fontSize: 8, margin: [0, 2, 0, 2] },
-              {
-                columns: [
-                  { text: chk(bn.hang_hu_khong_den), fontSize: 8, width: 16, alignment: 'center',
-                    border: [true, true, true, true],
-                    decoration: bn.hang_hu_khong_den ? undefined : undefined,
-                  },
-                  { text: ' Hàng Hư / Bể không đền.', fontSize: 8, width: '*' },
-                ],
-              },
-              { text: `Gởi lúc: ${gioStr}`, fontSize: 8, margin: [0, 3, 0, 0] },
+              { text: 'NGƯỜI GỬI', bold: true, fontSize: 8.5, color: '#1e40af', decoration: 'underline', margin: [0, 0, 0, 3] },
+              { text: [{ text: 'Đơn vị gửi: ', fontSize: 8 }, { text: bn.don_vi_gui || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Họ tên người gửi: ', fontSize: 8 }, { text: bn.nguoi_gui || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Điện thoại: ', fontSize: 8 }, { text: bn.dien_thoai_gui || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Địa chỉ: ', fontSize: 8 }, { text: bn.dia_chi_gui || '', fontSize: 8 }] },
             ],
           },
-          // ── Cột 2: Giao + ký ──
+          // ── Cột phải: Người nhận ──
           {
-            width: '28%',
+            width: '50%',
             stack: [
-              { text: ' ', fontSize: 14 },
+              { text: 'NGƯỜI NHẬN', bold: true, fontSize: 8.5, color: '#1e40af', decoration: 'underline', margin: [0, 0, 0, 3] },
+              { text: [{ text: 'Đơn vị nhận: ', fontSize: 8 }, { text: bn.don_vi_nhan || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Họ tên người nhận: ', fontSize: 8 }, { text: bn.nguoi_nhan || '', bold: true, fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Điện thoại: ', fontSize: 8 }, { text: bn.dien_thoai_nhan || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Địa chỉ: ', fontSize: 8 }, { text: bn.dia_chi_nhan || '', fontSize: 8 }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Số CCCD: ', fontSize: 8 }, { text: bn.so_cccd || '', fontSize: 8 }] },
+            ],
+            margin: [10, 0, 0, 0],
+          },
+        ],
+      },
+
+      // ══════════════ DÒNG KẺ ══════════════
+      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 560, y2: 2, lineWidth: 0.5 }], margin: [0, 4, 0, 4] },
+
+      // ══════════════ THÔNG TIN HÀNG HÓA — 3 cột ══════════════
+      {
+        columns: [
+          // ── Cột 1: Thông tin hàng hóa (60%) ──
+          {
+            width: '60%',
+            stack: [
+              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 8 }, { text: bn.ten_hang_hoa || '', bold: true, fontSize: 8 }] },
+              { text: `Thu hộ: ${fmtCurrency(bn.thu_ho)} (đồng).`, fontSize: 8, margin: [0, 4, 0, 4] },
+              bn.trong_luong
+                ? { text: `Trọng lượng: ${bn.trong_luong} kg`, fontSize: 8, margin: [0, 0, 0, 4] }
+                : { text: '', fontSize: 1 },
+              bn.gia_tri_hang
+                ? { text: `Giá trị hàng: ${fmtCurrency(bn.gia_tri_hang)} đ`, fontSize: 8, margin: [0, 0, 0, 4] }
+                : { text: '', fontSize: 1 },
+              { text: `Gởi lúc: ${gioStr} - ${ngayStr}`, fontSize: 8, margin: [0, 3, 0, 0] },
+            ],
+          },
+          // ── Cột 2: Các checkbox tùy chọn (40%) ──
+          {
+            width: '40%',
+            stack: [
               {
                 columns: [
-                  { text: 'Giao tận nơi:', fontSize: 8, width: 'auto' },
+                  { text: 'Hàng hư / bể không đền:', fontSize: 8, width: 110 },
+                  {
+                    table: {
+                      widths: [14],
+                      body: [[{ text: chk(bn.hang_hu_khong_den), fontSize: 7, alignment: 'center' }]],
+                    },
+                    width: 20,
+                    layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                  },
+                ],
+                margin: [0, 0, 0, 4],
+              },
+              {
+                columns: [
+                  { text: 'Giao tận nơi:', fontSize: 8, width: 110 },
                   {
                     table: {
                       widths: [14],
@@ -234,40 +284,37 @@ export async function generateBienNhanPDF(bienNhanId) {
                     },
                     width: 20,
                     layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-                    margin: [4, 0, 0, 0],
                   },
                 ],
-                margin: [0, 0, 0, 2],
+                margin: [0, 0, 0, 4],
               },
               {
                 columns: [
-                  { text: 'ĐT đến nhận:', fontSize: 8, width: 'auto' },
+                  { text: 'Điện thoại đến nhận:', fontSize: 8, width: 110 },
                   {
                     table: {
                       widths: [14],
-                      body: [[{ text: chk(bn.hinh_thuc_giao === 'goi_dien' || bn.hinh_thuc_giao === 'tu_toi'), fontSize: 7, alignment: 'center' }]],
+                      body: [[{ text: chk(bn.hinh_thuc_giao === 'goi_dien'), fontSize: 7, alignment: 'center' }]],
                     },
                     width: 20,
                     layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-                    margin: [4, 0, 0, 0],
+                  },
+                ],
+                margin: [0, 0, 0, 4],
+              },
+              {
+                columns: [
+                  { text: 'Tự đến lấy:', fontSize: 8, width: 110 },
+                  {
+                    table: {
+                      widths: [14],
+                      body: [[{ text: chk(bn.hinh_thuc_giao === 'tu_toi'), fontSize: 7, alignment: 'center' }]],
+                    },
+                    width: 20,
+                    layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
                   },
                 ],
               },
-            ],
-            margin: [6, 0, 0, 0],
-          },
-          // ── Cột 3: Ngày + NV ──
-          {
-            width: '34%',
-            stack: [
-              bn.trong_luong
-                ? { text: `Trọng lượng: ${bn.trong_luong} kg`, fontSize: 8, margin: [0, 0, 0, 2] }
-                : { text: '', fontSize: 1 },
-              bn.gia_tri_hang
-                ? { text: `Giá trị hàng: ${fmtCurrency(bn.gia_tri_hang)}đ`, fontSize: 8, margin: [0, 0, 0, 2] }
-                : { text: '', fontSize: 1 },
-              { text: ' ', fontSize: 6 },
-              { text: ngayStr, fontSize: 8, alignment: 'right', margin: [0, 0, 0, 0] },
             ],
             margin: [6, 0, 0, 0],
           },
@@ -280,44 +327,27 @@ export async function generateBienNhanPDF(bienNhanId) {
           {
             width: '33%',
             stack: [
-              { text: ' ', fontSize: 20 },
+              { text: ' ', fontSize: 18 },
               { text: 'NGƯỜI GỬI', bold: true, fontSize: 8, alignment: 'center' },
             ],
           },
           {
             width: '34%',
             stack: [
-              { text: 'Nhận lúc:', fontSize: 8 },
-              { text: ' ', fontSize: 12 },
+              { text: ' ', fontSize: 18 },
               { text: 'NGƯỜI NHẬN', bold: true, fontSize: 8, alignment: 'center' },
             ],
           },
           {
             width: '33%',
             stack: [
-              { text: ' ', fontSize: 20 },
+              { text: ' ', fontSize: 18 },
               { text: 'NV. PHỤC VỤ', bold: true, fontSize: 8, alignment: 'right' },
               { text: bn.nhan_vien_nhap.ten, fontSize: 7, color: '#666', alignment: 'right' },
             ],
           },
         ],
         margin: [0, 4, 0, 0],
-      },
-
-      // ══════════════ FOOTER — Điều khoản ══════════════
-      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 560, y2: 2, lineWidth: 0.5, lineColor: '#999' }], margin: [0, 4, 0, 2] },
-      {
-        text: [
-          'Biên nhận chỉ có giá trị trong vòng 10 ngày. Quá thời hạn mọi khiếu nại sẽ không được giải quyết. ',
-          'Khi nhận hàng, quý khách phải mang theo giấy CMND / Giấy giới thiệu. ',
-          'Hàng hóa quý khách phải khai báo trị giá. Nếu có rủi ro DN bồi thường 100% trị giá khai báo. ',
-          'Nếu không khai báo trị giá, nếu có rủi ro DN bồi thường 10 lần giá cước đã thu. ',
-          'Doanh nghiệp không chịu trách nhiệm với mặt hàng dễ cháy nổ, tiền, kim loại quý và hàng Quốc cấm, hàng lậu trong kiện hàng đã niêm phong.',
-        ],
-        fontSize: 5,
-        color: '#666',
-        italics: true,
-        lineHeight: 1.2,
       },
     ],
 

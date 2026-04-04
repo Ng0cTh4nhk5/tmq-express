@@ -43,6 +43,7 @@ const form = ref({
   gia_cuoc: 0,
   trang_thai_thu: 'da_thu',
   can_xuat_hddt: false,
+  hang_hu_khong_den: false,
   hinh_thuc_giao: 'tan_noi',
 });
 
@@ -135,6 +136,7 @@ async function loadBienNhan() {
       gia_cuoc: Number(bn.gia_cuoc) || 0,
       trang_thai_thu: bn.trang_thai_thu,
       can_xuat_hddt: bn.can_xuat_hddt,
+      hang_hu_khong_den: bn.hang_hu_khong_den || false,
       hinh_thuc_giao: bn.hinh_thuc_giao,
     };
   } catch {
@@ -180,7 +182,7 @@ async function save() {
       }
       const vpGui = form.value.van_phong_gui_id;
       const vpNhan = form.value.van_phong_nhan_id;
-      form.value = { ...form.value, don_vi_gui: '', nguoi_gui: '', dien_thoai_gui: '', dia_chi_gui: '', don_vi_nhan: '', nguoi_nhan: '', dien_thoai_nhan: '', dia_chi_nhan: '', so_cccd: '', ten_hang_hoa: '', gia_tri_hang: null, trong_luong: null, thu_ho: 0, gia_cuoc: 0, can_xuat_hddt: false };
+      form.value = { ...form.value, don_vi_gui: '', nguoi_gui: '', dien_thoai_gui: '', dia_chi_gui: '', don_vi_nhan: '', nguoi_nhan: '', dien_thoai_nhan: '', dia_chi_nhan: '', so_cccd: '', ten_hang_hoa: '', gia_tri_hang: null, trong_luong: null, thu_ho: 0, gia_cuoc: 0, can_xuat_hddt: false, hang_hu_khong_den: false };
       form.value.van_phong_gui_id = vpGui;
       form.value.van_phong_nhan_id = vpNhan;
       fetchPreviewMaSo();
@@ -343,6 +345,10 @@ onMounted(() => {
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <Checkbox v-model="form.can_xuat_hddt" :binary="true" inputId="hddt" />
                 <label for="hddt" style="font-weight: 500; cursor: pointer; font-size: 0.85rem;">Cần xuất hóa đơn điện tử</label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                <Checkbox v-model="form.hang_hu_khong_den" :binary="true" inputId="hkd" />
+                <label for="hkd" style="font-weight: 500; cursor: pointer; font-size: 0.85rem;">Hàng hư / bể không đền</label>
               </div>
             </div>
           </div>
