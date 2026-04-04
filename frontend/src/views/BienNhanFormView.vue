@@ -21,6 +21,8 @@ const toast = useToast();
 const isEdit = computed(() => !!route.params.id);
 const loading = ref(false);
 const saving = ref(false);
+const autoPrint = ref(false);
+const editBienNhanId = ref(null);
 const vanPhongs = ref([]);
 const previewMaSo = ref('');
 
@@ -170,9 +172,13 @@ async function save() {
     if (isEdit.value) {
       await api.put(`/bien-nhan/${route.params.id}`, form.value);
       toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật biên nhận', life: 3000 });
+      if (autoPrint.value) {
+        openPdf(route.params.id);
+      }
       router.push('/bien-nhan');
     } else {
       const { data: res } = await api.post('/bien-nhan', form.value);
+      const createdId = res.data?.id || res.id;
       toast.add({ severity: 'success', summary: 'Thành công', detail: `Tạo biên nhận ${previewMaSo.value}`, life: 3000 });
       // Thông báo khách hàng tự tạo
       if (res.auto_created_kh?.length) {
@@ -180,18 +186,53 @@ async function save() {
           toast.add({ severity: 'info', summary: 'Tự tạo khách hàng mới', detail: `${kh.ma_kh} — ${kh.ten_don_vi}`, life: 5000 });
         }
       }
-      const vpGui = form.value.van_phong_gui_id;
-      const vpNhan = form.value.van_phong_nhan_id;
-      form.value = { ...form.value, don_vi_gui: '', nguoi_gui: '', dien_thoai_gui: '', dia_chi_gui: '', don_vi_nhan: '', nguoi_nhan: '', dien_thoai_nhan: '', dia_chi_nhan: '', so_cccd: '', ten_hang_hoa: '', gia_tri_hang: null, trong_luong: null, thu_ho: 0, gia_cuoc: 0, can_xuat_hddt: false, hang_hu_khong_den: false };
-      form.value.van_phong_gui_id = vpGui;
-      form.value.van_phong_nhan_id = vpNhan;
-      fetchPreviewMaSo();
+      if (autoPrint.value && createdId) {
+        openPdf(createdId);
+      }
+      router.push('/bien-nhan');
     }
   } catch (err) {
     handleApiError(err, toast, 'Lỗi lưu biên nhận');
   } finally {
     saving.value = false;
   }
+}
+
+async function saveAndContinue() {
+  if (!validate()) return;
+  saving.value = true;
+  try {
+    const { data: res } = await api.post('/bien-nhan', form.value);
+    const createdId = res.data?.id || res.id;
+    toast.add({ severity: 'success', summary: 'Thành công', detail: `Tạo biên nhận ${previewMaSo.value}`, life: 3000 });
+    if (res.auto_created_kh?.length) {
+      for (const kh of res.auto_created_kh) {
+        toast.add({ severity: 'info', summary: 'Tự tạo khách hàng mới', detail: `${kh.ma_kh} — ${kh.ten_don_vi}`, life: 5000 });
+      }
+    }
+    if (autoPrint.value && createdId) {
+      openPdf(createdId);
+    }
+    // Reset form nhưng giữ tuyến
+    const vpGui = form.value.van_phong_gui_id;
+    const vpNhan = form.value.van_phong_nhan_id;
+    const trangThaiThu = form.value.trang_thai_thu;
+    const hinhThucGiao = form.value.hinh_thuc_giao;
+    form.value = { ...form.value, don_vi_gui: '', nguoi_gui: '', dien_thoai_gui: '', dia_chi_gui: '', don_vi_nhan: '', nguoi_nhan: '', dien_thoai_nhan: '', dia_chi_nhan: '', so_cccd: '', ten_hang_hoa: '', gia_tri_hang: null, trong_luong: null, thu_ho: 0, gia_cuoc: 0, can_xuat_hddt: false, hang_hu_khong_den: false };
+    form.value.van_phong_gui_id = vpGui;
+    form.value.van_phong_nhan_id = vpNhan;
+    form.value.trang_thai_thu = trangThaiThu;
+    form.value.hinh_thuc_giao = hinhThucGiao;
+    fetchPreviewMaSo();
+  } catch (err) {
+    handleApiError(err, toast, 'Lỗi lưu biên nhận');
+  } finally {
+    saving.value = false;
+  }
+}
+
+function openPdf(id) {
+  window.open(`/pdf/bien-nhan/${id}`, '_blank');
 }
 
 onMounted(() => {
@@ -353,11 +394,48 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Actions -->
-          <div class="form-actions" style="border-top: none; padding-top: 0;">
-            <Button :label="isEdit ? 'Cập nhật' : 'Lưu biên nhận'" icon="pi pi-check" :loading="saving" @click="save" />
-            <Button v-if="!isEdit" label="Lưu & Tạo tiếp" icon="pi pi-plus" severity="secondary" :loading="saving" @click="save" />
-            <Button label="Hủy" severity="secondary" text @click="router.push('/bien-nhan')" />
+          <!-- Action bar -->
+          <div class="bn-action-bar">
+            <div class="bn-action-left">
+              <div class="bn-autoprint-toggle">
+                <Checkbox v-model="autoPrint" :binary="true" inputId="autoPrint" />
+                <label for="autoPrint" class="autoprint-label">
+                  <i class="pi pi-print"></i> Lưu và In
+                </label>
+              </div>
+            </div>
+            <div class="bn-action-right">
+              <Button
+                v-if="isEdit"
+                label="In biên nhận"
+                icon="pi pi-print"
+                class="bn-btn-print"
+                outlined
+                @click="openPdf(route.params.id)"
+              />
+              <Button
+                :label="isEdit ? 'Cập nhật' : 'Lưu biên nhận'"
+                :icon="isEdit ? 'pi pi-check' : 'pi pi-save'"
+                class="bn-btn-save"
+                :loading="saving"
+                @click="save"
+              />
+              <Button
+                v-if="!isEdit"
+                label="Lưu & Tạo tiếp"
+                icon="pi pi-plus-circle"
+                class="bn-btn-continue"
+                :loading="saving"
+                @click="saveAndContinue"
+              />
+              <Button
+                label="Hủy"
+                icon="pi pi-times"
+                class="bn-btn-cancel"
+                text
+                @click="router.push('/bien-nhan')"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -394,4 +472,124 @@ onMounted(() => {
 }
 
 .req { color: var(--danger); }
+
+/* ═══════════════════════════════════════════ */
+/* Action Bar                                 */
+/* ═══════════════════════════════════════════ */
+.bn-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bn-action-left {
+  display: flex;
+  align-items: center;
+}
+
+.bn-action-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Autoprint toggle */
+.bn-autoprint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--surface-hover);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.bn-autoprint-toggle:has(input:checked) {
+  background: rgba(var(--primary-rgb, 59, 130, 246), 0.08);
+  border-color: var(--primary);
+}
+
+.autoprint-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-secondary);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bn-autoprint-toggle:has(input:checked) .autoprint-label {
+  color: var(--primary);
+}
+
+/* Save button — primary, prominent */
+:deep(.bn-btn-save) {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  border-color: #059669 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  padding: 0.5rem 1.25rem !important;
+  font-size: 0.85rem !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s;
+}
+
+:deep(.bn-btn-save:hover) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Save & Continue button — accent blue */
+:deep(.bn-btn-continue) {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  border-color: #2563eb !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+  transition: all 0.2s;
+}
+
+:deep(.bn-btn-continue:hover) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Print button — outlined teal */
+:deep(.bn-btn-print) {
+  color: #0891b2 !important;
+  border-color: #0891b2 !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  transition: all 0.2s;
+}
+
+:deep(.bn-btn-print:hover) {
+  background: rgba(8, 145, 178, 0.08) !important;
+  border-color: #0e7490 !important;
+}
+
+/* Cancel button — subtle */
+:deep(.bn-btn-cancel) {
+  color: var(--text-muted) !important;
+  font-weight: 500 !important;
+  font-size: 0.82rem !important;
+}
+
+:deep(.bn-btn-cancel:hover) {
+  color: var(--danger) !important;
+}
 </style>
