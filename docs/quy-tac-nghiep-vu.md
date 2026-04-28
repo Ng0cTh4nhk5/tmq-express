@@ -1,7 +1,7 @@
 # TMQ Express ERP — Quy tắc Nghiệp vụ
 
-> **Phiên bản:** 1.0  
-> **Ngày cập nhật:** 02/04/2026  
+> **Phiên bản:** 1.1  
+> **Ngày cập nhật:** 28/04/2026  
 > **Mục đích:** Liệt kê đầy đủ tất cả các quy tắc nghiệp vụ được cấu hình và thực thi trong phần mềm, bao gồm: ràng buộc dữ liệu, luồng trạng thái, tự động hoá, phân quyền, và quy tắc bảo mật.
 
 ---
@@ -232,6 +232,72 @@
 
 ---
 
+## 3a. Quy tắc Thu hộ (COD)
+
+### QT-COD-01: Tự động đặt trạng thái COD khi tạo/sửa BN
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Khi tạo BN với `thu_ho > 0`, hệ thống tự đặt `trang_thai_cod = 'cho_thu'`. Khi cập nhật `thu_ho` từ 0 → >0, đặt `cho_thu`. Khi `thu_ho` > 0 → 0 và COD chưa bắt đầu xử lý, đặt `khong_co` |
+| **Nơi thực thi** | `services/bien-nhan.service.js` → `buildFields()` + `updateBienNhan()` |
+
+### QT-COD-02: Luồng trạng thái COD tuần tự (State Machine)
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Trạng thái COD chỉ chuyển tuần tự: `cho_thu → da_thu → da_chuyen → da_tra`. Mỗi bước chỉ chấp nhận đúng 1 trạng thái đầu vào (positive guard) |
+| **Nơi thực thi** | `services/thu-ho.service.js` → `xacNhanThu/Chuyen/TraCOD()` |
+
+**Bảng chuyển đổi:**
+
+| Hàm | Trạng thái vào | Trạng thái ra | Phiếu tạo |
+|---|---|---|---|
+| `xacNhanThuCOD` | `cho_thu` | `da_thu` | PT tại VP nhận |
+| `xacNhanChuyenCOD` | `da_thu` | `da_chuyen` | PC tại VP nhận + PT tại VP gửi |
+| `xacNhanTraCOD` | `da_chuyen` | `da_tra` | PC tại VP gửi |
+
+### QT-COD-03: Auto-thu COD khi giao hàng
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Khi trạng thái vận chuyển chuyển sang `khach_da_nhan`, nếu BN có `thu_ho > 0` và `trang_thai_cod = 'cho_thu'`, hệ thống tự động xác nhận thu COD |
+| **Graceful degradation** | Nếu auto-thu fail, trạng thái vận chuyển vẫn update OK. Batch mode trả chi tiết BN nào thu thành công/thất bại |
+| **Nơi thực thi** | `routes/bien-nhan.routes.js` → PATCH `/:id/trang-thai` + `/batch-trang-thai` |
+
+### QT-COD-04: Không xóa BN có COD đang xử lý
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Không cho xóa BN có `trang_thai_cod` là `da_thu`, `da_chuyen`, hoặc `da_tra` vì có PhieuThu/PhieuChi liên quan |
+| **Lỗi trả về** | HTTP 400 — "Biên nhận có COD đang xử lý hoặc đã hoàn tất, không thể xóa" |
+| **Nơi thực thi** | `services/bien-nhan.service.js` → `deleteBienNhan()` |
+
+### QT-COD-05: Không xóa thu_ho khi COD đang xử lý
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Khi cập nhật BN, nếu `thu_ho` giảm về 0 nhưng COD đã bắt đầu xử lý (`da_thu`, `da_chuyen`, `da_tra`), từ chối |
+| **Lỗi trả về** | HTTP 400 — "Không thể xóa tiền thu hộ khi COD đang được xử lý" |
+| **Nơi thực thi** | `services/bien-nhan.service.js` → `updateBienNhan()` |
+
+### QT-COD-06: Phân quyền COD
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Xem danh sách / Tổng hợp** | Admin, Accountant |
+| **Xác nhận thu** | Admin, Accountant, Staff |
+| **Xác nhận chuyển / trả** | Admin, Accountant |
+| **Nơi thực thi** | `routes/thu-ho.routes.js` → `preHandler` RBAC |
+
+### QT-COD-07: Transaction-safe createWithCode
+
+| Thuộc tính | Chi tiết |
+|---|---|
+| **Mô tả** | Khi tạo phiếu thu/chi trong COD transaction, `createWithCode` nhận transaction client (`tx`) để đọc mã cuối cùng trong cùng transaction context, tránh race condition |
+| **Nơi thực thi** | `utils/ma-so-generator.js` + `services/thu-ho.service.js` |
+
+---
+
 ## 4. Quy tắc Bảng kê HĐĐT
 
 ### QT-BK-01: Chỉ BN đánh dấu HĐĐT và chưa vào bảng kê
@@ -289,9 +355,9 @@
 
 | Thuộc tính | Chi tiết |
 |---|---|
-| **Mô tả** | Hàm `createWithCode()` bọc việc sinh mã + INSERT trong vòng retry. Nếu gặp lỗi Prisma `P2002` (unique violation), tự tăng số và thử lại |
-| **Max retry** | 3 lần |
-| **Lỗi cuối** | "Không thể tạo mã {prefix} sau 3 lần thử" |
+| **Mô tả** | Hàm `createWithCode()` bọc việc sinh mã + INSERT trong vòng retry. Nếu gặp lỗi Prisma `P2002` (unique violation), tự tăng số và thử lại. Hỗ trợ truyền transaction client (`tx`) để đọc mã trong cùng transaction context |
+| **Max retry** | 10 lần |
+| **Lỗi cuối** | "Không thể tạo mã {prefix} sau 10 lần thử" |
 | **Nơi thực thi** | `utils/ma-so-generator.js` → `createWithCode()` |
 
 ---
@@ -314,6 +380,9 @@
 | **Phiếu chi (xem/tạo/sửa)** | ✅ | ❌ | ✅ |
 | **Phiếu chi (huỷ)** | ✅ | ❌ | ❌ |
 | **Công nợ** | ✅ | ❌ | ✅ |
+| **Thu hộ COD (xem/tổng hợp)** | ✅ | ❌ | ✅ |
+| **Thu hộ COD (xác nhận thu)** | ✅ | ✅ | ✅ |
+| **Thu hộ COD (chuyển/trả)** | ✅ | ❌ | ✅ |
 | **Bảng kê HĐĐT** | ✅ | ❌ | ❌ |
 | **Báo cáo** | ✅ | ❌ | ✅ |
 | **Quản lý VP** | ✅ | ❌ | ❌ |

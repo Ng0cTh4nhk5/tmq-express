@@ -25,7 +25,7 @@ export default async function scanRoutes(fastify) {
         select: {
           id: true,
           ma_so: true,
-          ngay_nhan: true,
+          ngay_bien_nhan: true,
           ten_hang_hoa: true,
           trang_thai: true,
           van_phong_gui: { select: { ma_vp: true, ten: true } },
@@ -60,7 +60,7 @@ export default async function scanRoutes(fastify) {
         data: {
           id: bn.id,
           ma_so: bn.ma_so,
-          ngay_nhan: bn.ngay_nhan,
+          ngay_bien_nhan: bn.ngay_bien_nhan,
           van_phong_gui: bn.van_phong_gui,
           van_phong_nhan: bn.van_phong_nhan,
           ten_hang_hoa: bn.ten_hang_hoa,

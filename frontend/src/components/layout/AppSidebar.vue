@@ -14,11 +14,9 @@ const menuItems = computed(() => {
     { label: 'Biên nhận', icon: 'pi pi-file-edit', to: '/bien-nhan', show: auth.hasRole('admin', 'staff', 'accountant') },
     { label: 'Khách hàng', icon: 'pi pi-users', to: '/khach-hang', show: true },
     { label: 'Bảng kê HĐĐT', icon: 'pi pi-file-excel', to: '/bang-ke', show: auth.isAdmin },
-    { label: 'Phiếu thu', icon: 'pi pi-wallet', to: '/phieu-thu', show: auth.hasRole('admin', 'accountant') },
-    { label: 'Phiếu chi', icon: 'pi pi-credit-card', to: '/phieu-chi', show: auth.hasRole('admin', 'accountant') },
-    { label: 'Công nợ', icon: 'pi pi-chart-bar', to: '/cong-no', show: auth.hasRole('admin', 'accountant') },
-    { label: 'Dashboard', icon: 'pi pi-chart-pie', to: '/dashboard', show: true },
-    { label: 'Báo cáo', icon: 'pi pi-print', to: '/bao-cao', show: auth.hasRole('admin', 'accountant') },
+    { label: 'Bảng kê công nợ', icon: 'pi pi-chart-bar', to: '/cong-no', show: auth.hasRole('admin', 'accountant') },
+    { label: 'Thu hộ (COD)', icon: 'pi pi-money-bill', to: '/thu-ho', show: auth.hasRole('admin', 'accountant') },
+    { label: 'Báo cáo doanh thu', icon: 'pi pi-chart-line', to: '/doanh-thu', show: auth.hasRole('admin', 'accountant') },
   ];
 
   if (auth.isAdmin) {
@@ -26,6 +24,7 @@ const menuItems = computed(() => {
       { type: 'divider' },
       { label: 'Văn phòng', icon: 'pi pi-building', to: '/van-phong', show: true },
       { label: 'Nhân viên', icon: 'pi pi-id-card', to: '/nhan-vien', show: true },
+      { label: 'Chành', icon: 'pi pi-map-marker', to: '/chanh', show: true },
     );
   }
 
@@ -56,11 +55,11 @@ function handleMouseLeave() {
     <!-- Brand -->
     <div class="sidebar-brand">
       <div class="brand-icon">
-        <i class="pi pi-truck"></i>
+        <img src="/logo.png" alt="TMQ" />
       </div>
       <transition name="fade-text">
         <div v-if="ui.sidebarExpanded" class="brand-text">
-          <span class="brand-name">TMQ Express</span>
+          <span class="brand-name">TMQ <span class="brand-accent">Express</span></span>
           <span class="brand-sub">Hệ thống quản lý</span>
         </div>
       </transition>
@@ -135,14 +134,19 @@ function handleMouseLeave() {
   width: 34px;
   height: 34px;
   min-width: 34px;
-  background: linear-gradient(135deg, var(--primary), #7c3aed);
   border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 1rem;
   margin: 0 auto;
+  overflow: hidden;
+}
+
+.brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius);
 }
 
 .sidebar.expanded .brand-icon {
@@ -160,6 +164,10 @@ function handleMouseLeave() {
   font-weight: 700;
   font-size: 0.9rem;
   line-height: 1.2;
+}
+
+.brand-accent {
+  color: #f97316;
 }
 
 .brand-sub {

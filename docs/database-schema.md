@@ -2,8 +2,8 @@
 
 > **Database Engine:** PostgreSQL 15+
 > **ORM:** Prisma 6.x
-> **Tổng cộng:** 12 bảng, 8 enums, 24 indexes, 15 foreign keys
-> **Cập nhật lần cuối:** 2026-04-05 (Phase 1: Security Upgrade)
+> **Tổng cộng:** 12 bảng, 9 enums, 25 indexes, 15 foreign keys
+> **Cập nhật lần cuối:** 2026-04-28 (Phase 2: COD Workflow)
 
 ---
 
@@ -111,6 +111,7 @@ erDiagram
         boolean can_xuat_hddt
         boolean da_vao_bang_ke
         enum hinh_thuc_giao
+        enum trang_thai_cod
         timestamp created_at
         timestamp updated_at
     }
@@ -343,6 +344,18 @@ erDiagram
 | `doanh_nghiep` | Doanh nghiệp (Cty, DNTN, Cửa hàng...) |
 | `ca_nhan` | Cá nhân thường xuyên |
 
+### 3.9. TrangThaiCOD — Trạng thái thu hộ (COD)
+
+| Giá trị | Mô tả | Chuyển bởi |
+|---|---|---|
+| `khong_co` | Không có thu hộ | Mặc định khi `thu_ho = 0` |
+| `cho_thu` | Chờ thu từ người nhận | Tự động khi tạo BN với `thu_ho > 0` |
+| `da_thu` | VP nhận đã thu tiền | `xacNhanThuCOD()` hoặc auto-thu khi giao hàng |
+| `da_chuyen` | Tiền đã chuyển về VP gửi | `xacNhanChuyenCOD()` |
+| `da_tra` | Đã trả cho người gửi | `xacNhanTraCOD()` |
+
+> **State Machine:** `cho_thu → da_thu → da_chuyen → da_tra`. Mỗi bước chỉ chấp nhận đúng 1 trạng thái đầu vào. Validate ở application layer (`thu-ho.service.js`).
+
 ---
 
 ## 4. Chi tiết thuộc tính từng bảng
@@ -432,6 +445,7 @@ erDiagram
 | `can_xuat_hddt` | BOOLEAN | DEFAULT `false`, INDEX (composite) | Cần xuất hoá đơn điện tử |
 | `da_vao_bang_ke` | BOOLEAN | DEFAULT `false`, INDEX (composite) | Đã đưa vào bảng kê HĐĐT |
 | `hinh_thuc_giao` | ENUM `HinhThucGiao` | DEFAULT `'tan_noi'` | Hình thức giao hàng |
+| `trang_thai_cod` | ENUM `TrangThaiCOD` | DEFAULT `'khong_co'`, INDEX | Trạng thái thu hộ COD |
 | `created_at` | TIMESTAMP(3) | DEFAULT `now()` | Ngày tạo |
 | `updated_at` | TIMESTAMP(3) | AUTO (`@updatedAt`) | Tự động cập nhật khi sửa |
 
@@ -589,6 +603,7 @@ erDiagram
 | bien_nhan | `trang_thai` | `bien_nhan_trang_thai_idx` | Filter/count theo trạng thái |
 | bien_nhan | `ngay_nhan` | `bien_nhan_ngay_nhan_idx` | Filter theo khoảng ngày |
 | bien_nhan | `(can_xuat_hddt, da_vao_bang_ke)` | `bien_nhan_can_xuat_hddt_da_vao_bang_ke_idx` | Tìm BN cần xuất HĐĐT chưa vào bảng kê |
+| bien_nhan | `trang_thai_cod` | `bien_nhan_trang_thai_cod_idx` | Filter theo trạng thái COD |
 | lich_su_trang_thai | `bien_nhan_id` | `lich_su_trang_thai_bien_nhan_id_idx` | Truy vấn lịch sử theo BN |
 | phieu_thu | `ngay_thu` | `phieu_thu_ngay_thu_idx` | Filter theo ngày |
 | phieu_thu | `van_phong_id` | `phieu_thu_van_phong_id_idx` | Filter theo VP |

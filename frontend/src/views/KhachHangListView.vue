@@ -75,16 +75,15 @@ onMounted(loadData);
       <DataTable
         :value="customers" :loading="loading" :totalRecords="totalRecords" :rows="limit" :lazy="true"
         paginator :first="(page - 1) * limit" @page="onPage" stripedRows size="small" responsiveLayout="scroll">
-        <Column field="ma_kh" header="Mã KH" style="width: 85px;" sortable />
+        <Column field="ma_kh" header="Mã KH" style="width: 85px;" />
         <Column field="loai_kh" header="Loại khách hàng" style="width: 120px;">
           <template #body="{ data }">
             <Tag :value="data.loai_kh === 'doanh_nghiep' ? 'Doanh nghiệp' : 'Cá nhân'" :severity="data.loai_kh === 'doanh_nghiep' ? 'info' : 'secondary'" />
           </template>
         </Column>
-        <Column field="ten_don_vi" header="Tên đơn vị" sortable />
+        <Column field="ten_don_vi" header="Tên đơn vị" />
         <Column field="nguoi_lien_he" header="Người liên hệ" />
         <Column field="dien_thoai" header="Số điện thoại" style="width: 120px;" />
-        <Column field="dia_chi" header="Địa chỉ" />
         <Column header="Trạng thái" style="width: 100px;">
           <template #body="{ data }">
             <Tag :value="data.active ? 'Hoạt động' : 'Ngừng'" :severity="data.active ? 'success' : 'danger'" />

@@ -2,20 +2,6 @@ import { requestContext } from './request-context.js';
 import prisma from '../config/database.js';
 
 /**
- * Entities to track for audit logging.
- * Map Prisma model names to readable entity names.
- */
-const AUDITED_ENTITIES = {
-  bienNhan: 'bien_nhan',
-  phieuThu: 'phieu_thu',
-  phieuChi: 'phieu_chi',
-  congNo: 'cong_no',
-  nhanVien: 'nhan_vien',
-  khachHang: 'khach_hang',
-  bangKe: 'bang_ke',
-};
-
-/**
  * Fields to exclude from audit log data (sensitive/noise)
  */
 const EXCLUDED_FIELDS = ['password_hash', 'token_version', 'failed_login_count', 'locked_until'];
@@ -56,5 +42,3 @@ export async function writeAuditLog({ action, entity, entityId, oldData, newData
     console.warn('[AuditLog] Failed to write:', err.message);
   }
 }
-
-export { AUDITED_ENTITIES };

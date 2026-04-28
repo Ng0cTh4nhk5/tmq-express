@@ -1,7 +1,7 @@
 # TMQ Express ERP — Hướng dẫn Sử dụng
 
-> **Phiên bản:** 1.1  
-> **Ngày cập nhật:** 02/04/2026  
+> **Phiên bản:** 1.3  
+> **Ngày cập nhật:** 22/04/2026  
 > **Đối tượng:** Nhân viên, Kế toán, Quản trị viên
 
 ---
@@ -9,18 +9,17 @@
 ## Mục lục
 
 1. [Đăng nhập & Giao diện](#1-đăng-nhập--giao-diện)
-2. [Trang chủ & Dashboard](#2-trang-chủ--dashboard)
+2. [Trang chủ](#2-trang-chủ)
 3. [Quản lý Biên nhận](#3-quản-lý-biên-nhận)
 4. [Quản lý Khách hàng](#4-quản-lý-khách-hàng)
-5. [Phiếu thu](#5-phiếu-thu)
-6. [Phiếu chi](#6-phiếu-chi)
-7. [Công nợ](#7-công-nợ)
-8. [Bảng kê HĐĐT](#8-bảng-kê-hđđt)
-9. [Báo cáo](#9-báo-cáo)
-10. [Quản lý Văn phòng](#10-quản-lý-văn-phòng)
-11. [Quản lý Nhân viên](#11-quản-lý-nhân-viên)
-12. [Tra cứu QR công khai](#12-tra-cứu-qr-công-khai)
-13. [Câu hỏi thường gặp](#13-câu-hỏi-thường-gặp)
+5. [Công nợ & Đối soát](#5-công-nợ--đối-soát)
+6. [Bảng kê HĐĐT](#6-bảng-kê-hđđt)
+7. [Báo cáo Doanh thu](#7-báo-cáo-doanh-thu)
+8. [Quản lý Văn phòng](#8-quản-lý-văn-phòng)
+9. [Quản lý Nhân viên](#9-quản-lý-nhân-viên)
+10. [Quản lý Chành](#10-quản-lý-chành)
+11. [Tra cứu QR công khai](#11-tra-cứu-qr-công-khai)
+12. [Câu hỏi thường gặp](#12-câu-hỏi-thường-gặp)
 
 ---
 
@@ -62,16 +61,15 @@ Sau khi đăng nhập, giao diện gồm 3 phần:
 
 | Icon | Tên | Ai thấy |
 |---|---|---|
-| 📊 | Dashboard | Tất cả |
+| 🏠 | Trang chủ | Tất cả |
 | 📝 | Biên nhận | Tất cả (Staff chỉ xem BN liên quan VP mình) |
 | 👥 | Khách hàng | Tất cả |
 | 📋 | Bảng kê HĐĐT | Admin |
-| 💰 | Phiếu thu | Admin, Kế toán |
-| 💳 | Phiếu chi | Admin, Kế toán |
-| 📈 | Công nợ | Admin, Kế toán |
-| 🖨️ | Báo cáo | Admin, Kế toán |
+| 📈 | Bảng kê công nợ | Admin, Kế toán |
+| 📊 | Báo cáo doanh thu | Admin, Kế toán |
 | 🏢 | Văn phòng | Admin |
 | 🪪 | Nhân viên | Admin |
+| 🚚 | Chành | Admin |
 
 ### 1.4. Đăng xuất
 
@@ -79,26 +77,13 @@ Nhấn **nút đăng xuất** ở góc trên phải Header. Bạn sẽ được 
 
 ---
 
-## 2. Trang chủ & Dashboard
+## 2. Trang chủ
 
-### 2.1. Dashboard
+Sau khi đăng nhập, trang chủ hiển thị:
 
-Vào menu **Dashboard** để xem tổng quan hoạt động kinh doanh:
-
-**Các thẻ thống kê (trên cùng):**
-| Thẻ | Ý nghĩa |
-|---|---|
-| 📦 BN hôm nay | Số biên nhận tạo trong ngày |
-| 📋 Tổng BN | Tổng số biên nhận trong hệ thống |
-| 💰 Doanh thu tháng | Tổng cước thu trong tháng hiện tại |
-| ⚠️ Công nợ tồn | Tổng tiền công nợ chưa thu + số lượng |
-
-**Các biểu đồ:**
-- **Doanh thu 7 ngày** (cột): Giá trị cước thu mỗi ngày trong 7 ngày qua
-- **Tỷ lệ tuyến** (tròn): Top 10 tuyến vận chuyển (VP gửi → VP nhận) theo số BN
-- **Thu - Chi theo tháng** (đường): So sánh thu/chi 6 tháng gần nhất
-
-> **Mẹo:** Dashboard tự động cập nhật mỗi 60 giây. Bạn cũng có thể nhấn nút 🔄 để làm mới ngay.
+- **Lời chào** theo buổi (sáng/chiều/tối) + tên người dùng
+- **Thao tác nhanh**: Các nút truy cập nhanh đến modules chính (tuỳ quyền)
+- **Biên nhận gần đây**: 5 biên nhận mới nhất để tra cứu nhanh
 
 ---
 
@@ -218,117 +203,56 @@ Vào menu **Dashboard** để xem tổng quan hoạt động kinh doanh:
 
 ---
 
-## 5. Phiếu thu
+## 5. Công nợ & Đối soát
 
 *Dành cho: Admin, Kế toán*
 
-### 5.1. Xem danh sách
+### 5.1. Bảng kê công nợ tháng
 
-1. Vào menu **Phiếu thu**
-2. Tìm kiếm bằng ô tìm kiếm
-3. Mỗi dòng hiển thị: Số phiếu, Ngày, Đối tượng, Lý do, Số tiền, Hình thức, Liên kết BN, NV lập
+1. Vào menu **Bảng kê công nợ**
+2. Chọn **Tháng** và **Năm** → Nhấn **Xem**
+3. Bảng hiển thị tổng hợp công nợ theo **đối tượng** (đơn vị gửi)
+4. **3 thẻ tổng hợp**: Tổng nợ, Đã thu, Còn nợ
+5. Nhấn **Xuất tất cả (Excel)** để tải bảng kê toàn bộ
 
-### 5.2. Tạo phiếu thu
+### 5.2. Chi tiết đối tượng
 
-1. Nhấn **+ Tạo phiếu**
-2. Điền:
-   - **Đối tượng**: Tên người/đơn vị nộp tiền
-   - **Lý do**: Nội dung thu
-   - **Số tiền** (VNĐ)
-   - **Hình thức**: Tiền mặt hoặc Chuyển khoản
-3. Nhấn **Lập phiếu** — Mã tự động (VD: `PT-0001`)
+1. **Click vào tên đối tượng** trên bảng kê → Dialog chi tiết mở ra
+2. Xem từng phiếu công nợ: STT, Ngày, Mã BN, Hàng hoá, Số tiền, Trạng thái
+3. Trong dialog có 2 nút:
+   - **Xuất PDF** — Tải báo cáo công nợ chi tiết (khổ A4, có header TMQ, bảng chi tiết, tổng cộng)
+   - **Xuất Excel** — Tải bảng kê Excel cho đối tượng đó
 
-> **Auto-fill từ biên nhận:** Nếu tạo phiếu thu từ biên nhận (chọn BN liên kết), hệ thống tự điền: Đối tượng = đơn vị/người gửi, Lý do = "Thu cước BN {mã số}", Số tiền = giá cước trên BN.
+### 5.3. Đối soát cước
 
-### 5.3. In PDF
+Phần **"Đối soát cước"** nằm bên dưới bảng kê tháng:
 
-Nhấn **biểu tượng PDF** 📄 → PDF mở tab mới → In
+1. Chọn **Tháng/Năm** → Nhấn **Đối soát**
+2. Bảng so sánh cho từng đối tượng:
+   - **Cước thực tế** — tổng cước trên biên nhận gửi trong tháng
+   - **Cước HĐĐT** — tổng cước trên bảng kê HĐĐT đã xuất
+   - **Chênh lệch** — HĐĐT − Thực tế
+3. Dòng **bất thường** được highlight đỏ + icon ⚠️
 
-### 5.4. Sửa phiếu thu
+> **Bất thường là gì?** Khi HĐĐT cao hơn cước thực tế, hoặc đối tượng gửi ≤5 BN nhưng xuất HĐĐT >1 triệu.
 
-1. Nhấn **biểu tượng bút chì** ✏️ trên dòng phiếu
-2. Chỉnh sửa đối tượng, lý do, số tiền, hình thức
-3. Nhấn **Cập nhật**
-
-> **Lưu ý:** Non-admin chỉ sửa phiếu do mình tạo. Số tiền phải ≥ 1 VNĐ.
-
-### 5.5. Hủy phiếu thu (chỉ Admin)
-
-1. Nhấn **biểu tượng X** trên dòng phiếu
-2. Xác nhận hủy
-3. Nếu phiếu liên kết với công nợ, công nợ sẽ được **revert về "Chưa thu"** tự động
-4. Phiếu đã hủy **không hiển thị** trong danh sách mặc định
-
-> **Cảnh báo:** Hủy phiếu thu không thể hoàn tác! Phiếu đã hủy trước đó không thể hủy lại.
-
----
-
-## 6. Phiếu chi
-
-*Dành cho: Admin, Kế toán*
-
-### 6.1. Xem danh sách
-
-Vào menu **Phiếu chi** — giao diện tương tự Phiếu thu
-
-### 6.2. Tạo phiếu chi
-
-1. Nhấn **+ Tạo phiếu**
-2. Điền: **Người nhận**, **Lý do**, **Số tiền**, **Hình thức**
-3. Nhấn **Lập phiếu**
-
-### 6.3. Sửa phiếu chi
-
-1. Nhấn **biểu tượng bút chì** ✏️ → Sửa → **Cập nhật**
-2. Non-admin chỉ sửa phiếu do mình tạo
-
-### 6.4. In PDF & Hủy
-
-- In PDF tương tự Phiếu thu
-- Hủy chỉ Admin — phiếu bị đánh dấu "Đã hủy" (soft delete), không xóa khỏi DB
-
----
-
-## 7. Công nợ
-
-*Dành cho: Admin, Kế toán*
-
-### 7.1. Xem danh sách
-
-1. Vào menu **Công nợ**
-2. Phía trên hiển thị **tổng hợp**: Tổng nợ (VNĐ) & Số công nợ
-3. **Lọc** theo trạng thái:
-   - Chưa thu & Quá hạn (mặc định)
-   - Chưa thu
-   - Quá hạn
-   - Đã thu
-   - Tất cả
-
-### 7.2. Xác nhận thu
-
-Khi khách hàng thanh toán khoản nợ:
+### 5.4. Xác nhận thu công nợ
 
 1. Nhấn **biểu tượng xác nhận** ✅ trên dòng công nợ
-2. Chọn **hình thức thanh toán** (Tiền mặt / Chuyển khoản)
-3. Thêm **ghi chú** nếu cần
-4. Nhấn **Xác nhận**
-
-**Kết quả:**
-- Hệ thống **tự động tạo Phiếu thu** liên kết
-- Trạng thái công nợ chuyển thành **"Đã thu"**
-- Phiếu thu xuất hiện trong module Phiếu thu
+2. Chọn hình thức thanh toán → Nhấn **Xác nhận**
+3. Hệ thống tự tạo **Phiếu thu** liên kết + chuyển công nợ thành "Đã thu"
 
 ---
 
-## 8. Bảng kê HĐĐT
+## 6. Bảng kê HĐĐT
 
 *Dành cho: Admin*
 
-### 8.1. Tab "BN chờ"
+### 6.1. Tab "BN chờ"
 
 Hiển thị danh sách biên nhận đã đánh dấu **"Cần xuất HĐĐT"** nhưng chưa vào bảng kê nào.
 
-### 8.2. Xuất bảng kê
+### 6.2. Xuất bảng kê
 
 1. Ở tab **BN chờ**, tích ☑️ chọn các biên nhận cần xuất
 2. Nhấn **Xuất bảng kê**
@@ -337,54 +261,41 @@ Hiển thị danh sách biên nhận đã đánh dấu **"Cần xuất HĐĐT"**
    - **Tải file Excel** tự động
    - Các BN được đánh dấu "Đã vào bảng kê"
 
-### 8.3. Tab "Lịch sử"
+### 6.3. Tab "Lịch sử"
 
 - Xem danh sách bảng kê đã xuất (mã, ngày, số BN, tổng cước)
 - Nhấn **biểu tượng tải** ⬇️ để tải lại file Excel
 
 ---
 
-## 9. Báo cáo
+## 7. Báo cáo Doanh thu
 
 *Dành cho: Admin, Kế toán*
 
-### 9.1. Xem báo cáo
+### 7.1. Xem báo cáo
 
-1. Vào menu **Báo cáo**
-2. Chọn **loại báo cáo** từ dropdown:
-   - 📈 Doanh thu
-   - 💵 Sổ quỹ
-   - 📦 Biên nhận theo tuyến
-   - 📋 Công nợ tổng hợp
-3. (Tùy chọn) Chọn **khoảng ngày** lọc
-4. Nhấn **Xem báo cáo**
+1. Vào menu **Báo cáo doanh thu**
+2. Chọn bộ lọc:
+   - **Từ ngày / Đến ngày** — khoảng thời gian
+   - **VP gửi** — lọc theo văn phòng gửi (hoặc Tất cả)
+   - **Nhóm theo** — Ngày / Tuần / Tháng / Năm
+3. Nhấn **Xem**
 
-### 9.2. Chi tiết từng loại báo cáo
+### 7.2. Kết quả
 
-**📈 Báo cáo Doanh thu:**
-- Bảng chi tiết: Mã BN, Ngày, Đơn vị gửi, Đơn vị nhận, Hàng, Cước, TT thu
-- Tổng hợp: Tổng số BN, Tổng cước
+- **4 thẻ tổng hợp**: Số BN, Tổng doanh thu, Đã thu, Chưa thu + Công nợ
+- **Bảng chi tiết** theo kỳ: Kỳ, Số BN, Tổng cước, Đã thu, Chưa thu, Công nợ, Thu hộ
+- **Footer tổng cộng** phía dưới bảng
 
-**💵 Báo cáo Sổ quỹ:**
-- Bảng phiếu thu (mã, ngày, đối tượng, số tiền)
-- Bảng phiếu chi (mã, ngày, người nhận, số tiền)
-- Tổng hợp: Tổng thu, Tổng chi, **Tồn quỹ** (Thu − Chi)
-
-**📦 BN theo tuyến:**
-- Bảng: Tuyến (VP gửi → VP nhận), Số BN, Tổng cước, Đã giao, Công nợ
-- Sắp xếp theo số BN giảm dần
-
-**📋 Công nợ tổng hợp:**
-- Bảng: Mã công nợ, Mã BN, Đối tượng, Số tiền nợ, Ngày phát sinh, TT
-- Tổng hợp: Tổng nợ, Số khoản
+> **Mẹo:** Trang tự động load tháng hiện tại khi mở. Dùng nhóm "Ngày" để đối soát cuối ngày, "Tháng" cho báo cáo tháng.
 
 ---
 
-## 10. Quản lý Văn phòng
+## 8. Quản lý Văn phòng
 
 *Dành cho: Admin*
 
-### 10.1. Xem & Tạo
+### 8.1. Xem & Tạo
 
 1. Vào menu **Văn phòng**
 2. Nhấn **Thêm VP** → Điền:
@@ -393,11 +304,11 @@ Hiển thị danh sách biên nhận đã đánh dấu **"Cần xuất HĐĐT"**
    - Địa chỉ, SĐT
 3. **Lưu**
 
-### 10.2. Sửa
+### 8.2. Sửa
 
 Nhấn ✏️ → Chỉnh sửa (không sửa được mã VP) → **Cập nhật**
 
-### 10.3. Bật/Tắt
+### 8.3. Bật/Tắt
 
 - Bật/Tắt bằng **toggle switch** trên mỗi dòng
 - **Không thể tắt** VP nếu:
@@ -406,16 +317,16 @@ Nhấn ✏️ → Chỉnh sửa (không sửa được mã VP) → **Cập nhậ
 
 ---
 
-## 11. Quản lý Nhân viên
+## 9. Quản lý Nhân viên
 
 *Dành cho: Admin*
 
-### 11.1. Xem danh sách
+### 9.1. Xem danh sách
 
 1. Vào menu **Nhân viên**
 2. Danh sách hiển thị: Mã NV, Tên, VP, Vai trò, Trạng thái
 
-### 11.2. Thêm nhân viên
+### 9.2. Thêm nhân viên
 
 1. Nhấn **+ Thêm NV**
 2. Điền:
@@ -427,19 +338,19 @@ Nhấn ✏️ → Chỉnh sửa (không sửa được mã VP) → **Cập nhậ
    - **Văn phòng**: Chọn VP
 3. **Lưu**
 
-### 11.3. Sửa thông tin
+### 9.3. Sửa thông tin
 
 Nhấn ✏️ → Sửa tên, vai trò, VP → **Cập nhật**
 
 > Không sửa được mã NV và username.
 
-### 11.4. Bật/Tắt nhân viên
+### 9.4. Bật/Tắt nhân viên
 
 - Nhấn toggle để tắt (vô hiệu hóa) NV
 - NV bị tắt không thể đăng nhập
 - **Không thể tự tắt chính mình**
 
-### 11.5. Reset mật khẩu
+### 9.5. Reset mật khẩu
 
 1. Nhấn **biểu tượng khóa** 🔒 trên dòng NV
 2. Xác nhận reset
@@ -450,9 +361,28 @@ Nhấn ✏️ → Sửa tên, vai trò, VP → **Cập nhật**
 
 ---
 
-## 12. Tra cứu QR công khai
+## 10. Quản lý Chành
 
-### 12.1. Khách hàng tra cứu trạng thái
+*Dành cho: Admin*
+
+### 10.1. Xem & Tạo
+
+1. Vào menu **Chành**
+2. Nhấn **Thêm chành** → Điền:
+   - **Tên chành**, Địa chỉ, Điện thoại, Người liên hệ
+   - **Văn phòng** thuộc
+3. **Lưu**
+
+### 10.2. Sửa & Bật/Tắt
+
+- Nhấn ✏️ → Chỉnh sửa → **Cập nhật**
+- Bật/Tắt bằng toggle switch
+
+---
+
+## 11. Tra cứu QR công khai
+
+### 11.1. Khách hàng tra cứu trạng thái
 
 Khi khách nhận biên nhận (bản in PDF), trên đó có **Mã QR**:
 
@@ -466,7 +396,7 @@ Khi khách nhận biên nhận (bản in PDF), trên đó có **Mã QR**:
 
 ---
 
-## 13. Câu hỏi thường gặp
+## 12. Câu hỏi thường gặp
 
 ### Q: Tôi quên mật khẩu, phải làm sao?
 **A:** Liên hệ Admin để reset mật khẩu. Admin vào module Nhân viên → nhấn biểu tượng khóa → gửi mật khẩu mới cho bạn.

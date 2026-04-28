@@ -8,6 +8,7 @@ import Select from 'primevue/select';
 import Button from 'primevue/button';
 import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
+import { handleApiError } from '../utils/error-handler';
 
 const route = useRoute();
 const router = useRouter();
@@ -22,7 +23,9 @@ const loaiKhOptions = [
 ];
 
 const form = ref({
-  ten_don_vi: '', loai_kh: 'ca_nhan', nguoi_lien_he: '', dien_thoai: '', dia_chi: '', email: '', ma_so_thue: '', ghi_chu: '',
+  ten_don_vi: '', loai_kh: 'ca_nhan', nguoi_lien_he: '', dien_thoai: '',
+  so_cccd: '', dia_chi: '',
+  email: '', ma_so_thue: '', ghi_chu: '',
 });
 const maKh = ref('');
 
@@ -35,7 +38,8 @@ async function loadKH() {
     maKh.value = kh.ma_kh;
     form.value = {
       ten_don_vi: kh.ten_don_vi || '', loai_kh: kh.loai_kh || 'ca_nhan', nguoi_lien_he: kh.nguoi_lien_he || '',
-      dien_thoai: kh.dien_thoai || '', dia_chi: kh.dia_chi || '',
+      dien_thoai: kh.dien_thoai || '',
+      so_cccd: kh.so_cccd || '', dia_chi: kh.dia_chi || '',
       email: kh.email || '', ma_so_thue: kh.ma_so_thue || '', ghi_chu: kh.ghi_chu || '',
     };
   } catch {
@@ -71,7 +75,7 @@ async function save() {
     }
     router.push('/khach-hang');
   } catch (err) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: err.response?.data?.error?.message || 'Có lỗi', life: 5000 });
+    handleApiError(err, toast, 'Không thể lưu khách hàng');
   } finally {
     saving.value = false;
   }
@@ -116,9 +120,15 @@ onMounted(loadKH);
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Địa chỉ</label>
-        <InputText v-model="form.dia_chi" placeholder="Nhập địa chỉ" fluid />
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">CCCD/CMND</label>
+          <InputText v-model="form.so_cccd" placeholder="Số CCCD..." fluid />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Địa chỉ</label>
+          <InputText v-model="form.dia_chi" placeholder="Địa chỉ liên hệ..." fluid />
+        </div>
       </div>
 
       <div class="form-grid">

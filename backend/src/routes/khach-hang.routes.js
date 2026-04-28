@@ -28,6 +28,13 @@ export default async function khachHangRoutes(fastify) {
   // GET /api/khach-hang/:id
   fastify.get('/:id', {
     preHandler: [fastify.authenticate],
+    schema: {
+      params: {
+        type: 'object',
+        properties: { id: { type: 'integer' } },
+        required: ['id'],
+      },
+    },
     handler: async (request, reply) => {
       const data = await getKhachHang(Number(request.params.id));
       if (!data) return reply.status(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy khách hàng' } });
@@ -46,10 +53,11 @@ export default async function khachHangRoutes(fastify) {
           ten_don_vi: { type: 'string', minLength: 1 },
           loai_kh: { type: 'string', enum: ['doanh_nghiep', 'ca_nhan'] },
           nguoi_lien_he: { type: 'string' },
-          dien_thoai: { type: 'string' },
-          dia_chi: { type: 'string' },
-          email: { type: 'string' },
+          dien_thoai: { type: 'string', pattern: '^0[2-9]\\d{8,9}$' },
+          email: { type: 'string', format: 'email' },
           ma_so_thue: { type: 'string' },
+          so_cccd: { type: 'string' },
+          dia_chi: { type: 'string' },
           ghi_chu: { type: 'string' },
         },
         additionalProperties: false,
@@ -71,10 +79,11 @@ export default async function khachHangRoutes(fastify) {
           ten_don_vi: { type: 'string', minLength: 1 },
           loai_kh: { type: 'string', enum: ['doanh_nghiep', 'ca_nhan'] },
           nguoi_lien_he: { type: 'string' },
-          dien_thoai: { type: 'string' },
-          dia_chi: { type: 'string' },
-          email: { type: 'string' },
+          dien_thoai: { type: 'string', pattern: '^0[2-9]\\d{8,9}$' },
+          email: { type: 'string', format: 'email' },
           ma_so_thue: { type: 'string' },
+          so_cccd: { type: 'string' },
+          dia_chi: { type: 'string' },
           ghi_chu: { type: 'string' },
         },
         additionalProperties: false,

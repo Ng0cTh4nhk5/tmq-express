@@ -17,11 +17,11 @@ import bienNhanRoutes from './routes/bien-nhan.routes.js';
 import scanRoutes from './routes/scan.routes.js';
 import bangKeRoutes from './routes/bang-ke.routes.js';
 import nhanVienRoutes from './routes/nhan-vien.routes.js';
-import phieuThuRoutes from './routes/phieu-thu.routes.js';
-import phieuChiRoutes from './routes/phieu-chi.routes.js';
 import congNoRoutes from './routes/cong-no.routes.js';
-import dashboardRoutes from './routes/dashboard.routes.js';
-import baoCaoRoutes from './routes/bao-cao.routes.js';
+import doanhThuRoutes from './routes/doanh-thu.routes.js';
+import chanhRoutes from './routes/chanh.routes.js';
+import doanhNghiepHDDTRoutes from './routes/doanh-nghiep-hddt.routes.js';
+import thuHoRoutes from './routes/thu-ho.routes.js';
 
 const fastify = Fastify({
   logger: {
@@ -67,11 +67,11 @@ await fastify.register(bienNhanRoutes, { prefix: '/api/bien-nhan' });
 await fastify.register(scanRoutes, { prefix: '/api/scan' });
 await fastify.register(bangKeRoutes, { prefix: '/api/bang-ke' });
 await fastify.register(nhanVienRoutes, { prefix: '/api/nhan-vien' });
-await fastify.register(phieuThuRoutes, { prefix: '/api/phieu-thu' });
-await fastify.register(phieuChiRoutes, { prefix: '/api/phieu-chi' });
 await fastify.register(congNoRoutes, { prefix: '/api/cong-no' });
-await fastify.register(dashboardRoutes, { prefix: '/api/dashboard' });
-await fastify.register(baoCaoRoutes, { prefix: '/api/bao-cao' });
+await fastify.register(doanhThuRoutes, { prefix: '/api/doanh-thu' });
+await fastify.register(chanhRoutes, { prefix: '/api/chanh' });
+await fastify.register(doanhNghiepHDDTRoutes, { prefix: '/api/doanh-nghiep-hddt' });
+await fastify.register(thuHoRoutes, { prefix: '/api/thu-ho' });
 
 // ---- Graceful Shutdown ----
 const shutdown = async (signal) => {

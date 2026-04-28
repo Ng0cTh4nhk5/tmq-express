@@ -232,6 +232,8 @@ button, input, select, textarea, .p-component {
 .stat-card-gradient .stat-icon { font-size: 1.5rem; flex-shrink: 0; opacity: 0.9; }
 .stat-card-gradient .stat-value { font-size: 1.15rem; font-weight: 800; }
 .stat-card-gradient .stat-label { font-size: 0.7rem; opacity: 0.85; }
+.stat-card-gradient .stat-subtitle { font-size: 0.68rem; opacity: 0.7; margin-top: 1px; }
+.stat-card .stat-subtitle { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
 
 /* ─── Filter Bar ─── */
 .filter-bar {
@@ -268,6 +270,12 @@ button, input, select, textarea, .p-component {
 .badge-da-thu { background: #d1fae5; color: #065f46; }
 .badge-chua-thu { background: #fef3c7; color: #92400e; }
 .badge-cong-no { background: #fee2e2; color: #991b1b; }
+.badge-danger { background: #fee2e2; color: #991b1b; }
+/* COD Status badges */
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-info { background: #dbeafe; color: #1e40af; }
+.badge-help { background: #ede9fe; color: #5b21b6; }
+.badge-success { background: #d1fae5; color: #065f46; }
 
 /* ─── Form Utilities ─── */
 .form-grid {
@@ -280,6 +288,13 @@ button, input, select, textarea, .p-component {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.1rem;
+}
+
+/* Tỉ lệ 1:2 — dùng cho trường nhỏ + trường lớn (VD: CCCD + Chành) */
+.form-grid-1-2 {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1.1rem 1.25rem;
 }
 
 .form-group {
@@ -439,4 +454,49 @@ button, input, select, textarea, .p-component {
 
 .font-mono {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Input with unit addon ─────────── */
+.input-addon {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.input-addon-field {
+  flex: 1;
+  border-radius: 6px 0 0 6px !important;
+  border-right: none !important;
+  min-width: 0;
+}
+
+.input-addon-field:focus {
+  z-index: 1;
+}
+
+.input-addon-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Ẩn spin button của input[type=number] cho gọn */
+.input-addon-field::-webkit-outer-spin-button,
+.input-addon-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.input-addon-field[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

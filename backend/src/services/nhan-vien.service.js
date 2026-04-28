@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 export async function listNhanVien({ van_phong_id, active, page = 1, limit = 20 }) {
+  const p = parseInt(page, 10) || 1;
+  const l = parseInt(limit, 10) || 20;
   const where = {};
   if (van_phong_id) where.van_phong_id = Number(van_phong_id);
   if (active !== undefined) where.active = active === 'true';
@@ -10,8 +12,8 @@ export async function listNhanVien({ van_phong_id, active, page = 1, limit = 20 
   const [data, total] = await Promise.all([
     prisma.nhanVien.findMany({
       where,
-      skip: (page - 1) * limit,
-      take: Number(limit),
+      skip: (p - 1) * l,
+      take: l,
       orderBy: { created_at: 'desc' },
       select: {
         id: true, ma_nv: true, ten: true, username: true,
@@ -21,7 +23,7 @@ export async function listNhanVien({ van_phong_id, active, page = 1, limit = 20 
     }),
     prisma.nhanVien.count({ where }),
   ]);
-  return { data, pagination: { page: Number(page), limit: Number(limit), total, totalPages: Math.ceil(total / Number(limit)) } };
+  return { data, pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) } };
 }
 
 export async function createNhanVien(data) {

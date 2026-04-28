@@ -9,7 +9,7 @@ async function rbacPlugin(fastify) {
     return async (request, reply) => {
       const userRole = request.user?.role;
       if (!userRole || !allowedRoles.includes(userRole)) {
-        reply.status(403).send({
+        return reply.status(403).send({
           success: false,
           error: {
             code: 'FORBIDDEN',

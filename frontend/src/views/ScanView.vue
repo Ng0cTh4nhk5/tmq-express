@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../api/client';
 import StatusBadge from '../components/bien-nhan/StatusBadge.vue';
+import StatusStepper from '../components/bien-nhan/StatusStepper.vue';
 
 const route = useRoute();
 const ma_so = route.params.ma_so;
@@ -66,16 +67,21 @@ onMounted(load);
       <!-- Header -->
       <div class="scan-header">
         <div class="scan-brand">
-          <i class="pi pi-truck"></i>
+          <img src="/logo.png" alt="TMQ Express" class="scan-logo" />
           TMQ Express
         </div>
         <div class="scan-ma-so">{{ bn.ma_so }}</div>
       </div>
 
+      <!-- Status Stepper -->
+      <div class="scan-section">
+        <StatusStepper :current="bn.trang_thai" />
+      </div>
+
       <!-- Status -->
       <div class="scan-status">
         <StatusBadge :value="bn.trang_thai" type="trang_thai" />
-        <span class="scan-date">{{ formatDate(bn.ngay_nhan) }}</span>
+        <span class="scan-date">{{ formatDate(bn.ngay_bien_nhan) }}</span>
       </div>
 
       <!-- Route -->
@@ -182,6 +188,15 @@ onMounted(load);
   gap: 0.5rem;
   font-weight: 700;
   font-size: 1.1rem;
+}
+
+.scan-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: white;
+  padding: 2px;
 }
 
 .scan-ma-so {

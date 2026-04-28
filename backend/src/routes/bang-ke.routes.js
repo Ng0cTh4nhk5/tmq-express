@@ -1,7 +1,7 @@
 import { getBienNhanCho, createBangKe, listBangKe, downloadBangKe } from '../services/bang-ke.service.js';
 
 export default async function bangKeRoutes(fastify) {
-  // GET /api/bang-ke/bien-nhan-cho — DS BN đánh dấu HĐĐT & chưa vào bảng kê
+  // GET /api/bang-ke/bien-nhan-cho?ngay=YYYY-MM-DD
   fastify.get('/bien-nhan-cho', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     handler: async (request) => {
@@ -10,22 +10,39 @@ export default async function bangKeRoutes(fastify) {
     },
   });
 
-  // POST /api/bang-ke — Xuất bảng kê
+  // POST /api/bang-ke — Tạo bảng kê (Case A + B)
   fastify.post('/', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     schema: {
       body: {
         type: 'object',
-        required: ['bien_nhan_ids'],
+        required: ['items'],
         properties: {
-          bien_nhan_ids: { type: 'array', items: { type: 'integer' }, minItems: 1 },
+          bien_so_xe: { type: 'string' },
+          items: {
+            type: 'array',
+            minItems: 1,
+            items: {
+              type: 'object',
+              properties: {
+                bien_nhan_id: { type: ['integer', 'null'] },
+                // Overrides cho Case A
+                hang_hoa:    { type: 'string' },
+                gia_cuoc:    { type: 'number', minimum: 0 },
+                // Required cho Case B
+                ngay:        { type: 'string' },
+                tuyen:       { type: 'string' },
+                nguoi_gui:   { type: 'string' },
+                dia_chi_gui: { type: 'string' },
+              },
+            },
+          },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request, reply) => {
-      const { bangKe, buffer, ten_file } = await createBangKe(request.body.bien_nhan_ids);
-
-      // Trả JSON với base64 Excel (tránh IDM giống PDF)
+      const { bangKe, buffer, ten_file } = await createBangKe(request.body);
       return {
         success: true,
         data: {
@@ -39,7 +56,7 @@ export default async function bangKeRoutes(fastify) {
     },
   });
 
-  // GET /api/bang-ke — Lịch sử bảng kê
+  // GET /api/bang-ke — Lịch sử
   fastify.get('/', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     handler: async (request) => {
@@ -48,7 +65,7 @@ export default async function bangKeRoutes(fastify) {
     },
   });
 
-  // GET /api/bang-ke/:id/download — Tải lại file Excel
+  // GET /api/bang-ke/:id/download
   fastify.get('/:id/download', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     handler: async (request) => {

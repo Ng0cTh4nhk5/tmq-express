@@ -1,7 +1,7 @@
 # TMQ Express ERP — Hướng dẫn cho Lập trình viên
 
-> **Phiên bản:** 1.2
-> **Ngày cập nhật:** 05/04/2026
+> **Phiên bản:** 1.5
+> **Ngày cập nhật:** 28/04/2026
 > **Đối tượng:** Developer, DevOps
 
 ---
@@ -24,7 +24,7 @@ TMQ-Express/
 ├── backend/                        # Fastify + Prisma API
 │   ├── fonts/                      # Font Roboto cho PDF (4 files .ttf)
 │   ├── prisma/
-│   │   ├── schema.prisma           # Mô hình dữ liệu (12 bảng, 8 enums)
+│   │   ├── schema.prisma           # Mô hình dữ liệu (14 bảng, 8 enums)
 │   │   ├── migrations/             # Lịch sử migration
 │   │   └── seed.js                 # Dữ liệu mẫu (3 VP, 4 NV, 10 KH)
 │   ├── src/
@@ -37,32 +37,30 @@ TMQ-Express/
 │   │   │   ├── error-handler.js    # Centralized error response
 │   │   │   ├── request-context.js  # AsyncLocalStorage for audit log context
 │   │   │   └── audit-log.js        # Audit logging utility (writeAuditLog)
-│   │   ├── routes/                 # 12 route files
+│   │   ├── routes/                 # 10 route files
 │   │   │   ├── auth.routes.js      # POST /login
 │   │   │   ├── bien-nhan.routes.js # CRUD + trạng thái + batch + PDF
 │   │   │   ├── khach-hang.routes.js
 │   │   │   ├── van-phong.routes.js
 │   │   │   ├── nhan-vien.routes.js
-│   │   │   ├── phieu-thu.routes.js # CRUD + PDF + hủy
-│   │   │   ├── phieu-chi.routes.js # CRUD + PDF + hủy
-│   │   │   ├── cong-no.routes.js   # List + xác nhận thanh toán
+│   │   │   ├── cong-no.routes.js   # List + xác nhận + bảng kê tháng + PDF + đối soát
 │   │   │   ├── bang-ke.routes.js   # BN chờ + xuất Excel + download
-│   │   │   ├── dashboard.routes.js # 4 thống kê + 3 biểu đồ
-│   │   │   ├── bao-cao.routes.js   # 4 loại báo cáo
+│   │   │   ├── doanh-thu.routes.js # Báo cáo doanh thu nhóm ngày/tuần/tháng/năm
+│   │   │   ├── chanh.routes.js     # CRUD chành
+│   │   │   ├── doanh-nghiep-hddt.routes.js
+│   │   │   ├── thu-ho.routes.js    # COD: list + tổng hợp + xác nhận thu/chuyển/trả
 │   │   │   └── scan.routes.js      # Public QR tracking
-│   │   ├── services/               # 12 service files (business logic)
+│   │   ├── services/               # 10 service files (business logic)
 │   │   │   ├── auth.service.js
 │   │   │   ├── bien-nhan.service.js
 │   │   │   ├── khach-hang.service.js
 │   │   │   ├── van-phong.service.js
 │   │   │   ├── nhan-vien.service.js
-│   │   │   ├── phieu-thu.service.js
-│   │   │   ├── phieu-chi.service.js
-│   │   │   ├── cong-no.service.js
+│   │   │   ├── cong-no.service.js  # Bảng kê, export Excel/PDF, đối soát
 │   │   │   ├── bang-ke.service.js  # Xuất Excel (ExcelJS)
-│   │   │   ├── dashboard.service.js
-│   │   │   ├── bao-cao.service.js
-│   │   │   └── pdf.service.js      # Biên nhận A5 ngang, Phiếu thu/chi PDF
+│   │   │   ├── doanh-thu.service.js # Nhóm doanh thu theo ngày/tuần/tháng/năm
+│   │   │   ├── thu-ho.service.js   # COD: list, tổng hợp, xác nhận thu/chuyển/trả
+│   │   │   └── pdf.service.js      # Biên nhận A5 ngang, Sổ biên nhận PDF
 │   │   ├── utils/
 │   │   │   └── ma-so-generator.js  # Auto-generate mã BN, PT, PC, BK
 │   │   └── server.js               # Entry point (Fastify bootstrap)
@@ -86,26 +84,24 @@ TMQ-Express/
 │   │   │       ├── PdfViewer.vue   # PDF.js viewer component
 │   │   │       └── StatusBadge.vue # Trạng thái badge (color-coded)
 │   │   ├── router/
-│   │   │   └── index.js            # 16 routes + auth guards
+│   │   │   └── index.js            # 12 routes + auth guards
 │   │   ├── stores/
 │   │   │   └── auth.store.js       # Pinia auth (login, logout, isAdmin)
 │   │   ├── utils/
 │   │   │   └── error-handler.js    # handleApiError — PrimeVue toast
-│   │   ├── views/                  # 16 page views
+│   │   ├── views/                  # 13 page views
 │   │   │   ├── LoginView.vue
 │   │   │   ├── HomeView.vue
-│   │   │   ├── DashboardView.vue   # 4 cards + 3 ECharts + auto-refresh
 │   │   │   ├── BienNhanListView.vue
-│   │   │   ├── BienNhanFormView.vue # Tạo/Sửa BN + auto-complete KH
 │   │   │   ├── KhachHangListView.vue
 │   │   │   ├── KhachHangFormView.vue
-│   │   │   ├── PhieuThuView.vue
-│   │   │   ├── PhieuChiView.vue
-│   │   │   ├── CongNoView.vue
+│   │   │   ├── CongNoView.vue      # Bảng kê + drill-down + PDF + đối soát
+│   │   │   ├── DoanhThuView.vue    # Báo cáo doanh thu nhóm theo kỳ
 │   │   │   ├── BangKeView.vue      # Tab BN chờ + Tab lịch sử
-│   │   │   ├── BaoCaoView.vue      # 4 loại báo cáo
 │   │   │   ├── VanPhongView.vue
 │   │   │   ├── NhanVienView.vue
+│   │   │   ├── ChanhView.vue
+│   │   │   ├── ThuHoView.vue      # Thu hộ (COD) management
 │   │   │   ├── ScanView.vue        # Public QR tracking (no auth)
 │   │   │   └── PdfViewerPage.vue   # PDF preview page
 │   │   ├── assets/                 # CSS styles
@@ -144,7 +140,7 @@ TMQ-Express/
 | | Axios | 1.14 | HTTP client |
 | | ECharts / vue-echarts | 6.0 / 8.0 | Biểu đồ Dashboard |
 | | pdfjs-dist | 5.6 | Hiển thị PDF trong browser |
-| **Database** | PostgreSQL | 15+ | 12 bảng, 8 enums |
+| **Database** | PostgreSQL | 15+ | 14 bảng, 8 enums |
 | **Dev Tools** | nodemon | 3.1 | Auto-reload backend |
 | | Vite | 8.0 | Frontend dev server + HMR |
 
@@ -304,12 +300,17 @@ server: {
 | `/api/nhan-vien` | GET, POST, PUT, PATCH | CRUD + `/:id/toggle-active` + `/:id/reset-password` | ✅ | admin |
 | `/api/phieu-thu` | GET, POST, PUT, PATCH | CRUD + `/:id/pdf` + `/:id/huy` | ✅ | admin, accountant |
 | `/api/phieu-chi` | GET, POST, PUT, PATCH | CRUD + `/:id/pdf` + `/:id/huy` | ✅ | admin, accountant |
-| `/api/cong-no` | GET, PATCH | List + `/:id/xac-nhan` | ✅ | admin, accountant |
+| `/api/cong-no` | GET, POST | List + `/:id/xac-nhan-thanh-toan` + `/bang-ke-thang` + `/bang-ke-thang/export` + `/bang-ke-thang/export-pdf` + `/doi-soat-chi-tiet` | ✅ | admin, accountant |
 | `/api/bang-ke` | GET, POST | `/bien-nhan-cho` + `/xuat` + `/:id/download` | ✅ | admin |
-| `/api/dashboard` | GET | `/stats` + `/doanh-thu-7-ngay` + `/ty-le-tuyen` + `/thu-chi-theo-thang` | ✅ | all |
-| `/api/bao-cao` | GET | `/doanh-thu` + `/so-quy` + `/bien-nhan` + `/cong-no` | ✅ | admin, accountant |
+| `/api/doanh-thu` | GET | Báo cáo doanh thu nhóm ngày/tuần/tháng/năm | ✅ | admin, accountant |
+| `/api/chanh` | GET, POST, PUT, PATCH | CRUD + `/:id/toggle-active` | ✅ | admin |
+| `/api/doanh-nghiep-hddt` | GET, POST, PUT | CRUD doanh nghiệp HĐĐT | ✅ | admin |
+| `/api/thu-ho` | GET | List + `/tong-hop` | ✅ | admin, accountant |
+| `/api/thu-ho` | POST | `/:id/xac-nhan-thu` + `/:id/xac-nhan-chuyen` + `/:id/xac-nhan-tra` | ✅ | admin, accountant, staff* |
 | `/api/scan` | GET | `/:ma_so` (public QR tracking) | — | — |
 | `/api/health` | GET | Health check | — | — |
+
+> \* Xác nhận thu: admin, accountant, staff. Xác nhận chuyển/trả: admin, accountant.
 
 ### 1.7. Các lệnh hữu ích
 
@@ -350,7 +351,7 @@ Request → Fastify
 **Patterns quan trọng:**
 - **State Machine:** Trạng thái BN chỉ chuyển tuần tự (`ALLOWED_TRANSITIONS` trong `bien-nhan.routes.js`)
 - **Atomic Transactions:** Tạo BN + Công nợ, Xác nhận thu + Phiếu thu, Hủy PT + Revert CN đều dùng `prisma.$transaction`
-- **Code Generation:** `ma-so-generator.js` dùng `createWithCode()` với retry pattern tránh race condition trên unique constraint
+- **Code Generation:** `ma-so-generator.js` dùng `createWithCode()` với retry pattern tránh race condition trên unique constraint. Hỗ trợ truyền transaction client (`tx`) để đọc mã trong cùng transaction context
 - **Soft Delete:** Phiếu thu/chi chỉ đánh dấu `da_huy = true`, không xóa
 - **Audit Logging:** Mọi CREATE/UPDATE/DELETE trên entities chính được ghi vào `audit_log` qua `writeAuditLog()`, sử dụng `AsyncLocalStorage` để truyền request context
 - **JWT Revocation:** Mỗi request verify `token_version` từ DB — cho phép force logout ngay lập tức khi deactivate NV hoặc đổi mật khẩu

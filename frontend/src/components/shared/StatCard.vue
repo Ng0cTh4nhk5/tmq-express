@@ -3,6 +3,7 @@ defineProps({
   icon: { type: String, required: true },
   label: { type: String, required: true },
   value: { type: [String, Number], default: '—' },
+  subtitle: { type: String, default: '' },
   iconBg: { type: String, default: '#dbeafe' },
   iconColor: { type: String, default: '#2563eb' },
   gradient: { type: String, default: '' },
@@ -16,6 +17,7 @@ defineProps({
     <div>
       <div class="stat-value">{{ value }}</div>
       <div class="stat-label">{{ label }}</div>
+      <div v-if="subtitle" class="stat-subtitle">{{ subtitle }}</div>
     </div>
   </div>
 
@@ -27,6 +29,7 @@ defineProps({
     <div>
       <div class="stat-value">{{ value }}</div>
       <div class="stat-label">{{ label }}</div>
+      <div v-if="subtitle" class="stat-subtitle">{{ subtitle }}</div>
     </div>
   </div>
 </template>
