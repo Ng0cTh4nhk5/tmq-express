@@ -2,29 +2,115 @@ import { listBienNhan, getBienNhan, getNextMaSo, createBienNhan, updateBienNhan,
 import { generateBienNhanPDF, generateSoBienNhan, generateSoBienNhanExcel } from '../services/pdf.service.js';
 import prisma from '../config/database.js';
 
-// Luồng trạng thái cho phép (chỉ chuyển tiếp tuần tự)
+// Luồng trạng thái cho phép (phân nhánh theo context)
+// da_den_kho có nhiều đích đến — validation chi tiết xử lý trong validateTransitionWithContext
 const ALLOWED_TRANSITIONS = {
-  cho_vc: ['dang_vc'],
-  dang_vc: ['da_den_kho'],
-  da_den_kho: ['da_bao_khach'],
-  da_bao_khach: ['khach_da_nhan'],
-  khach_da_nhan: [], // Terminal state
+  cho_vc:        ['dang_vc'],
+  dang_vc:       ['da_den_kho'],
+  da_den_kho:    ['da_bao_khach', 'khach_da_nhan', 'dang_giao', 'da_giao_chanh'],
+  da_bao_khach:  ['khach_da_nhan'],
+  dang_giao:     ['khach_da_nhan'],
+  da_giao_chanh: [], // Terminal
+  khach_da_nhan: [], // Terminal
 };
 
 const TRANG_THAI_LABELS = {
   cho_vc: 'Chờ VC', dang_vc: 'Đang VC', da_den_kho: 'Đã đến kho',
-  da_bao_khach: 'Đã báo khách', khach_da_nhan: 'Khách đã nhận',
+  da_bao_khach: 'Đã báo khách', dang_giao: 'Đang giao hàng',
+  da_giao_chanh: 'Đã giao Chành', khach_da_nhan: 'Khách đã nhận',
 };
 
+/**
+ * Validate transition cơ bản (chỉ kiểm tra có trong ALLOWED_TRANSITIONS).
+ * Được dùng cho batch (không có context hiều nước).
+ */
 function validateTransition(currentStatus, newStatus) {
   const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
   if (!allowed.includes(newStatus)) {
     throw Object.assign(
-      new Error(`Không thể chuyển từ "${TRANG_THAI_LABELS[currentStatus]}" sang "${TRANG_THAI_LABELS[newStatus]}"`),
+      new Error(`Không thể chuyển từ "${TRANG_THAI_LABELS[currentStatus]}" sang "${TRANG_THAI_LABELS[newStatus] || newStatus}"`),
       { statusCode: 400 },
     );
   }
 }
+
+/**
+ * Validate transition có context: kiểm tra luồng phân nhánh theo hinh_thuc_giao và chanh_id.
+ * Chỉ áp dụng cho chuyển truyết từ da_den_kho.
+ */
+function validateTransitionWithContext(existing, newTrangThai) {
+  // Bước 1: kiểm tra cơ bản (có trong ALLOWED_TRANSITIONS)
+  validateTransition(existing.trang_thai, newTrangThai);
+
+  // Bước 2: kiểm tra context nếu đang ở da_den_kho
+  if (existing.trang_thai !== 'da_den_kho') return;
+
+  const hasChanh = !!existing.chanh_id;
+  const htGiao   = existing.hinh_thuc_giao;
+
+  if (hasChanh) {
+    // Nếu có chành: chỉ cho phép da_giao_chanh
+    if (newTrangThai !== 'da_giao_chanh') {
+      throw Object.assign(
+        new Error('Biên nhận này có Chành — phải bàn giao cho Chành (da_giao_chanh)'),
+        { statusCode: 400 },
+      );
+    }
+    return;
+  }
+
+  // Không có chành: phân nhánh theo hinh_thuc_giao
+  const validNextMap = {
+    tu_toi:   'khach_da_nhan',
+    goi_dien: 'da_bao_khach',
+    tan_noi:  'dang_giao',
+  };
+  const expected = validNextMap[htGiao];
+  if (expected && newTrangThai !== expected) {
+    const htLabel = { tu_toi: 'Tự đến lấy', goi_dien: 'Gọi điện', tan_noi: 'Giao tận nơi' }[htGiao];
+    throw Object.assign(
+      new Error(`Hình thức giao "${htLabel}" phải chuyển sang "${TRANG_THAI_LABELS[expected]}"`),
+      { statusCode: 400 },
+    );
+  }
+}
+
+// Quy tắc: bước nào thuộc phạm vi VP nào
+const VP_TRANSITION_RULE = {
+  'cho_vc→dang_vc':             'gui',
+  'dang_vc→da_den_kho':         'nhan',
+  'da_den_kho→da_bao_khach':    'nhan',
+  'da_den_kho→khach_da_nhan':   'nhan',
+  'da_den_kho→dang_giao':       'nhan',
+  'da_den_kho→da_giao_chanh':   'nhan',
+  'da_bao_khach→khach_da_nhan': 'nhan',
+  'dang_giao→khach_da_nhan':    'nhan',
+};
+
+/**
+ * Kiểm tra quyền chuyển trạng thái theo VP.
+ * - Admin: bypass hoàn toàn.
+ * - Staff: chỉ được thực hiện bước thuộc VP mình.
+ */
+function validateVpPermission(existing, newTrangThai, user) {
+  if (user.role === 'admin') return;
+
+  const key = `${existing.trang_thai}→${newTrangThai}`;
+  const side = VP_TRANSITION_RULE[key];
+  if (!side) return; // unknown key — không restrict
+
+  const requiredVpId = side === 'gui'
+    ? existing.van_phong_gui_id
+    : existing.van_phong_nhan_id;
+
+  if (user.van_phong_id !== requiredVpId) {
+    const msg = side === 'gui'
+      ? 'Chỉ văn phòng gửi mới có thể thực hiện bước này'
+      : 'Chỉ văn phòng nhận mới có thể thực hiện bước này';
+    throw Object.assign(new Error(msg), { statusCode: 403 });
+  }
+}
+
 
 /**
  * Parse & validate query params cho các route sổ biên nhận.
@@ -51,12 +137,9 @@ function parseSoBienNhanParams(query) {
   const vpGuiId  = Number(vp_gui_id);
   const vpNhanId = Number(vp_nhan_id);
 
-  if (vpGuiId === vpNhanId) {
-    throw Object.assign(
-      new Error('VP gửi và VP nhận không được trùng nhau'),
-      { statusCode: 400 },
-    );
-  }
+  // [NT-01] Cho phép VP gửi = VP nhận (đơn nội thành).
+  // BN nội thành có prefix NT{VP} và trang_thai bắt đầu tại da_den_kho.
+  // Query theo van_phong_gui_id + van_phong_nhan_id hoạt động đúng kể cả khi 2 cột bằng nhau.
 
   return { from, to, vpGuiId, vpNhanId };
 }
@@ -144,7 +227,132 @@ export default async function bienNhanRoutes(fastify) {
     },
   });
 
-  // GET /api/bien-nhan/:id — Chi tiết
+  // GET /api/bien-nhan/hang-den — Danh sách hàng về VP nhận (inbox 3 tab)
+  // Staff: auto-scope theo VP mình; Admin/Accountant: truyền ?vp_nhan_id=
+  // Query params:
+  //   trang_thai = dang_vc (default) | da_den_kho | da_bao_khach
+  //   count_all  = true → chỉ trả tab_counts (badge sidebar, không query data)
+  // QUAN TRỌNG: phải đặt TRƯỚC /:id
+  fastify.get('/hang-den', {
+    preHandler: [fastify.authenticate],
+    handler: async (request) => {
+      let vpNhanId;
+      if (request.user.role === 'staff') {
+        vpNhanId = request.user.van_phong_id;
+      } else {
+        vpNhanId = request.query.vp_nhan_id ? Number(request.query.vp_nhan_id) : null;
+      }
+
+      const EMPTY = { success: true, data: [], stats: { total: 0, tong_cuoc: 0, so_co_cod: 0 }, tab_counts: { dang_vc: 0, da_den_kho: 0, da_bao_khach: 0, dang_giao: 0 } };
+      if (!vpNhanId) return EMPTY;
+
+      const ALLOWED_TABS = ['dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao'];
+      const trangThai = ALLOWED_TABS.includes(request.query.trang_thai)
+        ? request.query.trang_thai
+        : 'dang_vc';
+
+
+      // count_all=true: chỉ đếm tổng cho badge sidebar
+      if (request.query.count_all === 'true') {
+        const counts = await Promise.all(
+          ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { van_phong_nhan_id: vpNhanId, trang_thai: tt } }))
+        );
+        const tab_counts = Object.fromEntries(ALLOWED_TABS.map((tt, i) => [tt, counts[i]]));
+        return { success: true, tab_counts, total: counts.reduce((s, c) => s + c, 0) };
+      }
+
+      const where = { van_phong_nhan_id: vpNhanId, trang_thai: trangThai };
+
+      // [HD-01] Query data tab hiện tại + count chính xác + counts tất cả tab song song
+      // total lấy từ DB count — chính xác ngay cả khi > 500 BN (không dùng data.length)
+      const [data, totalCount, ...tabCountResults] = await Promise.all([
+        prisma.bienNhan.findMany({
+          where,
+          orderBy: [{ ngay_bien_nhan: 'asc' }, { id: 'asc' }],
+          take: 500,
+          include: {
+            van_phong_gui:  { select: { ma_vp: true, ten: true } },
+            van_phong_nhan: { select: { ma_vp: true, ten: true } },
+            nhan_vien_nhap: { select: { ten: true } },
+            chanh:          { select: { id: true, ten: true, dien_thoai: true, dia_chi: true, nguoi_lien_he: true } },
+          },
+        }),
+
+        prisma.bienNhan.count({ where }),                         // [HD-01] DB count cho stats.total chính xác
+        ...ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { van_phong_nhan_id: vpNhanId, trang_thai: tt } })),
+      ]);
+
+      const tab_counts = Object.fromEntries(ALLOWED_TABS.map((tt, i) => [tt, tabCountResults[i]]));
+      const stats = {
+        total:     totalCount,                                    // [HD-01] từ DB, không phải data.length
+        tong_cuoc: data.reduce((s, b) => s + Number(b.gia_cuoc || 0), 0),
+        so_co_cod: data.filter(b => Number(b.thu_ho) > 0).length,
+      };
+
+      return { success: true, data, stats, tab_counts, has_more: totalCount > data.length };
+    },
+  });
+
+  // GET /api/bien-nhan/cho-van-chuyen — Hàng đợi chờ giao xe tại VP Gửi
+  // Staff: auto-scope theo van_phong_gui_id; Admin/Accountant: ?vp_gui_id=
+  // count_all=true → chỉ trả count cho badge sidebar
+  // QUAN TRỌNG: phải đặt TRƯỚC /:id
+  fastify.get('/cho-van-chuyen', {
+    preHandler: [fastify.authenticate],
+    handler: async (request) => {
+      let vpGuiId;
+      if (request.user.role === 'staff') {
+        vpGuiId = request.user.van_phong_id;
+      } else {
+        vpGuiId = request.query.vp_gui_id ? Number(request.query.vp_gui_id) : null;
+      }
+
+      const EMPTY = {
+        success: true, data: [],
+        stats: { total: 0, tong_cuoc: 0, so_co_cod: 0 },
+        count: 0,
+      };
+      if (!vpGuiId) return EMPTY;
+
+      // count_all=true: chỉ đếm cho badge sidebar, không cần trả data
+      if (request.query.count_all === 'true') {
+        const count = await prisma.bienNhan.count({
+          where: { van_phong_gui_id: vpGuiId, trang_thai: 'cho_vc' },
+        });
+        return { success: true, count };
+      }
+
+      // [BE-W1] Query đầy đủ — count song song để stats luôn chính xác dù take: 500
+      const where = { van_phong_gui_id: vpGuiId, trang_thai: 'cho_vc' };
+      const [data, totalCount] = await Promise.all([
+        prisma.bienNhan.findMany({
+          where,
+          orderBy: { ngay_bien_nhan: 'asc' },
+          take: 500, // [RT-02] Giới hạn tải về — đủ cho một ca làm việc bình thường
+          include: {
+            van_phong_gui:  { select: { ma_vp: true, ten: true } },
+            van_phong_nhan: { select: { ma_vp: true, ten: true } },
+            nhan_vien_nhap: { select: { ten: true } },
+            chanh:          { select: { id: true, ten: true } },
+          },
+        }),
+        prisma.bienNhan.count({ where }),
+      ]);
+
+      // [BE-W1] total lấy từ DB count, tong_cuoc/so_co_cod tính từ data đã load
+      // (acceptable trade-off: tong_cuoc chỉ tính trên 500 BN đầu nếu vượt ngưỡng)
+      const stats = {
+        total:     totalCount,
+        tong_cuoc: data.reduce((s, b) => s + Number(b.gia_cuoc || 0), 0),
+        so_co_cod: data.filter(b => Number(b.thu_ho) > 0).length,
+      };
+
+      return { success: true, data, stats, has_more: totalCount > data.length };
+    },
+  });
+
+
+
   fastify.get('/:id', {
     preHandler: [fastify.authenticate],
     schema: {
@@ -319,26 +527,42 @@ export default async function bienNhanRoutes(fastify) {
         type: 'object',
         required: ['trang_thai'],
         properties: {
-          trang_thai: { type: 'string', enum: ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'khach_da_nhan'] },
+          trang_thai: { type: 'string', enum: ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao', 'da_giao_chanh', 'khach_da_nhan'] },
           ghi_chu: { type: 'string' },
           phuong_thuc: { type: 'string', enum: ['manual', 'scan'] },
         },
       },
     },
+
     handler: async (request) => {
       const id = Number(request.params.id);
       const { trang_thai, ghi_chu, phuong_thuc } = request.body;
 
-      // Validate transition — bổ sung select thu_ho + trang_thai_cod
+      // Fetch BN kèm context (hinh_thuc_giao, chanh_id, chanh info) để validate context-aware
       const existing = await prisma.bienNhan.findUnique({
         where: { id },
         select: {
           trang_thai: true, thu_ho: true, trang_thai_cod: true,
-          van_phong_nhan_id: true, don_vi_nhan: true, nguoi_nhan: true, ma_so: true,
+          gia_cuoc: true,             // [B1] cần để pre-check auto-thu cước
+          trang_thai_thu: true,       // [B1] cần để pre-check auto-thu cước
+          trang_thai_cuoc_nhan: true, // [B1] cần để trigger auto-thu
+          van_phong_gui_id: true, van_phong_nhan_id: true,
+          hinh_thuc_giao: true, chanh_id: true,
+          don_vi_nhan: true, nguoi_nhan: true, ma_so: true,
+          chanh: { select: { ten: true, dien_thoai: true, dia_chi: true, nguoi_lien_he: true } },
         },
       });
       if (!existing) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
-      validateTransition(existing.trang_thai, trang_thai);
+      validateTransitionWithContext(existing, trang_thai);
+      validateVpPermission(existing, trang_thai, request.user);
+
+      // Pre-fill ghi chú khi bàn giao chành nếu NV không nhập
+      let finalGhiChu = ghi_chu || null;
+      if (trang_thai === 'da_giao_chanh' && !ghi_chu && existing.chanh) {
+        const c = existing.chanh;
+        const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        finalGhiChu = `Giao cho Chành "${c.ten}" lúc ${now}${c.dien_thoai ? ` — ĐT: ${c.dien_thoai}` : ''}${c.dia_chi ? ` — ĐC: ${c.dia_chi}` : ''}`;
+      }
 
       // Cập nhật trạng thái vận chuyển + lịch sử
       const [bn] = await prisma.$transaction([
@@ -350,48 +574,75 @@ export default async function bienNhanRoutes(fastify) {
             trang_thai_moi: trang_thai,
             nhan_vien_id: request.user.id,
             phuong_thuc: phuong_thuc || 'manual',
-            ghi_chu: ghi_chu || null,
+            ghi_chu: finalGhiChu,
           },
         }),
       ]);
 
-      // *** AUTO-THU COD khi khach_da_nhan ***
-      if (trang_thai === 'khach_da_nhan'
-          && Number(existing.thu_ho) > 0
-          && existing.trang_thai_cod === 'cho_thu') {
-        try {
-          const { xacNhanThuCODAuto } = await import('../services/thu-ho.service.js');
-          const codResult = await xacNhanThuCODAuto(id, request.user);
-          return {
-            success: true,
-            data: codResult.bn,
-            message: 'Cập nhật trạng thái thành công. Đã tự động thu COD.',
-            auto_thu_cod: true,
-            phieu_thu: codResult.phieu_thu,
-          };
-        } catch (err) {
-          // Auto-thu thất bại không block việc cập nhật trạng thái
-          console.warn(`[Auto-COD] BN ${existing.ma_so}: ${err.message}`);
+
+      // *** AUTO-THU COD + CƯỚC khi khach_da_nhan ***
+      let autoCodResult = null;
+      let autoCuocResult = null;
+      let autoCuocWarning = null; // [B1] Trả warning về client thay vì nuốt lỗi
+
+      if (trang_thai === 'khach_da_nhan') {
+        // Auto-thu COD: chỉ thu khi không qua chành
+        // (Nếu BN có chanh_id: tiền COD đang ở chành, phải dùng luồng "chành đã thu" thủ công)
+        if (Number(existing.thu_ho) > 0 && existing.trang_thai_cod === 'cho_thu' && !existing.chanh_id) {
+          try {
+            const { xacNhanThuCODAuto } = await import('../services/thu-ho.service.js');
+            const codResult = await xacNhanThuCODAuto(id, request.user);
+            autoCodResult = { phieu_thu: codResult.phieu_thu };
+          } catch (err) {
+            console.warn(`[Auto-COD] BN ${existing.ma_so}: ${err.message}`);
+          }
+        }
+
+        // [B1] Auto-thu cước: pre-check gia_cuoc trước để tránh kẹt state
+        if (existing.trang_thai_cuoc_nhan === 'cho_thu') {
+          if (!existing.gia_cuoc || Number(existing.gia_cuoc) <= 0) {
+            // BN không có tiền cước → clear state để không kẹt mãi ở cho_thu
+            await prisma.bienNhan.update({
+              where: { id },
+              data: { trang_thai_cuoc_nhan: null },
+            });
+            autoCuocWarning = 'Biên nhận không có tiền cước (gia_cuoc = 0) — đã xóa trạng thái chờ thu tự động';
+            console.warn(`[Auto-Cuớc] BN ${existing.ma_so}: gia_cuoc=0, cleared trang_thai_cuoc_nhan`);
+          } else {
+            try {
+              const { xacNhanThuCuocNhanAuto } = await import('../services/cuoc-nhan.service.js');
+              const cuocResult = await xacNhanThuCuocNhanAuto(id, request.user);
+              autoCuocResult = { phieu_thu: cuocResult.phieu_thu };
+            } catch (err) {
+              // [B1] Log đầy đủ + trả warning về client — không nuốt lỗi
+              console.error(`[Auto-Cuớc FAIL] BN ${existing.ma_so}: ${err.message}`);
+              autoCuocWarning = `Thu cước tự động thất bại: ${err.message}. Vui lòng thu thủ công tại màn hình Cước nhận.`;
+            }
+          }
         }
       }
 
-      return { success: true, data: bn, message: 'Cập nhật trạng thái thành công' };
+      const messages = ['Cập nhật trạng thái thành công'];
+      if (autoCodResult) messages.push('Đã tự động thu COD');
+      if (autoCuocResult) messages.push('Đã tự động thu cước từ người nhận');
+      if (autoCuocWarning) messages.push('⚠ Cần thu cước thủ công');
+
+      return {
+        success: true,
+        data: bn,
+        message: messages.join('. '),
+        ...(autoCodResult   ? { auto_thu_cod:  true, phieu_thu_cod:  autoCodResult.phieu_thu  } : {}),
+        ...(autoCuocResult  ? { auto_thu_cuoc: true, phieu_thu_cuoc: autoCuocResult.phieu_thu } : {}),
+        ...(autoCuocWarning ? { cuoc_warning: autoCuocWarning } : {}), // [B1] warning về client
+      };
     },
   });
 
 
-  // DELETE /api/bien-nhan/:id — Xóa biên nhận
-  fastify.delete('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
-    handler: async (request) => {
-      const id = Number(request.params.id);
-      await deleteBienNhan(id, request.user.id, request.user.role);
-      return { success: true, message: 'Đã xóa biên nhận' };
-    },
-  });
-
-
-  // PATCH /api/bien-nhan/batch-trang-thai — Batch (gửi xe)
+  // [BE-B1] PATCH /api/bien-nhan/batch-trang-thai — Batch cập nhật trạng thái
+  // Lưu ý: PATCH "/batch-trang-thai" không conflict với PATCH "/:id/trang-thai" vì
+  // Fastify phân biệt cả method lẫn path structure — không cần đặt thứ tự đặc biệt cho PATCH.
+  // (Chỉ GET routes dạng "/hang-den", "/cho-van-chuyen" mới cần đặt TRƯỚC GET "/:id")
   fastify.patch('/batch-trang-thai', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
@@ -399,8 +650,9 @@ export default async function bienNhanRoutes(fastify) {
         type: 'object',
         required: ['ids', 'trang_thai'],
         properties: {
-          ids: { type: 'array', items: { type: 'integer' }, minItems: 1 },
-          trang_thai: { type: 'string', enum: ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'khach_da_nhan'] },
+          ids: { type: 'array', items: { type: 'integer' }, minItems: 1, maxItems: 200 },
+          trang_thai: { type: 'string', enum: ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao', 'da_giao_chanh', 'khach_da_nhan'] },
+
           ghi_chu: { type: 'string' },
         },
       },
@@ -411,14 +663,39 @@ export default async function bienNhanRoutes(fastify) {
       // Validate all transitions before executing
       const existingBNs = await prisma.bienNhan.findMany({
         where: { id: { in: ids } },
-        select: { id: true, ma_so: true, trang_thai: true, thu_ho: true, trang_thai_cod: true },
+        select: {
+          id: true, ma_so: true, trang_thai: true,
+          thu_ho: true, trang_thai_cod: true,
+          trang_thai_cuoc_nhan: true,
+          gia_cuoc: true,  // [B1] cần để pre-check auto-thu cước
+          van_phong_gui_id: true, van_phong_nhan_id: true,
+          chanh_id: true,  // cần để skip auto-COD khi giao qua chành
+        },
       });
+
+      // [BE-B2] Kiểm tra có IDs nào không tồn tại trong DB không
+      if (existingBNs.length !== ids.length) {
+        const foundIds = new Set(existingBNs.map(bn => bn.id));
+        const missingIds = ids.filter(id => !foundIds.has(id));
+        throw Object.assign(
+          new Error(`Không tìm thấy biên nhận với ID: ${missingIds.join(', ')}`),
+          { statusCode: 404 },
+        );
+      }
 
       const errors = [];
       for (const bn of existingBNs) {
+        // Kiểm tra transition hợp lệ
         const allowed = ALLOWED_TRANSITIONS[bn.trang_thai] || [];
         if (!allowed.includes(trang_thai)) {
           errors.push(`${bn.ma_so}: không thể chuyển từ "${TRANG_THAI_LABELS[bn.trang_thai]}" sang "${TRANG_THAI_LABELS[trang_thai]}"`);
+          continue;
+        }
+        // Kiểm tra quyền VP
+        try {
+          validateVpPermission(bn, trang_thai, request.user);
+        } catch (err) {
+          errors.push(`${bn.ma_so}: ${err.message}`);
         }
       }
       if (errors.length > 0) {
@@ -438,19 +715,32 @@ export default async function bienNhanRoutes(fastify) {
             trang_thai_cu: ttCuMap[id] || null,
             trang_thai_moi: trang_thai,
             nhan_vien_id: request.user.id,
-            phuong_thuc: 'manual',
+            phuong_thuc: 'batch',
             ghi_chu: ghi_chu || `Batch: ${ids.length} biên nhận`,
           })),
         });
       });
 
-      // Auto-thu COD cho các BN có thu_ho > 0 && cho_thu khi chuyển sang khach_da_nhan
+      // [B1] Auto-thu COD + cước: pre-check gia_cuoc, warning về client thay vì nuốt lỗi
       let autoCodResult;
+      let autoCuocResult;
+      const batchCuocWarnings = []; // [B1] collect warnings từng BN
+
       if (trang_thai === 'khach_da_nhan') {
         const { xacNhanThuCODAuto } = await import('../services/thu-ho.service.js');
-        const codBNs = existingBNs.filter(bn => Number(bn.thu_ho) > 0 && bn.trang_thai_cod === 'cho_thu');
-        const codSuccess = [];
-        const codErrors = [];
+        const { xacNhanThuCuocNhanAuto } = await import('../services/cuoc-nhan.service.js');
+
+        // Auto-thu COD: chỉ thu khi không qua chành
+        const codBNs  = existingBNs.filter(bn => Number(bn.thu_ho) > 0 && bn.trang_thai_cod === 'cho_thu' && !bn.chanh_id);
+
+        // [B1] Phân nhóm BN cần thu cước:
+        // - cuocBNsZero: gia_cuoc = 0 → clear state (không kẹt)
+        // - cuocBNsValid: gia_cuoc > 0 → thực hiện auto-thu
+        const allCuocBNs = existingBNs.filter(bn => bn.trang_thai_cuoc_nhan === 'cho_thu');
+        const cuocBNsZero  = allCuocBNs.filter(bn => !bn.gia_cuoc || Number(bn.gia_cuoc) <= 0);
+        const cuocBNsValid = allCuocBNs.filter(bn => bn.gia_cuoc && Number(bn.gia_cuoc) > 0);
+
+        const codSuccess = [], codErrors = [];
         for (const bn of codBNs) {
           try {
             await xacNhanThuCODAuto(bn.id, request.user);
@@ -460,16 +750,61 @@ export default async function bienNhanRoutes(fastify) {
             console.warn(`[Auto-COD Batch] BN ${bn.ma_so}: ${err.message}`);
           }
         }
-        if (codBNs.length > 0) {
-          autoCodResult = { success: codSuccess, errors: codErrors };
+        if (codBNs.length > 0) autoCodResult = { success: codSuccess, errors: codErrors };
+
+        // [B1] Clear state cho BN có gia_cuoc = 0
+        if (cuocBNsZero.length > 0) {
+          const zeroIds = cuocBNsZero.map(bn => bn.id);
+          await prisma.bienNhan.updateMany({
+            where: { id: { in: zeroIds } },
+            data: { trang_thai_cuoc_nhan: null },
+          });
+          cuocBNsZero.forEach(bn => {
+            console.warn(`[Auto-Cuớc Batch] BN ${bn.ma_so}: gia_cuoc=0, cleared trang_thai_cuoc_nhan`);
+            batchCuocWarnings.push(`${bn.ma_so}: không có tiền cước (gia_cuoc=0)`);
+          });
         }
+
+        // [B1] Thu cước các BN hợp lệ
+        const cuocSuccess = [], cuocErrors = [];
+        for (const bn of cuocBNsValid) {
+          try {
+            await xacNhanThuCuocNhanAuto(bn.id, request.user);
+            cuocSuccess.push(bn.ma_so);
+          } catch (err) {
+            cuocErrors.push({ ma_so: bn.ma_so, error: err.message });
+            batchCuocWarnings.push(`${bn.ma_so}: ${err.message}`);
+            console.error(`[Auto-Cuớc Batch FAIL] BN ${bn.ma_so}: ${err.message}`);
+          }
+        }
+        if (allCuocBNs.length > 0) autoCuocResult = { success: cuocSuccess, errors: cuocErrors, cleared_zero: cuocBNsZero.map(b => b.ma_so) };
       }
 
       return {
         success: true,
         message: `Đã cập nhật ${ids.length} biên nhận`,
-        ...(autoCodResult ? { auto_thu_cod: autoCodResult } : {}),
+        ...(autoCodResult  ? { auto_thu_cod:  autoCodResult  } : {}),
+        ...(autoCuocResult ? { auto_thu_cuoc: autoCuocResult } : {}),
+        ...(batchCuocWarnings.length > 0 ? { cuoc_warnings: batchCuocWarnings } : {}), // [B1]
       };
+    },
+  });
+
+
+  // DELETE /api/bien-nhan/:id — Xóa biên nhận
+  fastify.delete('/:id', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    schema: {
+      params: {
+        type: 'object',
+        properties: { id: { type: 'integer' } },
+        required: ['id'],
+      },
+    }, // [N-M02] Validate params.id là integer — tránh NaN khi id='abc'
+    handler: async (request) => {
+      const id = Number(request.params.id);
+      await deleteBienNhan(id, request.user.id, request.user.role);
+      return { success: true, message: 'Đã xóa biên nhận' };
     },
   });
 }

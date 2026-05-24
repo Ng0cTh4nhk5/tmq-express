@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { useToast } from 'primevue/usetoast'; // [H-02]
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Select from 'primevue/select';
@@ -10,10 +11,16 @@ import DatePicker from 'primevue/datepicker';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import StatusStepper from './StatusStepper.vue';
+import StatusBadge from './StatusBadge.vue';
+import CodStepper from './CodStepper.vue';
 import { useAuthStore } from '../../stores/auth.store';
 import api from '../../api/client';
+import { formatCurrency, formatDate, formatDateTime, parseDateSafe, toISODate } from '../../utils/format';
+import { formatPhone, applyPhoneFormat, PHONE_REGEX } from '../../utils/phone';
+import { usePhoneInput } from '../../composables/usePhoneInput';
 
 const auth = useAuthStore();
+const toast = useToast(); // [H-02]
 
 const props = defineProps({
   mode: { type: String, default: 'empty' }, // empty | view | edit | create
@@ -34,7 +41,12 @@ function makeEmptyHangHoa() {
   return HANG_HOA_UNITS.map(don_vi => ({ don_vi, so_luong: null, ghi_chu: '' }));
 }
 
-// ── Form data ─────────────────────────────────────────────────────
+// ── Phone input composable ───────────────────────────────────────
+const { handlePhoneInput } = usePhoneInput();
+
+// ── Form data & Validation state (khai báo sớm — cần trước watchers immediate) ────────
+const errors = ref({});
+
 const form = ref(createEmptyForm());
 
 function createEmptyForm() {
@@ -67,19 +79,17 @@ function createEmptyForm() {
   };
 }
 
-// ── Chành lọc theo VP nhận ────────────────────────────────────────
-const chanhOptions = computed(() => {
-  if (!form.value.van_phong_nhan_id) return props.chanhs;
-  return props.chanhs.filter(c => c.van_phong_id === form.value.van_phong_nhan_id);
-});
+// ── Chành: hiển thị tất cả (không lọc theo VP — chành là điểm gửi tiếp sau VP nhận)
+const chanhOptions = computed(() => props.chanhs);
 
 // ── VP nhận options (cho phép cùng VP gửi) ──────────────────────────────────
 const vpNhanOptions = computed(() => props.vanPhongs);
 
 // Reset chành và tự điền mã mới khi đổi VP nhận
-watch(() => form.value.van_phong_nhan_id, () => {
+// Bug 5 fixed: chỉ gọi fetchNextMaSo khi có giá trị (tránh gọi thừa khi clear = null)
+watch(() => form.value.van_phong_nhan_id, (newVal) => {
   form.value.chanh_id = null;
-  if (props.mode === 'create') fetchNextMaSo();
+  if (props.mode === 'create' && newVal) fetchNextMaSo();
 });
 
 // ── Autocomplete KH ──────────────────────────────────────────────
@@ -98,7 +108,7 @@ function onSelectGui(event) {
   const kh = event.value;
   form.value.don_vi_gui     = kh.ten_don_vi   || '';
   form.value.nguoi_gui      = kh.nguoi_lien_he || '';
-  form.value.dien_thoai_gui = kh.dien_thoai   || '';
+  form.value.dien_thoai_gui = applyPhoneFormat(kh.dien_thoai);
   form.value.so_cccd_gui    = kh.so_cccd      || '';
   form.value.dia_chi_gui    = kh.dia_chi      || '';
   // Xóa lỗi các trường vừa điền
@@ -110,7 +120,7 @@ function onSelectNhan(event) {
   const kh = event.value;
   form.value.don_vi_nhan     = kh.ten_don_vi   || '';
   form.value.nguoi_nhan      = kh.nguoi_lien_he || '';
-  form.value.dien_thoai_nhan = kh.dien_thoai   || '';
+  form.value.dien_thoai_nhan = applyPhoneFormat(kh.dien_thoai);
   form.value.so_cccd_nhan    = kh.so_cccd      || '';
   form.value.dia_chi_nhan    = kh.dia_chi      || '';
   delete errors.value.don_vi_nhan;
@@ -118,11 +128,14 @@ function onSelectNhan(event) {
 }
 
 // ── Load biên nhận vào form ───────────────────────────────────────
+// Bug 2 fixed: reset errors mỗi khi chuyển bản ghi để tránh hiển thị lỗi cũ
 watch(() => props.bienNhan, (bn) => {
+  errors.value = {};
   if (!bn) return;
   if (props.mode === 'view' || props.mode === 'edit') {
     form.value = {
-      ngay_bien_nhan: bn.ngay_bien_nhan ? new Date(bn.ngay_bien_nhan) : new Date(),
+      // Bug 8 fixed: parse date an toàn với timezone — dùng UTC parts để tránh lệch ngày
+      ngay_bien_nhan: bn.ngay_bien_nhan ? parseDateSafe(bn.ngay_bien_nhan) : new Date(),
       gio_tao: bn.gio_tao || '',
       ma_so_custom: '',
       van_phong_nhan_id: bn.van_phong_nhan_id,
@@ -131,12 +144,12 @@ watch(() => props.bienNhan, (bn) => {
       trang_thai_thu: bn.trang_thai_thu,
       don_vi_gui: bn.don_vi_gui || '',
       nguoi_gui: bn.nguoi_gui || '',
-      dien_thoai_gui: bn.dien_thoai_gui || '',
+      dien_thoai_gui: applyPhoneFormat(bn.dien_thoai_gui),
       dia_chi_gui: bn.dia_chi_gui || '',
       so_cccd_gui: bn.so_cccd_gui || '',
       don_vi_nhan: bn.don_vi_nhan || '',
       nguoi_nhan: bn.nguoi_nhan || '',
-      dien_thoai_nhan: bn.dien_thoai_nhan || '',
+      dien_thoai_nhan: applyPhoneFormat(bn.dien_thoai_nhan),
       dia_chi_nhan: bn.dia_chi_nhan || '',
       so_cccd_nhan: bn.so_cccd_nhan || '',
       hang_hoa_json: bn.hang_hoa_json?.length
@@ -148,7 +161,7 @@ watch(() => props.bienNhan, (bn) => {
       hang_hoa_khac: (() => {
         if (!bn.hang_hoa_json) return '';
         const khac = bn.hang_hoa_json.find(i => i.don_vi === 'Khác');
-        return khac ? `${khac.so_luong || ''} ${khac.ghi_chu || ''}`.trim() : '';
+        return khac ? (khac.ghi_chu || '').trim() : ''; // [M-01] so_luong luôn = 1, chỉ cần ghi_chu
       })(),
       hang_hu_khong_den: bn.hang_hu_khong_den || false,
       gia_tri_hang: bn.gia_tri_hang ? Number(bn.gia_tri_hang) : null,
@@ -172,6 +185,8 @@ watch(() => props.mode, (m) => {
   }
 });
 
+// parseDateSafe — đã chuyển vào utils/format.js
+
 // ── Lấy mã biên nhận dự kiến ─────────────────────────────────────
 async function fetchNextMaSo() {
   if (!props.vpGiaoDich || !form.value.van_phong_nhan_id) return;
@@ -191,6 +206,21 @@ async function fetchNextMaSo() {
 
 // ── Computed ──────────────────────────────────────────────────────
 const isEditable = computed(() => props.mode === 'edit' || props.mode === 'create');
+
+// [NT-01] Đơn nội thành: VP gửi = VP nhận
+// - Create mode: form.van_phong_nhan_id vs props.vpGiaoDich (VP gửi của nhân viên)
+// - View/Edit mode: van_phong_gui_id vs van_phong_nhan_id từ bienNhan
+const isNoiThanh = computed(() => {
+  if (props.mode === 'create') {
+    return !!(props.vpGiaoDich && form.value.van_phong_nhan_id &&
+      Number(props.vpGiaoDich) === Number(form.value.van_phong_nhan_id));
+  }
+  if (props.bienNhan) {
+    return props.bienNhan.van_phong_gui_id === props.bienNhan.van_phong_nhan_id;
+  }
+  return false;
+});
+
 const displayMaSo = computed(() => {
   if (props.mode === 'view') return props.bienNhan?.ma_so || '';
   // edit: hiện mã hiện tại (không đổi)
@@ -205,10 +235,9 @@ const displayDate = computed(() => {
   if (props.mode === 'view' || props.mode === 'edit') {
     const bn = props.bienNhan;
     if (!bn) return '';
-    const d = new Date(bn.ngay_bien_nhan);
-    return d.toLocaleDateString('vi-VN');
+    return formatDate(bn.ngay_bien_nhan); // parseDateSafe bên trong formatDate
   }
-  return form.value.ngay_bien_nhan?.toLocaleDateString('vi-VN') || '';
+  return formatDate(form.value.ngay_bien_nhan) || '';
 });
 const displayTime = computed(() => {
   if (props.mode === 'view' || props.mode === 'edit') return props.bienNhan?.gio_tao || '';
@@ -227,20 +256,16 @@ const displayChanh = computed(() => {
   return '';
 });
 
-function formatCurrency(v) {
-  if (!v) return '—';
-  return Number(v).toLocaleString('vi-VN') + 'đ';
-}
+// formatCurrency, formatPhone, applyPhoneFormat — đã chuyển vào utils/
+// onPhoneInput → handlePhoneInput từ composables/usePhoneInput
 
 // ── Build payload cho save ────────────────────────────────────────
 function buildPayload() {
   const p = { ...form.value };
   p.van_phong_gui_id = props.vpGiaoDich;
+  // Dùng toISODate từ utils/format để tránh timezone shift
   if (p.ngay_bien_nhan instanceof Date) {
-    const y = p.ngay_bien_nhan.getFullYear();
-    const m = String(p.ngay_bien_nhan.getMonth() + 1).padStart(2, '0');
-    const d = String(p.ngay_bien_nhan.getDate()).padStart(2, '0');
-    p.ngay_bien_nhan = `${y}-${m}-${d}`;
+    p.ngay_bien_nhan = toISODate(p.ngay_bien_nhan);
   }
   // Merge ô "Khác" vào hang_hoa_json
   let items = (p.hang_hoa_json || []).filter(i => Number(i.so_luong) > 0);
@@ -251,6 +276,9 @@ function buildPayload() {
   // Giao hàng: địa chỉ giao = địa chỉ người nhận
   p.dia_chi_giao = p.dia_chi_nhan || null;
   delete p.hang_hoa_khac;
+  // Strip khoảng trắng trong SĐT trước khi gửi lên server
+  if (p.dien_thoai_gui) p.dien_thoai_gui = p.dien_thoai_gui.replace(/\s/g, '');
+  if (p.dien_thoai_nhan) p.dien_thoai_nhan = p.dien_thoai_nhan.replace(/\s/g, '');
   // Giữ ma_so_custom nếu đang tạo mới (người dùng có thể sửa mã)
   if (props.mode !== 'create' || !p.ma_so_custom?.trim()) {
     delete p.ma_so_custom;
@@ -259,10 +287,6 @@ function buildPayload() {
 }
 
 // ── Validation ────────────────────────────────────────────────
-const errors = ref({});
-// Fix 3.1: Regex số điện thoại VN (10 chữ số, bắt đầu bằng 0)
-const PHONE_REGEX = /^0[3-9]\d{8}$|^02\d{9}$/;
-
 function validate() {
   const e = {};
   const f = form.value;
@@ -273,8 +297,8 @@ function validate() {
   if (!f.don_vi_gui?.trim() && !f.nguoi_gui?.trim())
     e.don_vi_gui = 'Vui lòng nhập đơn vị hoặc tên người gửi';
 
-  // Fix 3.1: Kiểm tra định dạng số điện thoại
-  const dtGui = f.dien_thoai_gui?.trim();
+  // Fix 3.1: Kiểm tra định dạng số điện thoại (strip spaces trước khi test)
+  const dtGui = f.dien_thoai_gui?.trim().replace(/\s/g, '');
   if (!dtGui)
     e.dien_thoai_gui = 'Số điện thoại người gửi là bắt buộc';
   else if (!PHONE_REGEX.test(dtGui))
@@ -283,7 +307,7 @@ function validate() {
   if (!f.don_vi_nhan?.trim() && !f.nguoi_nhan?.trim())
     e.don_vi_nhan = 'Vui lòng nhập đơn vị hoặc tên người nhận';
 
-  const dtNhan = f.dien_thoai_nhan?.trim();
+  const dtNhan = f.dien_thoai_nhan?.trim().replace(/\s/g, '');
   if (!dtNhan)
     e.dien_thoai_nhan = 'Số điện thoại người nhận là bắt buộc';
   else if (!PHONE_REGEX.test(dtNhan))
@@ -324,34 +348,49 @@ function onEdit()   { emit('edit'); }
 function onPrint()  { emit('print'); }
 
 // ── Status transition ─────────────────────────────────────────────
-const TRANG_THAI_ORDER = ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'khach_da_nhan'];
+const TRANG_THAI_ORDER = ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao', 'da_giao_chanh', 'khach_da_nhan'];
 const TRANG_THAI_LABELS = {
   cho_vc: 'Chờ vận chuyển', dang_vc: 'Đang vận chuyển', da_den_kho: 'Đã đến kho',
-  da_bao_khach: 'Đã báo khách', khach_da_nhan: 'Khách đã nhận',
+  da_bao_khach: 'Đã báo khách', dang_giao: 'Đang giao hàng',
+  da_giao_chanh: 'Đã giao Chành', khach_da_nhan: 'Khách đã nhận',
 };
 const TRANG_THAI_ICONS = {
   cho_vc: 'pi pi-box', dang_vc: 'pi pi-truck', da_den_kho: 'pi pi-building',
-  da_bao_khach: 'pi pi-phone', khach_da_nhan: 'pi pi-check-circle',
+  da_bao_khach: 'pi pi-phone', dang_giao: 'pi pi-car',
+  da_giao_chanh: 'pi pi-send', khach_da_nhan: 'pi pi-check-circle',
 };
 
 const statusConfirmVisible = ref(false);
 const statusGhiChu = ref('');
 const statusUpdating = ref(false);
 const lichSu = ref([]);
-const lichSuLoading = ref(false);
 
 const canUpdateStatus = computed(() => {
   return auth.hasRole('admin', 'staff') && props.mode === 'view' && props.bienNhan;
 });
 
+// Context-aware nextTrangThai: phân nhánh theo chanh_id & hinh_thuc_giao
 const nextTrangThai = computed(() => {
   if (!props.bienNhan) return null;
-  const idx = TRANG_THAI_ORDER.indexOf(props.bienNhan.trang_thai);
-  if (idx < 0 || idx >= TRANG_THAI_ORDER.length - 1) return null;
-  return TRANG_THAI_ORDER[idx + 1];
+  const tt = props.bienNhan.trang_thai;
+  const hasChanh = !!props.bienNhan.chanh_id;
+  const htGiao = props.bienNhan.hinh_thuc_giao;
+
+  if (tt === 'da_den_kho') {
+    if (hasChanh) return 'da_giao_chanh';
+    if (htGiao === 'tu_toi')  return 'khach_da_nhan';
+    if (htGiao === 'tan_noi') return 'dang_giao';
+    return 'da_bao_khach'; // goi_dien (default)
+  }
+  // Các bước còn lại: tuyến tính
+  const linear = { cho_vc: 'dang_vc', dang_vc: 'da_den_kho', da_bao_khach: 'khach_da_nhan', dang_giao: 'khach_da_nhan' };
+  return linear[tt] ?? null;
 });
 
-const isTerminal = computed(() => props.bienNhan?.trang_thai === 'khach_da_nhan');
+const isTerminal = computed(() =>
+  ['khach_da_nhan', 'da_giao_chanh'].includes(props.bienNhan?.trang_thai)
+);
+
 
 function openStatusConfirm() {
   statusGhiChu.value = '';
@@ -361,42 +400,55 @@ function openStatusConfirm() {
 async function confirmStatusUpdate() {
   if (!nextTrangThai.value || !props.bienNhan) return;
   statusUpdating.value = true;
+
+  // Pre-fill ghi chú cho bàn giao chành
+  let ghiChu = statusGhiChu.value || null;
+  if (nextTrangThai.value === 'da_giao_chanh' && !statusGhiChu.value && props.bienNhan.chanh) {
+    const c = props.bienNhan.chanh;
+    const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    ghiChu = `Giao cho Chành "${c.ten}" lúc ${now}${c.dien_thoai ? ` — ĐT: ${c.dien_thoai}` : ''}${c.dia_chi ? ` — ĐC: ${c.dia_chi}` : ''}`;
+  }
+
   try {
     await api.patch(`/bien-nhan/${props.bienNhan.id}/trang-thai`, {
       trang_thai: nextTrangThai.value,
-      ghi_chu: statusGhiChu.value || undefined,
+      ghi_chu: ghiChu || undefined,
       phuong_thuc: 'manual',
     });
+    lichSu.value = [
+      {
+        trang_thai_moi: nextTrangThai.value,
+        created_at: new Date().toISOString(),
+        ghi_chu: ghiChu || null,
+        phuong_thuc: 'manual',
+        nhan_vien: { ten: auth.user?.ten || '' },
+      },
+      ...lichSu.value,
+    ];
     statusConfirmVisible.value = false;
     emit('status-updated');
   } catch (err) {
-    alert(err.response?.data?.error?.message || 'Cập nhật thất bại');
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi cập nhật trạng thái',
+      detail: err.response?.data?.error?.message || 'Cập nhật thất bại',
+      life: 5000,
+    });
+    statusConfirmVisible.value = false;
   } finally {
     statusUpdating.value = false;
   }
 }
 
-async function loadLichSu() {
-  if (!props.bienNhan) return;
-  lichSuLoading.value = true;
-  try {
-    const { data: res } = await api.get(`/scan/${props.bienNhan.ma_so}`);
-    lichSu.value = res.data?.lich_su || [];
-  } catch {
-    lichSu.value = [];
-  } finally {
-    lichSuLoading.value = false;
-  }
-}
 
-watch(() => props.bienNhan?.id, (id) => {
-  if (id && props.mode === 'view') loadLichSu();
-}, { immediate: true });
+// Bug 6 fixed: backend getBienNhan() đã eager-load lich_su_trang_thai.
+// Không cần gọi thêm API riêng — watch props.bienNhan để đọc trực tiếp.
+watch(() => props.bienNhan, (bn) => {
+  lichSu.value = bn?.lich_su_trang_thai || [];
+}, { immediate: true, deep: true });
 
-function formatDateTime(dt) {
-  if (!dt) return '';
-  return new Date(dt).toLocaleString('vi-VN');
-}
+
+// formatDateTime — đã chuyển vào utils/format.js
 
 defineExpose({ buildPayload, validate });
 </script>
@@ -433,18 +485,37 @@ defineExpose({ buildPayload, validate });
           </div>
         </div>
         <div class="info-row-2">
-          <div class="info-field">
+          <div class="info-field info-field-ma-so">
             <span class="field-lbl">Mã số:</span>
-            <span class="field-val ma-so" v-if="!isEditable || mode === 'edit'">{{ displayMaSo }}</span>
-            <InputText v-else v-model="form.ma_so_custom" class="ma-so-input" />
+            <div class="ma-so-with-badge">
+              <span class="field-val ma-so" v-if="!isEditable || mode === 'edit'">{{ displayMaSo }}</span>
+              <InputText v-else v-model="form.ma_so_custom" class="ma-so-input" />
+              <!-- [NT-01] Badge nội thành — hiện khi VP gửi = VP nhận -->
+              <span
+                v-if="isNoiThanh"
+                class="noi-thanh-badge"
+                v-tooltip.right="'Đơn nội thành: hàng tiếp nhận và giao trong cùng một văn phòng, không qua xe liên tỉnh'"
+              >
+                <i class="pi pi-map-marker"></i>
+                Nội thành
+              </span>
+            </div>
           </div>
         </div>
         <div class="info-row-2">
           <div class="info-field">
             <span class="field-lbl">Giá cước:</span>
             <span class="field-val cuoc" v-if="!isEditable">{{ formatCurrency(bienNhan?.gia_cuoc) }}</span>
-            <div v-else class="input-addon compact">
-              <input type="number" v-model.number="form.gia_cuoc" min="0" step="1000" class="p-inputtext p-component input-addon-field" />
+            <div v-else class="input-addon compact-money">
+              <InputNumber
+                v-model="form.gia_cuoc"
+                :useGrouping="true"
+                locale="vi-VN"
+                :minFractionDigits="0"
+                :maxFractionDigits="0"
+                :min="0"
+                class="input-addon-num"
+              />
               <span class="input-addon-suffix">đ</span>
             </div>
           </div>
@@ -458,15 +529,17 @@ defineExpose({ buildPayload, validate });
               <label for="tt_cn" class="radio-lbl">Công nợ</label>
             </template>
             <template v-else>
-              <span class="badge" :class="'badge-' + (bienNhan?.trang_thai_thu || 'da_thu')">
-                {{ { da_thu: 'Đã thu', chua_thu: 'Chưa thu', cong_no: 'Công nợ' }[bienNhan?.trang_thai_thu] || '' }}
-              </span>
+              <StatusBadge :value="bienNhan?.trang_thai_thu" type="thu" />
             </template>
           </div>
         </div>
         <div class="info-row-2">
           <div class="info-field">
-            <span class="field-lbl">Địa điểm đến:</span>
+            <!-- [NT-01] Hint (= VP Gửi) khi nội thành -->
+            <span class="field-lbl">
+              Địa điểm đến:
+              <span v-if="isNoiThanh && isEditable" class="lbl-noi-thanh-hint">(= VP Gửi)</span>
+            </span>
             <Select v-if="isEditable" v-model="form.van_phong_nhan_id" :options="vpNhanOptions" optionLabel="label" optionValue="value" placeholder="Chọn VP nhận" class="select-compact" :class="{ 'p-invalid': errors.van_phong_nhan_id }" />
             <span v-if="errors.van_phong_nhan_id" class="error-msg">{{ errors.van_phong_nhan_id }}</span>
             <span v-else-if="!isEditable" class="field-val">{{ displayVpNhan }}</span>
@@ -474,7 +547,7 @@ defineExpose({ buildPayload, validate });
         </div>
         <div class="info-row-2">
           <div class="info-field">
-            <span class="field-lbl">Gửi tới:</span>
+            <span class="field-lbl">Gửi tới Chành:</span>
             <Select v-if="isEditable" v-model="form.chanh_id" :options="chanhOptions" optionLabel="ten" optionValue="id" placeholder="Chọn chành..." showClear class="select-compact" :disabled="!form.van_phong_nhan_id" />
             <span v-else class="field-val">{{ displayChanh }}</span>
           </div>
@@ -483,7 +556,7 @@ defineExpose({ buildPayload, validate });
 
       <!-- ═══ NGƯỜI GỬI ═══ -->
       <div class="group-box sender">
-        <div class="group-title">Thông tin người gửi</div>
+        <div class="group-title"><i class="pi pi-send"></i> Thông tin người gửi</div>
         <div class="field-full" :class="{ 'field-error': errors.don_vi_gui }">
           <span class="field-lbl lbl-fixed">Đơn vị gửi:</span>
           <template v-if="isEditable">
@@ -517,10 +590,17 @@ defineExpose({ buildPayload, validate });
           <div class="f-inline f-phone" :class="{ 'field-error': errors.dien_thoai_gui }">
             <span class="field-lbl">Điện thoại:</span>
             <template v-if="isEditable">
-              <InputText v-model="form.dien_thoai_gui" class="input-full" :class="{ 'p-invalid': errors.dien_thoai_gui }" @input="delete errors.dien_thoai_gui" />
+              <InputText
+                v-model="form.dien_thoai_gui"
+                class="input-full"
+                :class="{ 'p-invalid': errors.dien_thoai_gui }"
+                @input="handlePhoneInput(form, 'dien_thoai_gui', $event); delete errors.dien_thoai_gui"
+                placeholder=""
+                maxlength="13"
+              />
               <span v-if="errors.dien_thoai_gui" class="error-msg">{{ errors.dien_thoai_gui }}</span>
             </template>
-            <span v-else class="field-val">{{ bienNhan?.dien_thoai_gui || '—' }}</span>
+            <span v-else class="field-val">{{ formatPhone(bienNhan?.dien_thoai_gui) }}</span>
           </div>
           <div class="f-inline f-cccd">
             <span class="field-lbl">CCCD:</span>
@@ -537,7 +617,7 @@ defineExpose({ buildPayload, validate });
 
       <!-- ═══ NGƯỜI NHẬN ═══ -->
       <div class="group-box receiver">
-        <div class="group-title">Thông tin người nhận</div>
+        <div class="group-title"><i class="pi pi-map-marker"></i> Thông tin người nhận</div>
         <div class="field-full" :class="{ 'field-error': errors.don_vi_nhan }">
           <span class="field-lbl lbl-fixed">Đơn vị nhận:</span>
           <template v-if="isEditable">
@@ -571,10 +651,17 @@ defineExpose({ buildPayload, validate });
           <div class="f-inline f-phone" :class="{ 'field-error': errors.dien_thoai_nhan }">
             <span class="field-lbl">Điện thoại:</span>
             <template v-if="isEditable">
-              <InputText v-model="form.dien_thoai_nhan" class="input-full" :class="{ 'p-invalid': errors.dien_thoai_nhan }" @input="delete errors.dien_thoai_nhan" />
+              <InputText
+                v-model="form.dien_thoai_nhan"
+                class="input-full"
+                :class="{ 'p-invalid': errors.dien_thoai_nhan }"
+                @input="handlePhoneInput(form, 'dien_thoai_nhan', $event); delete errors.dien_thoai_nhan"
+                placeholder=""
+                maxlength="13"
+              />
               <span v-if="errors.dien_thoai_nhan" class="error-msg">{{ errors.dien_thoai_nhan }}</span>
             </template>
-            <span v-else class="field-val">{{ bienNhan?.dien_thoai_nhan || '—' }}</span>
+            <span v-else class="field-val">{{ formatPhone(bienNhan?.dien_thoai_nhan) }}</span>
           </div>
           <div class="f-inline f-cccd">
             <span class="field-lbl">CCCD:</span>
@@ -591,7 +678,7 @@ defineExpose({ buildPayload, validate });
 
       <!-- ═══ HÀNG HÓA ═══ -->
       <div class="group-box goods">
-        <div class="group-title">Thông tin hàng</div>
+        <div class="group-title"><i class="pi pi-box"></i> Thông tin hàng</div>
         <template v-if="isEditable">
           <div class="hh-grid" :class="{ 'field-error': errors.hang_hoa }">
             <div v-for="item in form.hang_hoa_json" :key="item.don_vi" class="hh-item" :class="{ filled: Number(item.so_luong) > 0 }">
@@ -612,16 +699,24 @@ defineExpose({ buildPayload, validate });
           </div>
         </template>
         <template v-else>
-          <div class="field-val goods-summary" style="margin-bottom:0.1rem;">{{ bienNhan?.ten_hang_hoa || '—' }}</div>
-          <div v-if="bienNhan?.hang_hu_khong_den" style="margin-bottom:0.2rem;">
+          <div class="field-val goods-summary">{{ bienNhan?.ten_hang_hoa || '—' }}</div>
+          <div v-if="bienNhan?.hang_hu_khong_den">
             <span class="badge badge-danger" style="display:inline-block;">Hàng hư/hỏng/bể không đền</span>
           </div>
         </template>
         <div class="field-row-2">
           <div class="f-50"><span class="field-lbl">Giá trị hàng:</span>
             <template v-if="isEditable">
-              <div class="input-addon compact">
-                <input type="number" v-model.number="form.gia_tri_hang" min="0" step="1000" class="p-inputtext p-component input-addon-field" />
+              <div class="input-addon compact-money">
+                <InputNumber
+                  v-model="form.gia_tri_hang"
+                  :useGrouping="true"
+                  locale="vi-VN"
+                  :minFractionDigits="0"
+                  :maxFractionDigits="0"
+                  :min="0"
+                  class="input-addon-num"
+                />
                 <span class="input-addon-suffix">đ</span>
               </div>
             </template>
@@ -629,7 +724,7 @@ defineExpose({ buildPayload, validate });
           </div>
           <div class="f-50"><span class="field-lbl">Trọng lượng:</span>
             <template v-if="isEditable">
-              <div class="input-addon compact">
+              <div class="input-addon compact-weight">
                 <input type="number" v-model.number="form.trong_luong" min="0" step="0.1" class="p-inputtext p-component input-addon-field" />
                 <span class="input-addon-suffix">Kg</span>
               </div>
@@ -641,7 +736,7 @@ defineExpose({ buildPayload, validate });
 
       <!-- ═══ THANH TOÁN & GIAO HÀNG ═══ -->
       <div class="group-box payment">
-        <div class="group-title">Thanh toán & Giao hàng</div>
+        <div class="group-title"><i class="pi pi-wallet"></i> Thanh toán & Giao hàng</div>
         <div class="radio-row" v-if="isEditable" :class="{ 'field-error': errors.hinh_thuc_giao }">
           <RadioButton v-model="form.hinh_thuc_giao" value="tan_noi" inputId="ht_tn" @change="delete errors.hinh_thuc_giao" />
           <label for="ht_tn" class="radio-lbl">Giao tận nơi</label>
@@ -651,32 +746,44 @@ defineExpose({ buildPayload, validate });
           <label for="ht_tt" class="radio-lbl">Tự đến lấy</label>
         </div>
         <span v-if="isEditable && errors.hinh_thuc_giao" class="error-msg" style="display:block;margin-bottom:4px;">{{ errors.hinh_thuc_giao }}</span>
-        <div v-if="!isEditable" class="field-val" style="margin-bottom:0.3rem; display:flex; align-items:baseline; gap:0.35rem;">
+        <div v-if="!isEditable" class="field-val" style="display:flex; align-items:baseline; gap:0.35rem;">
           <span class="field-lbl">Hình thức giao hàng:</span> {{ { tan_noi: 'Giao tận nơi', goi_dien: 'Gọi điện', tu_toi: 'Tự đến nhận' }[bienNhan?.hinh_thuc_giao] || '' }}
         </div>
         <div class="field-row-2">
           <div class="f-50"><span class="field-lbl">Thu hộ (COD):</span>
             <template v-if="isEditable">
-              <div class="input-addon compact">
-                <input type="number" v-model.number="form.thu_ho" min="0" step="1000" class="p-inputtext p-component input-addon-field" />
+              <div class="input-addon compact-money">
+                <InputNumber
+                  v-model="form.thu_ho"
+                  :useGrouping="true"
+                  locale="vi-VN"
+                  :minFractionDigits="0"
+                  :maxFractionDigits="0"
+                  :min="0"
+                  class="input-addon-num"
+                />
                 <span class="input-addon-suffix">đ</span>
               </div>
             </template>
             <span v-else class="field-val">{{ formatCurrency(bienNhan?.thu_ho) }}</span>
             <!-- Badge TT COD -->
-            <span
-              v-if="!isEditable && Number(bienNhan?.thu_ho) > 0 && bienNhan?.trang_thai_cod && bienNhan.trang_thai_cod !== 'khong_co'"
-              class="badge"
-              :class="{
-                'badge-warning': bienNhan.trang_thai_cod === 'cho_thu',
-                'badge-info': bienNhan.trang_thai_cod === 'da_thu',
-                'badge-help': bienNhan.trang_thai_cod === 'da_chuyen',
-                'badge-success': bienNhan.trang_thai_cod === 'da_tra',
-              }"
+            <StatusBadge
+              v-if="!isEditable && Number(bienNhan?.thu_ho) > 0"
+              :value="bienNhan?.trang_thai_cod"
+              type="cod"
               style="margin-left: 0.4rem; font-size: 0.7rem;"
-            >
-              {{ { cho_thu: 'COD: Chờ thu', da_thu: 'COD: Đã thu', da_chuyen: 'COD: Đã chuyển', da_tra: 'COD: Hoàn tất' }[bienNhan.trang_thai_cod] }}
-            </span>
+            />
+          </div>
+          <!-- COD mini-stepper — chỉ show ở view mode khi có thu_ho -->
+          <div
+            v-if="!isEditable && Number(bienNhan?.thu_ho) > 0"
+            class="cod-stepper-wrap"
+          >
+            <div class="cod-stepper-label">
+              <i class="pi pi-send" />
+              Tiến trình thu hộ (COD)
+            </div>
+            <CodStepper :current="bienNhan.trang_thai_cod" />
           </div>
           <div class="f-50" v-if="isEditable">
             <div class="check-row">
@@ -692,22 +799,30 @@ defineExpose({ buildPayload, validate });
 
       <!-- ═══ TRẠNG THÁI VẬN CHUYỂN ═══ -->
       <div v-if="mode === 'view' && bienNhan" class="group-box status-section">
-        <div class="group-title">Trạng thái vận chuyển</div>
-        <StatusStepper :current="bienNhan.trang_thai" style="margin-bottom: 0.75rem;" />
+        <div class="group-title"><i class="pi pi-truck"></i> Trạng thái vận chuyển</div>
+        <StatusStepper
+          :current="bienNhan.trang_thai"
+          :hinhThucGiao="bienNhan.hinh_thuc_giao"
+          :hasChanh="!!bienNhan.chanh_id"
+          style="margin-top: 0.5rem; margin-bottom: 0.75rem;"
+        />
 
-        <!-- Next step button -->
-        <div v-if="canUpdateStatus && nextTrangThai" class="status-action">
-          <Button
-            :label="'Chuyển sang: ' + TRANG_THAI_LABELS[nextTrangThai]"
-            :icon="TRANG_THAI_ICONS[nextTrangThai]"
-            severity="info"
-            size="small"
-            class="status-btn"
-            @click="openStatusConfirm"
-          />
+        <!-- Panel Chành nổi bật khi da_giao_chanh -->
+        <div v-if="bienNhan.trang_thai === 'da_giao_chanh' && bienNhan.chanh" class="chanh-handover-panel">
+          <i class="pi pi-send"></i>
+          <div>
+            <div class="chanh-title">Đã bàn giao cho Chành</div>
+            <strong>{{ bienNhan.chanh.ten }}</strong>
+            <span v-if="bienNhan.chanh.dien_thoai"> — {{ bienNhan.chanh.dien_thoai }}</span>
+            <div v-if="bienNhan.chanh.dia_chi" class="chanh-sub">{{ bienNhan.chanh.dia_chi }}</div>
+            <div v-if="bienNhan.chanh.nguoi_lien_he" class="chanh-sub">NLH: {{ bienNhan.chanh.nguoi_lien_he }}</div>
+          </div>
         </div>
-        <div v-else-if="isTerminal" class="status-terminal">
-          <i class="pi pi-check-circle"></i> Đã hoàn tất giao hàng
+
+        <!-- Next step button — REMOVED (chuyển trạng thái qua scan/hang-den) -->
+        <div v-if="isTerminal" class="status-terminal">
+          <i :class="bienNhan.trang_thai === 'da_giao_chanh' ? 'pi pi-send' : 'pi pi-check-circle'"></i>
+          {{ bienNhan.trang_thai === 'da_giao_chanh' ? 'Đã bàn giao Chành — kết thúc trách nhiệm TMQ' : 'Đã hoàn tất giao hàng' }}
         </div>
 
         <!-- Timeline -->
@@ -724,27 +839,30 @@ defineExpose({ buildPayload, validate });
         </div>
       </div>
 
-      <!-- Status confirm dialog -->
-      <Dialog v-model:visible="statusConfirmVisible" header="Xác nhận chuyển trạng thái" :modal="true" :style="{ width: '400px' }">
-        <div class="confirm-content">
-          <p>Biên nhận: <strong>{{ bienNhan?.ma_so }}</strong></p>
-          <p>Trạng thái hiện tại: <strong>{{ TRANG_THAI_LABELS[bienNhan?.trang_thai] }}</strong></p>
-          <p>Chuyển sang: <strong style="color: #2563eb;">{{ TRANG_THAI_LABELS[nextTrangThai] }}</strong></p>
-          <div style="margin-top: 0.75rem;">
-            <label class="form-label" style="font-size:0.78rem;">Ghi chú (tùy chọn):</label>
-            <InputText v-model="statusGhiChu" placeholder="Nhập ghi chú..." fluid />
-          </div>
-        </div>
-        <template #footer>
-          <Button label="Hủy" severity="secondary" text size="small" @click="statusConfirmVisible = false" />
-          <Button label="Xác nhận" icon="pi pi-check" size="small" :loading="statusUpdating" @click="confirmStatusUpdate" />
-        </template>
-      </Dialog>
+
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ── Chành handover panel (status section) ─────────────────────── */
+.chanh-handover-panel {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  background: #ede9fe; border: 1px solid #c4b5fd; border-radius: 8px;
+  padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.82rem; color: #4c1d95;
+}
+.chanh-handover-panel i { font-size: 1.1rem; margin-top: 2px; flex-shrink: 0; }
+.chanh-handover-panel .chanh-title { font-size: 0.72rem; font-weight: 700; color: #7c3aed; margin-bottom: 2px; }
+.chanh-handover-panel .chanh-sub { font-size: 0.75rem; color: #5b21b6; margin-top: 2px; }
+
+/* ── Chành info box inside confirm dialog ───────────────────────── */
+.chanh-confirm-info {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  background: #f3e8ff; border: 1px solid #d8b4fe; border-radius: 6px;
+  padding: 0.5rem 0.6rem; margin: 0.4rem 0; font-size: 0.82rem; color: #6b21a8;
+}
+.chanh-confirm-info i { font-size: 0.9rem; margin-top: 2px; flex-shrink: 0; }
+
 /* ── Validation errors ─────────────────────────────────────────── */
 .error-msg {
   color: #ef4444;
@@ -790,12 +908,14 @@ defineExpose({ buildPayload, validate });
 }
 
 .right-panel {
-  height: 100%;
+  flex: 1;          /* fill toàn bộ bn-right thay vì dùng height:100% */
+  min-height: 0;    /* cho phép shrink trong flex container */
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .mode-empty {
@@ -822,20 +942,24 @@ defineExpose({ buildPayload, validate });
 
 .panel-scroll {
   flex: 1;
+  min-height: 0;    /* KEY: thiếu cái này → overflow-y:auto không bao giờ hoạt động */
   overflow-y: auto;
-  padding: 0.65rem 0.75rem;
+  padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 /* ── Header info ── */
 .header-info {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem 0.65rem;
+  border-bottom: 2px solid var(--border);
+  background: linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%);
+  border-radius: 10px 10px 0 0;
+  margin: -0.75rem -0.85rem 0;
 }
 
 .info-row-2 {
@@ -847,112 +971,151 @@ defineExpose({ buildPayload, validate });
 .info-field {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   flex: 1;
   min-width: 0;
 }
 
 .field-lbl {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: #475569;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .lbl-fixed {
-  width: 75px; /* Căn chỉnh thẳng hàng cho cột đầu tiên */
+  min-width: 82px;
 }
 
 .field-val {
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.84rem;
+  font-weight: 400;
   color: var(--text);
 }
 
 .ma-so {
   font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
-  letter-spacing: 0.03em;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
   color: var(--primary);
+  font-weight: 800;
 }
 
-.nv-name { color: var(--text-secondary); }
-.cuoc { color: #dc2626; font-size: 0.9rem; }
+.nv-name { color: #6366f1; font-weight: 700; }
+.cuoc { color: #dc2626; font-size: 0.95rem; font-weight: 800; }
 
 .inline-inputs {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.4rem;
   align-items: center;
   flex: 1;
 }
 
-:deep(.dp-compact) { max-width: 135px; }
-:deep(.dp-compact .p-inputtext) { font-size: 0.8rem; padding: 0.2rem 0.4rem; height: 28px; }
-.time-input { width: 55px; font-size: 0.8rem !important; padding: 0.2rem 0.4rem !important; height: 28px; text-align: center; }
-.ma-so-input { max-width: 140px; font-size: 0.82rem !important; font-family: monospace; padding: 0.2rem 0.4rem !important; height: 28px; }
+:deep(.dp-compact) { max-width: 138px; }
+:deep(.dp-compact .p-inputtext) { font-size: 0.82rem; padding: 0.25rem 0.5rem; height: 30px; }
+.time-input { width: 58px; font-size: 0.82rem !important; padding: 0.25rem 0.4rem !important; height: 30px; text-align: center; }
+.ma-so-input { max-width: 145px; font-size: 0.84rem !important; font-family: monospace; font-weight: 700; padding: 0.25rem 0.5rem !important; height: 30px; }
 :deep(.select-compact) { flex: 1; }
-:deep(.select-compact .p-select-label) { font-size: 0.82rem; padding: 0.2rem 0.4rem; }
+:deep(.select-compact .p-select-label) { font-size: 0.84rem; padding: 0.25rem 0.5rem; }
 
 /* ── Radio group ── */
 .radio-group, .radio-row {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
+  padding: 0.3rem 0.1rem;
 }
 .radio-lbl {
-  font-size: 0.78rem;
-  font-weight: 500;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
-  margin-right: 0.5rem;
-  color: var(--text-secondary);
+  margin-right: 0.55rem;
+  color: #475569;
 }
 
 /* ── GroupBox ── */
 .group-box {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.6rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0 0 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  overflow: visible;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s;
+}
+.group-box:focus-within {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .group-title {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.15rem;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.7rem;
+  margin-bottom: 0.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.sender { border-left: 3px solid #3b82f6; }
-.sender .group-title { color: #3b82f6; }
-.receiver { border-left: 3px solid #10b981; }
-.receiver .group-title { color: #10b981; }
-.goods { border-left: 3px solid #f59e0b; }
-.goods .group-title { color: #f59e0b; }
-.payment { border-left: 3px solid #8b5cf6; }
-.payment .group-title { color: #8b5cf6; }
+/* Nội dung bên trong group-box có padding */
+.group-box > :not(.group-title) {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+}
+
+.sender {
+  border-top: 3px solid #3b82f6;
+}
+.sender .group-title {
+  color: #1d4ed8;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+.receiver {
+  border-top: 3px solid #10b981;
+}
+.receiver .group-title {
+  color: #065f46;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+.goods {
+  border-top: 3px solid #f59e0b;
+}
+.goods .group-title {
+  color: #92400e;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+.payment {
+  border-top: 3px solid #8b5cf6;
+}
+.payment .group-title {
+  color: #5b21b6;
+  background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+}
 
 /* ── Field layouts ── */
 .field-full {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .field-row-2 {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.55rem;
   align-items: flex-start;
 }
 
 .field-row-3 {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 /* Fix baseline trong chế độ View Mode */
@@ -981,6 +1144,11 @@ defineExpose({ buildPayload, validate });
   flex: 0 0 230px !important; 
 }
 
+/* Nếu chỉ có 1 field duy nhất trong hàng → cho stretch toàn bộ chiều rộng */
+.view-mode .info-row-2 > .info-field:only-child {
+  flex: 1 1 auto !important;
+}
+
 /* Thiết lập chia cột ngang cho các input đã bị tách dọc từ Sửa form */
 .view-mode .f-50,
 .view-mode .f-40,
@@ -996,9 +1164,52 @@ defineExpose({ buildPayload, validate });
   gap: 0.5rem !important;
 }
 
-.f-40 { flex: 4; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.f-30 { flex: 3; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.f-50 { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+/* ══ View-mode spacing overrides ══════════════════════════════════
+   Trong view mode, mỗi dòng chỉ cao ~20px (text) so với ~30px (input)
+   trong edit mode. Các giá trị gap/padding phải thu hẹp lại để
+   khoảng trống giữa các dòng đồng đều và nhỏ gọn hơn.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* Giảm khoảng giữa các group-box */
+.view-mode .panel-scroll {
+  gap: 0.4rem;
+}
+
+/* Tighten header-info */
+.view-mode .header-info {
+  gap: 0.28rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Bỏ padding thừa của radio-group khi chỉ hiển thị badge (view mode) */
+.view-mode .header-info .radio-group {
+  padding: 0;
+}
+
+/* Tighten group-box: less bottom padding, tighter row gap */
+.view-mode .group-box {
+  gap: 0.2rem;
+  padding-bottom: 0.55rem;
+}
+
+/* Group title: bớt padding dọc, bỏ margin-bottom thừa */
+.view-mode .group-title {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0;
+}
+
+/* goods-summary: bỏ padding dọc thừa, khép line-height để gap trên/dưới badge đều nhau */
+.view-mode .goods-summary {
+  padding-top: 0.25;
+  padding-bottom: 0;
+  line-height: 0.75;
+}
+
+.f-40 { flex: 4; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.f-30 { flex: 3; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.f-50 { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
 
 /* Label + input nằm cùng 1 hàng trong field-row-3 */
 .f-inline {
@@ -1007,7 +1218,7 @@ defineExpose({ buildPayload, validate });
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 
 .f-inline .field-lbl {
@@ -1028,13 +1239,13 @@ defineExpose({ buildPayload, validate });
   white-space: nowrap;
 }
 
-.f-name { flex: 1; }
-.f-phone { flex: 0 0 160px; } /* Thu nhỏ cho vừa 10-11 số */
-.f-cccd { flex: 0 0 145px; } /* Thu nhỏ cho vừa 12 số CCCD */
+.f-name { flex: 2; min-width: 140px; }
+.f-phone { flex: 1; min-width: 140px; }
+.f-cccd { flex: 1; min-width: 120px; }
 
-.input-full { width: 100%; font-size: 0.82rem !important; }
+.input-full { width: 100%; font-size: 0.84rem !important; height: 30px; }
 :deep(.ac-full) { flex: 1; }
-:deep(.ac-full .p-autocomplete-input) { font-size: 0.82rem; width: 100%; }
+:deep(.ac-full .p-autocomplete-input) { font-size: 0.84rem; width: 100%; height: 30px; }
 
 /* ── Hàng hóa grid ── */
 .hh-grid {
@@ -1045,87 +1256,138 @@ defineExpose({ buildPayload, validate });
 
 .hh-item {
   display: grid;
-  grid-template-columns: 48px auto 1fr;
+  grid-template-columns: 52px auto 1fr;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  transition: border-color 0.15s;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fafbfd;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hh-item:hover {
+  border-color: #cbd5e1;
+  background: #f8faff;
 }
 
 .hh-item.filled {
-  border-color: var(--primary);
-  background: rgba(59, 130, 246, 0.04);
+  border-color: #93c5fd;
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .hh-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #94a3b8;
   text-align: right;
+  letter-spacing: -0.01em;
 }
 
-.hh-item.filled .hh-label { color: var(--primary); }
+.hh-item.filled .hh-label { color: #2563eb; }
 
-:deep(.hh-num .p-inputnumber-input) { text-align: center; font-weight: 600; font-size: 0.82rem; padding: 0.15rem 0.2rem; width: 50px; }
-:deep(.hh-num .p-inputnumber-button) { width: 1.4rem; padding: 0; }
-:deep(.hh-note) { font-size: 0.75rem !important; padding: 0.15rem 0.4rem !important; border-color: transparent !important; background: transparent !important; font-style: italic; color: var(--text-muted); }
-:deep(.hh-note:focus) { border-color: var(--primary) !important; background: white !important; }
+:deep(.hh-num .p-inputnumber-input) { text-align: center; font-weight: 700; font-size: 0.84rem; padding: 0.2rem 0.25rem; width: 52px; }
+:deep(.hh-num .p-inputnumber-button) { width: 1.5rem; padding: 0; }
+:deep(.hh-note) { font-size: 0.78rem !important; padding: 0.2rem 0.5rem !important; border-color: transparent !important; background: transparent !important; font-style: italic; color: #94a3b8; }
+:deep(.hh-note:focus) { border-color: #93c5fd !important; background: white !important; }
 
 .hh-other {
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 52px 1fr;
   border-style: dashed;
+  border-color: #cbd5e1;
 }
 
 :deep(.hh-other-input) {
-  font-size: 0.82rem !important;
-  padding: 0.2rem 0.4rem !important;
-}
-
-.goods-summary {
-  font-size: 0.85rem;
-  padding: 0.2rem 0;
+  font-size: 0.84rem !important;
+  padding: 0.25rem 0.5rem !important;
 }
 
 /* ── Checkboxes ── */
 .check-row {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.25rem;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
 }
 
 .check-lbl {
-  font-size: 0.78rem;
-  font-weight: 500;
+  font-size: 0.82rem;
+  font-weight: 600;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #475569;
+}
+
+.goods-summary {
+  font-size: 0.87rem;
+  font-weight: 500;
+  padding: 0.2rem 0;
 }
 
 /* ── Compact input-addon ── */
+.input-addon {
+  display: flex;
+  align-items: stretch;
+}
 .input-addon.compact { max-width: 160px; }
-.input-addon.compact .input-addon-field { font-size: 0.82rem; padding: 0.2rem 0.4rem; height: 28px; }
-.input-addon.compact .input-addon-suffix { font-size: 0.78rem; padding: 0 0.5rem; }
+.input-addon.compact-money { max-width: 160px; }
+.input-addon.compact-weight { max-width: 110px; }
 
-/* ── Badge ── */
+/* Suffix addon — trông như input-group chuẩn */
+.input-addon-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Native input bên trong compact-weight */
+.input-addon.compact-weight .input-addon-field {
+  font-size: 0.84rem;
+  padding: 0.25rem 0.5rem;
+  height: 30px;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* InputNumber bên trong compact-money — cần :deep() để style inner input */
+:deep(.input-addon-num.p-inputnumber) { flex: 1; min-width: 0; }
+:deep(.input-addon-num .p-inputnumber-input) {
+  width: 100%;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  height: 30px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* ── Badge đặc biệt (hàng hư, HĐĐT — không liên quan trạng thái) ── */
 .badge-danger { background: #fee2e2; color: #991b1b; display: inline-flex; padding: 0.1rem 0.4rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
 .badge-info { background: #dbeafe; color: #1e40af; display: inline-flex; padding: 0.1rem 0.4rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
 
 /* ── Status Section ── */
 .status-section {
-  border-color: #2563eb !important;
+  border-top-color: #2563eb !important;
 }
 .status-section .group-title {
-  color: #2563eb !important;
+  color: #1d4ed8 !important;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
 }
 
 .status-action {
   text-align: center;
   margin-bottom: 0.5rem;
+  padding: 0 0.7rem;
 }
-.status-btn { width: 100%; }
+.status-btn { width: 100%; font-weight: 600; }
 
 .status-terminal {
   text-align: center;
@@ -1200,5 +1462,77 @@ defineExpose({ buildPayload, validate });
 .confirm-content p {
   margin: 0.25rem 0;
   font-size: 0.85rem;
+}
+
+/* ── COD mini-stepper wrapper ── */
+.cod-stepper-wrap {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.cod-stepper-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* ── [NT-01] Đơn Nội Thành ────────────────────────────────────── */
+
+/* Wrapper mã số + badge cùng hàng */
+.ma-so-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/*
+ * Badge "Nội thành" — semantic green (Layer 3: Semantic Communication)
+ * Dùng màu success chuẩn hệ thống: không loè loẹt, mang nghĩa trạng thái.
+ * Font nhỏ, pill shape để không át mã biên nhận.
+ */
+.noi-thanh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #15803d;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  cursor: default;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.noi-thanh-badge i {
+  font-size: 0.65rem;
+}
+.noi-thanh-badge:hover {
+  background: #bbf7d0;
+  border-color: #4ade80;
+}
+
+/*
+ * Hint label nhỏ "(= VP Gửi)" khi đơn nội thành ở edit/create mode.
+ * Màu muted để không cạnh tranh với label chính.
+ */
+.lbl-noi-thanh-hint {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted, #6b7280);
+  margin-left: 0.25rem;
 }
 </style>

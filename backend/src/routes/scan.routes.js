@@ -20,19 +20,25 @@ export default async function scanRoutes(fastify) {
       },
     },
     handler: async (request, reply) => {
-      const bn = await prisma.bienNhan.findUnique({
+      // FIX: ma_so không unique độc lập (unique constraint là ma_so + ngay_bien_nhan)
+      // → dùng findFirst + orderBy để lấy bản ghi mới nhất
+      const bn = await prisma.bienNhan.findFirst({
         where: { ma_so: request.params.ma_so },
+        orderBy: { ngay_bien_nhan: 'desc' },
         select: {
           id: true,
           ma_so: true,
           ngay_bien_nhan: true,
           ten_hang_hoa: true,
           trang_thai: true,
+          hinh_thuc_giao: true,
+          chanh_id: true,
           van_phong_gui: { select: { ma_vp: true, ten: true } },
           van_phong_nhan: { select: { ma_vp: true, ten: true } },
+          chanh: { select: { id: true, ten: true, dien_thoai: true, dia_chi: true, nguoi_lien_he: true } },
           lich_su_trang_thai: {
             orderBy: { created_at: 'desc' },
-            take: 5,
+            take: 10,
             select: {
               trang_thai_moi: true,
               created_at: true,
@@ -50,10 +56,33 @@ export default async function scanRoutes(fastify) {
         });
       }
 
-      // Tính trạng thái tiếp theo (tuần tự)
-      const trangThaiOrder = ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'khach_da_nhan'];
-      const currentIdx = trangThaiOrder.indexOf(bn.trang_thai);
-      const nextTrangThai = currentIdx < trangThaiOrder.length - 1 ? trangThaiOrder[currentIdx + 1] : null;
+      // Tính trạng thái tiếp theo — dựa trên context (chanh / hinh_thuc_giao)
+      const isTerminal = ['khach_da_nhan', 'da_giao_chanh'].includes(bn.trang_thai);
+      let nextTrangThai = null;
+
+      if (!isTerminal) {
+        if (bn.trang_thai === 'da_den_kho') {
+          // Phân nhánh tại da_den_kho
+          if (bn.chanh_id) {
+            nextTrangThai = 'da_giao_chanh';
+          } else if (bn.hinh_thuc_giao === 'tu_toi') {
+            nextTrangThai = 'khach_da_nhan';
+          } else if (bn.hinh_thuc_giao === 'tan_noi') {
+            nextTrangThai = 'dang_giao';
+          } else {
+            nextTrangThai = 'da_bao_khach'; // goi_dien (default)
+          }
+        } else {
+          // Các bước khác: tuyến tính
+          const linearOrder = {
+            cho_vc: 'dang_vc',
+            dang_vc: 'da_den_kho',
+            da_bao_khach: 'khach_da_nhan',
+            dang_giao: 'khach_da_nhan',
+          };
+          nextTrangThai = linearOrder[bn.trang_thai] || null;
+        }
+      }
 
       return {
         success: true,
@@ -65,6 +94,8 @@ export default async function scanRoutes(fastify) {
           van_phong_nhan: bn.van_phong_nhan,
           ten_hang_hoa: bn.ten_hang_hoa,
           trang_thai: bn.trang_thai,
+          hinh_thuc_giao: bn.hinh_thuc_giao,
+          chanh: bn.chanh || null,   // Thông tin chành để khách liên hệ
           next_trang_thai: nextTrangThai,
           lich_su: bn.lich_su_trang_thai,
         },
@@ -72,4 +103,3 @@ export default async function scanRoutes(fastify) {
     },
   });
 }
-

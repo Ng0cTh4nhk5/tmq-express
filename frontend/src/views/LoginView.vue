@@ -24,7 +24,12 @@ async function handleLogin() {
   loading.value = true;
   try {
     await auth.login(username.value, password.value);
-    router.push('/');
+    // Nếu user cần đổi MK lần đầu → redirect về trang đổi MK
+    if (auth.user?.require_password_change) {
+      router.push('/doi-mat-khau');
+    } else {
+      router.push('/');
+    }
   } catch (err) {
     if (err.response?.status === 423) {
       const lockedUntil = err.response?.data?.error?.locked_until;
@@ -55,24 +60,14 @@ async function handleLogin() {
     <div class="login-container">
       <!-- Left branding panel -->
       <div class="login-branding">
+        <!-- Ảnh nền chi nhánh HCM -->
+        <div class="branding-photo-overlay"></div>
+        <img src="/login-bg.png" alt="Chi nhánh HCM" class="branding-photo" />
+
         <div class="branding-content">
           <img src="/logo.png" alt="TMQ Express" class="branding-logo" />
           <h1 class="branding-title">TMQ Express</h1>
-          <p class="branding-tagline">Hệ thống Quản lý Vận chuyển & Tài chính</p>
-          <div class="branding-features">
-            <div class="feature-item">
-              <i class="pi pi-truck"></i>
-              <span>Quản lý vận chuyển liên tỉnh</span>
-            </div>
-            <div class="feature-item">
-              <i class="pi pi-chart-line"></i>
-              <span>Báo cáo doanh thu thời gian thực</span>
-            </div>
-            <div class="feature-item">
-              <i class="pi pi-shield"></i>
-              <span>Bảo mật & kiểm soát truy cập</span>
-            </div>
-          </div>
+          <p class="branding-tagline">App vận hành nội bộ</p>
         </div>
         <div class="branding-footer">
           <small>© 2026 TMQ Express · Tất cả quyền được bảo lưu</small>
@@ -147,7 +142,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0a1628 0%, #132042 40%, #0d1b33 100%);
+  background: linear-gradient(135deg, #091428 0%, #0f1f3d 40%, #0c1830 100%);
   padding: 1rem;
   position: relative;
   overflow: hidden;
@@ -171,7 +166,7 @@ async function handleLogin() {
 .shape-1 {
   width: 500px;
   height: 500px;
-  background: #f97316;
+  background: var(--gold-400, #d4a829);
   top: -10%;
   right: -5%;
   animation: float1 20s ease-in-out infinite;
@@ -180,7 +175,7 @@ async function handleLogin() {
 .shape-2 {
   width: 400px;
   height: 400px;
-  background: #2563eb;
+  background: var(--navy-400, #2a4f8a);
   bottom: -15%;
   left: -5%;
   animation: float2 25s ease-in-out infinite;
@@ -189,7 +184,7 @@ async function handleLogin() {
 .shape-3 {
   width: 300px;
   height: 300px;
-  background: #7c3aed;
+  background: var(--navy-300, #5a7db0);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -230,50 +225,48 @@ async function handleLogin() {
 .login-branding {
   width: 420px;
   flex-shrink: 0;
-  background: linear-gradient(160deg, #1e40af 0%, #1d4ed8 30%, #2563eb 60%, #1e3a8a 100%);
-  padding: 2.5rem;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  position: relative;
-  overflow: hidden;
+  padding: 2.5rem;
 }
 
-.login-branding::before {
-  content: '';
+/* Ảnh nền trắng đen */
+.branding-photo {
   position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 200px;
-  height: 200px;
-  background: rgba(249, 115, 22, 0.15);
-  border-radius: 50%;
-  filter: blur(40px);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(100%) brightness(0.45) contrast(1.1);
 }
 
-.login-branding::after {
-  content: '';
+/* Overlay gradient đè lên ảnh */
+.branding-photo-overlay {
   position: absolute;
-  bottom: -30px;
-  left: -30px;
-  width: 150px;
-  height: 150px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 50%;
-  filter: blur(30px);
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(9, 20, 40, 0.55) 0%,
+    rgba(30, 58, 110, 0.45) 60%,
+    rgba(9, 20, 40, 0.7) 100%
+  );
+  z-index: 1;
 }
 
 .branding-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .branding-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
   object-fit: cover;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   margin-bottom: 1.25rem;
   background: white;
   padding: 4px;
@@ -285,48 +278,24 @@ async function handleLogin() {
   color: white;
   margin-bottom: 0.35rem;
   letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 .branding-tagline {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9rem;
-  margin-bottom: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
   line-height: 1.5;
-}
-
-.branding-features {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.82rem;
-}
-
-.feature-item i {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
-  flex-shrink: 0;
+  font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
 
 .branding-footer {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   color: rgba(255, 255, 255, 0.4);
   font-size: 0.7rem;
   padding-top: 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* Right login form */

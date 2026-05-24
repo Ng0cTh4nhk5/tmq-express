@@ -1,11 +1,12 @@
 import prisma from '../config/database.js';
 import { generateCode } from '../utils/ma-so-generator.js';
 
-export async function listKhachHang({ search, active, page = 1, limit = 20 }) {
+export async function listKhachHang({ search, active, loai_kh, page = 1, limit = 20 }) {
   const p = parseInt(page, 10) || 1;
   const l = parseInt(limit, 10) || 20;
   const where = {};
   if (active !== undefined) where.active = active;
+  if (loai_kh) where.loai_kh = loai_kh;
   if (search) {
     where.OR = [
       { ten_don_vi: { contains: search, mode: 'insensitive' } },

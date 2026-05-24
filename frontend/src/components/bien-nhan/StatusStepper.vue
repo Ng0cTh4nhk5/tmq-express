@@ -3,18 +3,41 @@ import { computed } from 'vue';
 
 const props = defineProps({
   current: { type: String, required: true },
+  hinhThucGiao: { type: String, default: null }, // 'tan_noi' | 'goi_dien' | 'tu_toi'
+  hasChanh: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
 });
 
-const STEPS = [
-  { key: 'cho_vc', label: 'Chờ VC', icon: 'pi pi-box', short: 'Chờ' },
-  { key: 'dang_vc', label: 'Đang vận chuyển', icon: 'pi pi-truck', short: 'Đang VC' },
-  { key: 'da_den_kho', label: 'Đã đến kho', icon: 'pi pi-building', short: 'Đến kho' },
-  { key: 'da_bao_khach', label: 'Đã báo khách', icon: 'pi pi-phone', short: 'Đã báo' },
-  { key: 'khach_da_nhan', label: 'Khách đã nhận', icon: 'pi pi-check-circle', short: 'Đã nhận' },
-];
+// Định nghĩa tất cả steps có thể có
+const STEP_DEF = {
+  cho_vc:        { key: 'cho_vc',        label: 'Chờ VC',         icon: 'pi pi-box',          short: 'Chờ' },
+  dang_vc:       { key: 'dang_vc',       label: 'Đang vận chuyển',icon: 'pi pi-truck',         short: 'Đang VC' },
+  da_den_kho:    { key: 'da_den_kho',    label: 'Đã đến kho',     icon: 'pi pi-building',      short: 'Đến kho' },
+  da_bao_khach:  { key: 'da_bao_khach',  label: 'Đã báo khách',   icon: 'pi pi-phone',         short: 'Đã báo' },
+  dang_giao:     { key: 'dang_giao',     label: 'Đang giao',      icon: 'pi pi-car',           short: 'Đang giao' },
+  da_giao_chanh: { key: 'da_giao_chanh', label: 'Giao Chành',     icon: 'pi pi-send',          short: 'Giao Chành' },
+  khach_da_nhan: { key: 'khach_da_nhan', label: 'Khách đã nhận',  icon: 'pi pi-check-circle',  short: 'Đã nhận' },
+};
 
-const currentIdx = computed(() => STEPS.findIndex(s => s.key === props.current));
+// Tính danh sách bước phù hợp với loại BN
+const STEPS = computed(() => {
+  const { cho_vc, dang_vc, da_den_kho, da_bao_khach, dang_giao, da_giao_chanh, khach_da_nhan } = STEP_DEF;
+
+  // Ưu tiên: Chành > Hình thức giao
+  if (props.hasChanh) {
+    return [cho_vc, dang_vc, da_den_kho, da_giao_chanh];
+  }
+  if (props.hinhThucGiao === 'tu_toi') {
+    return [cho_vc, dang_vc, da_den_kho, khach_da_nhan];
+  }
+  if (props.hinhThucGiao === 'tan_noi') {
+    return [cho_vc, dang_vc, da_den_kho, dang_giao, khach_da_nhan];
+  }
+  // goi_dien hoặc không xác định (default)
+  return [cho_vc, dang_vc, da_den_kho, da_bao_khach, khach_da_nhan];
+});
+
+const currentIdx = computed(() => STEPS.value.findIndex(s => s.key === props.current));
 
 function stepClass(idx) {
   if (idx < currentIdx.value) return 'done';

@@ -120,8 +120,8 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
   // Helper: label + value inline
   const row = (label, value, opts = {}) => ({
     text: [
-      { text: label, fontSize: 9, color: '#444' },
-      { text: value || '—', fontSize: 9.5, bold: true, color: '#111', ...opts },
+      { text: label, fontSize: 8, color: '#444' },
+      { text: value || '—', fontSize: 8.5, bold: true, color: '#111', ...opts },
     ],
     margin: [0, 0, 0, 2],
   });
@@ -134,7 +134,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
         layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
         width: 16,
       },
-      { text: label, fontSize: 9, margin: [3, 1, 0, 0] },
+      { text: label, fontSize: 9, margin: [3, 0, 0, 0] },
     ],
     margin: [0, 0, 0, mb],
   });
@@ -158,10 +158,10 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
                   widths: ['auto', '*'],
                   body: [[
                     logoDataUrl
-                      ? { image: logoDataUrl, width: 104, height: 18.66, border: [false,false,false,false], margin: [0,0,3,0] }
-                      : { text: '', border: [false,false,false,false] },
+                      ? { image: logoDataUrl, width: 104, height: 18.66, border: [false, false, false, false], margin: [0, 0, 3, 0] }
+                      : { text: '', border: [false, false, false, false] },
                     {
-                      border: [false,false,false,false],
+                      border: [false, false, false, false],
                       verticalAlignment: 'middle',
                       text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG',
                       bold: true, fontSize: 14, color: '#1e40af',
@@ -205,24 +205,28 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
             width: '*',
             stack: [
               {
-                table: { widths: [40, '*'], body: [[
-                  { text: 'Mã số:', fontSize: 9, border: [false,false,false,false], margin: [0,1,0,0] },
-                  { text: bn.ma_so, bold: true, fontSize: 11, alignment: 'right', border: [true,true,true,true] },
-                ]] },
+                table: {
+                  widths: [40, '*'], body: [[
+                    { text: 'Mã số:', fontSize: 9, border: [false, false, false, false], margin: [0, 1, 0, 0] },
+                    { text: bn.ma_so, bold: true, fontSize: 11, alignment: 'right', border: [true, true, true, true] },
+                  ]]
+                },
                 layout: { paddingLeft: () => 2, paddingRight: () => 4, paddingTop: () => 1, paddingBottom: () => 1 },
-                margin: [0,0,0,2],
+                margin: [0, 0, 0, 2],
               },
               {
-                table: { widths: [40, '*'], body: [[
-                  { text: 'Giá cước:', fontSize: 9, border: [false,false,false,false], margin: [0,1,0,0] },
-                  { text: `${fmtCurrency(bn.gia_cuoc)} đ`, bold: true, fontSize: 11, alignment: 'right', border: [true,true,true,true] },
-                ]] },
+                table: {
+                  widths: [40, '*'], body: [[
+                    { text: 'Giá cước:', fontSize: 9, border: [false, false, false, false], margin: [0, 1, 0, 0] },
+                    { text: `${fmtCurrency(bn.gia_cuoc)} đ`, bold: true, fontSize: 11, alignment: 'right', border: [true, true, true, true] },
+                  ]]
+                },
                 layout: { paddingLeft: () => 2, paddingRight: () => 4, paddingTop: () => 1, paddingBottom: () => 1 },
-                margin: [0,0,0,2],
+                margin: [0, 0, 0, 2],
               },
               { text: `Gởi lúc: ${gioStr} - ${ngayStr}`, fontSize: 8, color: '#444' },
             ],
-            margin: [8,0,8,0],
+            margin: [8, 0, 8, 0],
           },
           {
             width: 72,
@@ -231,13 +235,21 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
                 table: {
                   widths: ['*', 13],
                   body: [
-                    [{ text: 'Đã thu:', fontSize: 8.5, alignment: 'right', border: [false,false,false,false] }, { text: chk(bn.trang_thai_thu === 'da_thu'),   fontSize: 8.5, alignment: 'center', border: [true,true,true,true] }],
-                    [{ text: 'Chưa thu:', fontSize: 8.5, alignment: 'right', border: [false,false,false,false] }, { text: chk(bn.trang_thai_thu === 'chua_thu'), fontSize: 8.5, alignment: 'center', border: [true,true,true,true] }],
-                    [{ text: 'Công nợ:', fontSize: 8.5, alignment: 'right', border: [false,false,false,false] }, { text: chk(bn.trang_thai_thu === 'cong_no'),  fontSize: 8.5, alignment: 'center', border: [true,true,true,true] }],
+                    [{ text: 'Đã thu:', fontSize: 8.5, alignment: 'right', border: [false, false, false, false] }, { text: chk(bn.trang_thai_thu === 'da_thu'), fontSize: 8.5, alignment: 'center', border: [true, true, true, true] }],
+                    [{ text: 'Chưa thu:', fontSize: 8.5, alignment: 'right', border: [false, false, false, false] }, { text: chk(bn.trang_thai_thu === 'chua_thu'), fontSize: 8.5, alignment: 'center', border: [true, true, true, true] }],
+                    [{ text: 'Công nợ:', fontSize: 8.5, alignment: 'right', border: [false, false, false, false] }, { text: chk(bn.trang_thai_thu === 'cong_no'), fontSize: 8.5, alignment: 'center', border: [true, true, true, true] }],
                   ],
                 },
                 layout: { paddingLeft: () => 1, paddingRight: () => 1, paddingTop: () => 1, paddingBottom: () => 1 },
               },
+              // [CuocNhan] Nhắc nhở thu cước từ người nhận khi chua_thu
+              ...(bn.trang_thai_thu === 'chua_thu' ? [{
+                text: 'Người nhận trả cước',
+                fontSize: 7, bold: true, color: '#b45309',
+                background: '#fef3c7',
+                margin: [0, 3, 0, 0],
+                alignment: 'center',
+              }] : []),
             ],
           },
         ],
@@ -252,7 +264,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
           {
             width: '50%',
             stack: [
-              { text: 'NGƯỜI GỬI', bold: true, fontSize: 10.5, color: '#1e40af', decoration: 'underline', margin: [0,0,0,2] },
+              { text: 'NGƯỜI GỬI', bold: true, fontSize: 9.5, color: '#1e40af', decoration: 'underline', margin: [0, 0, 0, 2] },
               row('Đơn vị gửi: ', bn.don_vi_gui),
               row('Họ tên người gửi: ', bn.nguoi_gui),
               row('Điện thoại: ', bn.dien_thoai_gui),
@@ -263,7 +275,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
           {
             width: '50%',
             stack: [
-              { text: 'NGƯỜI NHẬN', bold: true, fontSize: 10.5, color: '#1e40af', decoration: 'underline', margin: [0,0,0,2] },
+              { text: 'NGƯỜI NHẬN', bold: true, fontSize: 9.5, color: '#1e40af', decoration: 'underline', margin: [0, 0, 0, 2] },
               row('Đơn vị nhận: ', bn.don_vi_nhan),
               row('Họ tên người nhận: ', bn.nguoi_nhan),
               row('Điện thoại: ', bn.dien_thoai_nhan),
@@ -271,7 +283,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
               row('Số CCCD: ', bn.so_cccd_nhan),
               ...(bn.chanh?.ten ? [row('Gửi đến chành: ', bn.chanh.ten)] : []),
             ],
-            margin: [10,0,0,0],
+            margin: [10, 0, 0, 0],
           },
         ],
       },
@@ -285,29 +297,45 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
           {
             width: '60%',
             stack: [
-              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 9.5, color: '#444' }, { text: hangStr, fontSize: 10, bold: true }], margin: [0,0,0,4] },
-              { text: [{ text: 'Thu hộ (COD): ', fontSize: 9.5, color: '#444' }, { text: `${fmtCurrency(bn.thu_ho)} đ`, fontSize: 10, bold: true }], margin: [0,0,0,4] },
+              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 8, color: '#444' }, { text: hangStr, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Thu hộ (COD): ', fontSize: 8, color: '#444' }, { text: `${fmtCurrency(bn.thu_ho)} đ`, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
               {
                 columns: [
-                  { text: [{ text: 'Trọng lượng: ', fontSize: 9.5, color: '#444' }, { text: bn.trong_luong ? `${bn.trong_luong} kg` : '—', fontSize: 10 }], width: '*' },
-                  { text: [{ text: 'Giá trị hàng: ', fontSize: 9.5, color: '#444' }, { text: bn.gia_tri_hang ? `${fmtCurrency(bn.gia_tri_hang)} đ` : '—', fontSize: 10 }], width: '*' },
+                  { text: [{ text: 'Trọng lượng: ', fontSize: 8, color: '#444' }, { text: bn.trong_luong ? `${bn.trong_luong} kg` : '—', fontSize: 8.5 }], width: '*' },
+                  { text: [{ text: 'Giá trị hàng: ', fontSize: 8, color: '#444' }, { text: bn.gia_tri_hang ? `${fmtCurrency(bn.gia_tri_hang)} đ` : '—', fontSize: 8.5 }], width: '*' },
                 ],
-                margin: [0,0,0,4],
+                margin: [0, 0, 0, 2],
               },
               bn.ghi_chu
-                ? { text: [{ text: 'Ghi chú: ', fontSize: 9.5, color: '#444' }, { text: bn.ghi_chu, fontSize: 9.5, italics: true }], margin: [0,0,0,4] }
+                ? { text: [{ text: 'Ghi chú: ', fontSize: 8, color: '#444' }, { text: bn.ghi_chu, fontSize: 8, italics: true }], margin: [0, 0, 0, 2] }
                 : { text: '', fontSize: 1 },
             ],
           },
           {
             width: '40%',
-            stack: [
-              chkRow('Hàng hư/hỏng/bể không đền', bn.hang_hu_khong_den, 4),
-              chkRow('Giao tận nơi', bn.hinh_thuc_giao === 'tan_noi', 4),
-              chkRow('Điện thoại đến nhận', bn.hinh_thuc_giao === 'goi_dien', 4),
-              chkRow('Tự đến lấy', bn.hinh_thuc_giao === 'tu_toi', 0),
-            ],
-            margin: [8,0,0,0],
+            margin: [8, 0, 0, 0],
+            table: {
+              widths: [13, '*'],
+              body: [
+                [
+                  { text: chk(bn.hang_hu_khong_den), fontSize: 8.5, alignment: 'center', border: [true, true, true, true] },
+                  { text: 'Hàng hư/hỏng/bể không đền', fontSize: 8, border: [false, false, false, false], margin: [3, 0, 0, 0] },
+                ],
+                [
+                  { text: chk(bn.hinh_thuc_giao === 'tan_noi'), fontSize: 8.5, alignment: 'center', border: [true, false, true, true] },
+                  { text: 'Giao tận nơi', fontSize: 8, border: [false, false, false, false], margin: [3, 0, 0, 0] },
+                ],
+                [
+                  { text: chk(bn.hinh_thuc_giao === 'goi_dien'), fontSize: 8.5, alignment: 'center', border: [true, false, true, true] },
+                  { text: 'Điện thoại đến nhận', fontSize: 8, border: [false, false, false, false], margin: [3, 0, 0, 0] },
+                ],
+                [
+                  { text: chk(bn.hinh_thuc_giao === 'tu_toi'), fontSize: 8.5, alignment: 'center', border: [true, false, true, true] },
+                  { text: 'Tự đến lấy', fontSize: 8, border: [false, false, false, false], margin: [3, 0, 0, 0] },
+                ],
+              ],
+            },
+            layout: { paddingLeft: () => 1, paddingRight: () => 1, paddingTop: () => 1, paddingBottom: () => 1 },
           },
         ],
       },
@@ -315,13 +343,13 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
       // ══ CHỮ KÝ ══
       {
         columns: [
-          { width: '*', stack: [{ text: 'NGƯỜI GỬI', bold: true, fontSize: 10, alignment: 'center' }] },
-          { width: '*', stack: [{ text: 'NGƯỜI NHẬN', bold: true, fontSize: 10, alignment: 'center' }] },
+          { width: '*', stack: [{ text: 'NGƯỜI GỬI', bold: true, fontSize: 9, alignment: 'center' }] },
+          { width: '*', stack: [{ text: 'NGƯỜI NHẬN', bold: true, fontSize: 9, alignment: 'center' }] },
           {
             width: '*',
             stack: [
-              { text: 'NV. PHỤC VỤ', bold: true, fontSize: 10, alignment: 'center' },
-              { text: bn.nhan_vien_nhap?.ten || '', fontSize: 9, color: '#555', alignment: 'right', margin: [0, 20, 0, 0] },
+              { text: 'NV. PHỤC VỤ', bold: true, fontSize: 9, alignment: 'center' },
+              { text: bn.nhan_vien_nhap?.ten || '', fontSize: 8, color: '#555', alignment: 'right', margin: [0, 8, 0, 0] },
             ],
           },
         ],
@@ -333,10 +361,10 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
         stack: [
           { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 580, y2: 0, lineWidth: 0.5, lineColor: '#aaa' }], margin: [0, 0, 0, 2] },
           { text: 'Chú ý:', fontSize: 8, bold: true, margin: [0, 0, 0, 1] },
-          { text: '+ Phiếu này chỉ có giá trị trong vòng 10 ngày. Quá thời hạn mọi khiếu nại sẽ không được giải quyết.', fontSize: 7.5, margin: [0,0,0,1] },
-          { text: '+ KHI ĐẾN NHẬN HÀNG, QUÝ KHÁCH PHẢI MANG THEO GIẤY CMND / GIẤY GIỚI THIỆU.', fontSize: 7.5, bold: true, margin: [0,0,0,1] },
-          { text: '+ Yêu cầu quý khách phải khai báo trị giá. Nếu có rủi ro DN bồi thường 100% trị giá khai báo.', fontSize: 7.5, margin: [0,0,0,1] },
-          { text: '+ Hàng không khai báo trị giá. Nếu có rủi ro DN bồi thường 10 lần giá cước đã thu.', fontSize: 7.5, margin: [0,0,0,1] },
+          { text: '+ Phiếu này chỉ có giá trị trong vòng 10 NGÀY. Quá thời hạn mọi khiếu nại sẽ không được giải quyết.', fontSize: 7.5, margin: [0, 0, 0, 1] },
+          { text: '+ KHI ĐẾN NHẬN HÀNG, QUÝ KHÁCH PHẢI MANG THEO GIẤY CMND / GIẤY GIỚI THIỆU.', fontSize: 7.5, bold: true, margin: [0, 0, 0, 1] },
+          { text: '+ Yêu cầu quý khách phải khai báo trị giá. Nếu có rủi ro DN bồi thường 100% trị giá khai báo.', fontSize: 7.5, margin: [0, 0, 0, 1] },
+          { text: '+ Hàng không khai báo trị giá. Nếu có rủi ro DN bồi thường 10 lần giá cước đã thu.', fontSize: 7.5, margin: [0, 0, 0, 1] },
           { text: '+ Doanh nghiệp không chịu trách nhiệm với mặt hàng dễ cháy nổ, tiền, kim loại quý và hàng Quốc cấm, hàng lậu trong kiện hàng đã niêm phong.', fontSize: 7.5 },
         ],
       },
@@ -442,6 +470,197 @@ export async function generatePhieuChiPDF(phieuChiId, { nhan_vien_ten } = {}) {
   });
 }
 
+// ---- Phiếu Thu Hộ COD (BienNhanThuHo) PDF ----
+/**
+ * In phiếu thu hộ COD — A5 đứng, 2 liên (NV giữ + giao khách)
+ * @param {number} bienNhanId — ID của biên nhận gốc (không phải BNTH id)
+ */
+export async function generateBienNhanThuHoPDF(bienNhanId) {
+  const bnth = await prisma.bienNhanThuHo.findUnique({
+    where: { bien_nhan_id: bienNhanId },
+    include: {
+      bien_nhan: {
+        select: {
+          ma_so: true, thu_ho: true,
+          nguoi_gui: true, don_vi_gui: true, dien_thoai_gui: true,
+          nguoi_nhan: true, don_vi_nhan: true, dien_thoai_nhan: true,
+          van_phong_gui: { select: { ma_vp: true, ten: true } },
+          van_phong_nhan: { select: { ma_vp: true, ten: true } },
+        },
+      },
+      van_phong: { select: { ten: true, dia_chi: true } },
+      nhan_vien: { select: { ten: true } },
+    },
+  });
+
+  if (!bnth) throw Object.assign(new Error('Chưa có biên nhận thu hộ cho biên nhận này'), { statusCode: 404 });
+
+  const bn = bnth.bien_nhan;
+  const fmt = (n) => Number(n).toLocaleString('vi-VN');
+  const ngayThu = new Date(bnth.ngay_thu);
+  const ngayStr = ngayThu.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const gioStr  = ngayThu.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+  const htLabel = bnth.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản';
+  const logoDataUrl = getLogoDataUrl();
+
+  // Helper: dòng label + value
+  const infoRow = (label, value) => ({
+    columns: [
+      { text: label, fontSize: 8.5, color: '#64748b', width: 90, bold: false },
+      { text: value || '—', fontSize: 8.5, bold: true, color: '#0f172a', width: '*' },
+    ],
+    margin: [0, 0, 0, 3],
+  });
+
+  // Một liên (tái sử dụng 2 lần)
+  const lienContent = (title) => ([
+    // Logo + tiêu đề
+    {
+      columns: [
+        logoDataUrl
+          ? { image: logoDataUrl, width: 80, height: 14.3, margin: [0, 3, 8, 0] }
+          : { text: '', width: 80 },
+        {
+          stack: [
+            { text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG', fontSize: 9, bold: true, color: '#1e40af' },
+            { text: bnth.van_phong?.ten || '', fontSize: 7.5, color: '#475569' },
+          ],
+          width: '*',
+        },
+        {
+          stack: [
+            { text: title, fontSize: 7, color: '#94a3b8', alignment: 'right', italics: true },
+          ],
+          width: 60,
+          alignment: 'right',
+        },
+      ],
+      margin: [0, 0, 0, 4],
+    },
+    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 390, y2: 0, lineWidth: 0.8 }], margin: [0, 0, 0, 6] },
+
+    // Tiêu đề phiếu
+    { text: 'BIÊN NHẬN THU HỘ (COD)', fontSize: 13, bold: true, alignment: 'center', color: '#1e40af', margin: [0, 0, 0, 2] },
+    {
+      columns: [
+        { text: `Số: ${bnth.ma_bnth}`, fontSize: 9, bold: true, color: '#334155', alignment: 'center' },
+        { text: `${gioStr} — ${ngayStr}`, fontSize: 9, color: '#64748b', alignment: 'center' },
+      ],
+      margin: [0, 0, 0, 8],
+    },
+
+    // Thông tin biên nhận gốc
+    {
+      table: {
+        widths: ['*'],
+        body: [[{
+          stack: [
+            { text: 'THÔNG TIN BIÊN NHẬN', fontSize: 7.5, bold: true, color: '#64748b', margin: [0, 0, 0, 4] },
+            infoRow('Mã biên nhận:', bn.ma_so),
+            infoRow('Tuyến:', `${bn.van_phong_gui?.ma_vp || '?'} → ${bn.van_phong_nhan?.ma_vp || '?'}`),
+            infoRow('Người gửi:', bn.don_vi_gui || bn.nguoi_gui),
+            infoRow('Người nhận:', bn.don_vi_nhan || bn.nguoi_nhan),
+          ],
+          border: [false, false, false, false],
+          fillColor: '#f8fafc',
+          margin: [8, 6, 8, 6],
+          borderRadius: 4,
+        }]],
+      },
+      layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+      margin: [0, 0, 0, 8],
+    },
+
+    // Số tiền nổi bật
+    {
+      table: {
+        widths: ['*'],
+        body: [[{
+          stack: [
+            { text: 'SỐ TIỀN THU HỘ', fontSize: 7.5, bold: true, color: '#64748b', alignment: 'center', margin: [0, 0, 0, 2] },
+            { text: `${fmt(bnth.so_tien)} đ`, fontSize: 20, bold: true, color: '#dc2626', alignment: 'center', margin: [0, 0, 0, 2] },
+            { text: htLabel + (bnth.la_qua_chanh ? ' • Qua chành' : ''), fontSize: 8, color: '#64748b', alignment: 'center' },
+          ],
+          border: [true, true, true, true],
+          fillColor: '#fff7ed',
+          margin: [0, 6, 0, 6],
+        }]],
+      },
+      layout: {
+        hLineColor: () => '#fed7aa',
+        vLineColor: () => '#fed7aa',
+        hLineWidth: () => 1,
+        vLineWidth: () => 1,
+        paddingLeft: () => 8,
+        paddingRight: () => 8,
+        paddingTop: () => 0,
+        paddingBottom: () => 0,
+      },
+      margin: [0, 0, 0, 8],
+    },
+
+    // Người nộp + ghi chú
+    infoRow('Người nộp tiền:', bnth.nguoi_nop),
+    ...(bnth.ghi_chu ? [infoRow('Ghi chú:', bnth.ghi_chu)] : []),
+
+    // Chữ ký
+    {
+      columns: [
+        {
+          stack: [
+            { text: 'NGƯỜI NỘP TIỀN', fontSize: 8, bold: true, alignment: 'center' },
+            { text: '(Ký, ghi rõ họ tên)', fontSize: 7, color: '#94a3b8', alignment: 'center' },
+            { text: '\n\n\n', fontSize: 8 },
+            { text: '___________________', alignment: 'center', color: '#94a3b8' },
+          ],
+          width: '*',
+        },
+        {
+          stack: [
+            { text: 'NHÂN VIÊN THU', fontSize: 8, bold: true, alignment: 'center' },
+            { text: '(Ký, ghi rõ họ tên)', fontSize: 7, color: '#94a3b8', alignment: 'center' },
+            { text: '\n\n\n', fontSize: 8 },
+            { text: bnth.nhan_vien?.ten || '', fontSize: 8, alignment: 'center', color: '#334155' },
+            { text: '___________________', alignment: 'center', color: '#94a3b8' },
+          ],
+          width: '*',
+        },
+      ],
+      margin: [0, 10, 0, 0],
+    },
+  ]);
+
+  const docDefinition = {
+    pageSize: 'A5',
+    pageOrientation: 'portrait',
+    pageMargins: [20, 16, 20, 16],
+    content: [
+      // Liên 1: Khách giữ
+      ...lienContent('Liên 1 — Khách giữ'),
+      // Đường cắt
+      {
+        canvas: [
+          { type: 'line', x1: 0, y1: 8, x2: 390, y2: 8, lineWidth: 0.5, dash: { length: 4, space: 3 }, lineColor: '#cbd5e1' },
+        ],
+        margin: [0, 6, 0, 6],
+      },
+      { text: '✂  Đường cắt', fontSize: 7, color: '#94a3b8', alignment: 'center', margin: [0, 0, 0, 6] },
+      // Liên 2: VP giữ
+      ...lienContent('Liên 2 — VP lưu'),
+    ],
+    defaultStyle: { font: 'Roboto' },
+  };
+
+  return new Promise((resolve, reject) => {
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    const chunks = [];
+    pdfDoc.on('data', (chunk) => chunks.push(chunk));
+    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+    pdfDoc.on('error', reject);
+    pdfDoc.end();
+  });
+}
+
 // ---- Sổ Biên Nhận Hàng Gửi PDF ----
 /**
  * Xuất PDF Sổ Biên Nhận Hàng Gửi
@@ -456,10 +675,10 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
   if (!vpGui || !vpNhan) throw Object.assign(new Error('Không tìm thấy văn phòng'), { statusCode: 404 });
 
   const startOfRange = toVNStartOfDay(ngayTu);
-  const endOfRange   = toVNEndOfDay(ngayDen);
-  const ngayTuStr  = fmtDateStr(ngayTu);
+  const endOfRange = toVNEndOfDay(ngayDen);
+  const ngayTuStr = fmtDateStr(ngayTu);
   const ngayDenStr = fmtDateStr(ngayDen);
-  const isOneDay   = ngayTu === ngayDen;
+  const isOneDay = ngayTu === ngayDen;
 
   const bienNhans = await prisma.bienNhan.findMany({
     where: {
@@ -476,25 +695,25 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
     { text: 'Thông tin\nbiên nhận', style: 'thGroup', colSpan: 2, alignment: 'center' }, {},
     { text: 'Thông tin\nngười gửi', style: 'thGroup', rowSpan: 2, alignment: 'center' },
     { text: 'Thông tin người nhận', style: 'thGroup', colSpan: 3, alignment: 'center' }, {}, {},
-    { text: 'Thông tin\nhàng gửi', style: 'thGroup', alignment: 'center' },
+    { text: 'Thông tin hàng gửi', style: 'thGroup', alignment: 'center' },
     { text: 'HT Giao', style: 'thGroup', colSpan: 2, alignment: 'center' }, {},
     { text: 'Cước phí', style: 'thGroup', colSpan: 2, alignment: 'center' }, {},
     { text: 'Xác nhận', style: 'thGroup', alignment: 'center' },
   ];
   // Tầng 2: Column headers
   const headerRow2 = [
-    { text: 'T.Gian',      style: 'th', alignment: 'center' },
-    { text: 'Biên nhận',   style: 'th', alignment: 'center' },
+    { text: 'T.Gian', style: 'th', alignment: 'center' },
+    { text: 'Biên nhận', style: 'th', alignment: 'center' },
     {},  // rowSpan từ 'Thông tin người gửi'
-    { text: 'Họ tên',      style: 'th', alignment: 'center' },
+    { text: 'Họ tên', style: 'th', alignment: 'center' },
     { text: 'Địa chỉ/CCCD\n/Thu hộ', style: 'th', alignment: 'center' },
-    { text: 'Điện thoại',  style: 'th', alignment: 'center' },
-    { text: 'Tên hàng',    style: 'th', alignment: 'center' },
-    { text: 'Tận\nnơi',    style: 'th', alignment: 'center' },
-    { text: 'ĐT',         style: 'th', alignment: 'center' },
-    { text: 'Giá cước\nđã thu',    style: 'th', alignment: 'center' },
-    { text: 'Giá cước\nchưa thu',  style: 'th', alignment: 'center' },
-    { text: 'Ký, họ tên',  style: 'th', alignment: 'center' },
+    { text: 'Điện thoại', style: 'th', alignment: 'center' },
+    { text: 'Tên hàng', style: 'th', alignment: 'center' },
+    { text: 'Tận\nnơi', style: 'th', alignment: 'center' },
+    { text: 'ĐT', style: 'th', alignment: 'center' },
+    { text: 'Giá cước\nđã thu', style: 'th', alignment: 'center' },
+    { text: 'Giá cước\nchưa thu', style: 'th', alignment: 'center' },
+    { text: 'Ký, họ tên', style: 'th', alignment: 'center' },
   ];
 
   // ── Data rows — nhóm theo ngày giống sổ giấy gốc ─────────────────────────
@@ -515,19 +734,19 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
     ]);
 
     bns.forEach(bn => {
-      const timeStr = new Date(bn.ngay_bien_nhan).toLocaleTimeString('vi-VN', {
-        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh',
-      });
+      // Giờ thực tế lưu trong field gio_tao (String HH:mm), không parse từ ngay_bien_nhan
+      // (ngay_bien_nhan lưu là UTC midnight → toLocaleTimeString sẽ cho 07:00 sai)
+      const timeStr = bn.gio_tao || '—';
       // Ghép dữ liệu cột "Địa chỉ/CCCD/Thu hộ" — hiện đầy đủ thông tin
       const dcContent = [];
-      if (bn.dia_chi_nhan)  dcContent.push(bn.dia_chi_nhan + '\n');
-      if (bn.so_cccd_nhan)  dcContent.push(`CCCD: ${bn.so_cccd_nhan}\n`);
+      if (bn.dia_chi_nhan) dcContent.push(bn.dia_chi_nhan + '\n');
+      if (bn.so_cccd_nhan) dcContent.push(`CCCD: ${bn.so_cccd_nhan}\n`);
       const thuHoVal = Number(bn.thu_ho) || 0;
       dcContent.push({ text: thuHoVal > 0 ? `Thu hộ: ${fmtCurrency(thuHoVal)}` : 'Thu hộ: 0', bold: true });
 
-      const isTanNoi  = bn.hinh_thuc_giao === 'tan_noi';
+      const isTanNoi = bn.hinh_thuc_giao === 'tan_noi';
       const isGoiDien = bn.hinh_thuc_giao === 'goi_dien';
-      const daThu   = bn.trang_thai_thu === 'da_thu' ? fmtCurrency(bn.gia_cuoc) : '';
+      const daThu = bn.trang_thai_thu === 'da_thu' ? fmtCurrency(bn.gia_cuoc) : '';
       const chuaThu = bn.trang_thai_thu !== 'da_thu' ? fmtCurrency(bn.gia_cuoc) : '';
 
       // Parse hàng hóa giống biên nhận đơn lẻ
@@ -539,18 +758,18 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
         : (bn.ten_hang_hoa || '—');
 
       dataRows.push([
-        { text: timeStr,                                style: 'td' },
-        { text: bn.ma_so,                               style: 'td', bold: true, noWrap: true },
-        { text: bn.nguoi_gui  || bn.don_vi_gui  || '',  style: 'td' },
-        { text: bn.nguoi_nhan || bn.don_vi_nhan || '',  style: 'td', bold: true },
-        { text: dcContent,                              style: 'td', fontSize: 7.5 },
-        { text: bn.dien_thoai_nhan || '',               style: 'td', bold: true },
-        { text: hangStr,                                style: 'td' },
-        { text: isTanNoi  ? 'X' : '',                   style: 'td', alignment: 'center', bold: true },
-        { text: isGoiDien ? 'X' : '',                   style: 'td', alignment: 'center', bold: true },
-        { text: daThu,                                  style: 'td', alignment: 'right' },
-        { text: chuaThu,                                style: 'td', alignment: 'right', bold: true },
-        { text: '',                                     style: 'td' },
+        { text: timeStr, style: 'td' },
+        { text: bn.ma_so, style: 'td', bold: true, noWrap: true, alignment: 'center' },
+        { text: bn.nguoi_gui || bn.don_vi_gui || '', style: 'td' },
+        { text: bn.nguoi_nhan || bn.don_vi_nhan || '', style: 'td', bold: true },
+        { text: dcContent, style: 'td', fontSize: 7.5 },
+        { text: bn.dien_thoai_nhan || '', style: 'td', bold: true },
+        { text: hangStr, style: 'td', fontSize: 7.5 },
+        { text: isTanNoi ? 'X' : '', style: 'td', alignment: 'center', bold: true },
+        { text: isGoiDien ? 'X' : '', style: 'td', alignment: 'center', bold: true },
+        { text: daThu, style: 'td', alignment: 'right' },
+        { text: chuaThu, style: 'td', alignment: 'right', bold: true },
+        { text: '', style: 'td' },
       ]);
     });
   }
@@ -563,12 +782,12 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
   }
 
   // ── Dòng tổng kết ────────────────────────────────────────────────────────
-  const tongDaThu   = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
+  const tongDaThu = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
   const tongChuaThu = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu !== 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
   const summaryRow = [
     { text: `Tổng: ${bienNhans.length} biên nhận`, style: 'tdSum', bold: true, colSpan: 9, alignment: 'right' },
     {}, {}, {}, {}, {}, {}, {}, {},
-    { text: fmtCurrency(tongDaThu),   style: 'tdSum', bold: true, alignment: 'right' },
+    { text: fmtCurrency(tongDaThu), style: 'tdSum', bold: true, alignment: 'right' },
     { text: fmtCurrency(tongChuaThu), style: 'tdSum', bold: true, alignment: 'right' },
     { text: '', style: 'tdSum' },
   ];
@@ -593,10 +812,10 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
           widths: ['auto', '*'],
           body: [[
             logoDataUrl
-              ? { image: logoDataUrl, width: 130, height: 23.3, border: [false,false,false,false], margin: [0,0,4,0] }
-              : { text: '', border: [false,false,false,false] },
+              ? { image: logoDataUrl, width: 130, height: 23.3, border: [false, false, false, false], margin: [0, 0, 4, 0] }
+              : { text: '', border: [false, false, false, false] },
             {
-              border: [false,false,false,false],
+              border: [false, false, false, false],
               verticalAlignment: 'middle',
               text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG',
               bold: true, fontSize: 16, color: '#1e40af',
@@ -624,7 +843,7 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
         table: {
           headerRows: 2,
           dontBreakRows: false,
-          widths: [34, 80, 82, 74, 78, 58, '*', 20, 20, 50, 50, 44],
+          widths: [34, 46, 82, 74, '*', 58, 85, 20, 20, 50, 50, 44],
           body: [headerRow1, headerRow2, ...dataRows, summaryRow],
         },
         layout: {
@@ -632,19 +851,19 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
           vLineWidth: () => 0.5,
           hLineColor: (i, node) => (i === 0 || i === 2 || i === node.table.body.length) ? '#333' : '#ccc',
           vLineColor: () => '#bbb',
-          paddingLeft:   () => 3,
-          paddingRight:  () => 3,
-          paddingTop:    () => 2,
+          paddingLeft: () => 3,
+          paddingRight: () => 3,
+          paddingTop: () => 2,
           paddingBottom: () => 2,
         },
       },
     ],
 
     styles: {
-      thGroup: { fontSize: 10,  bold: true, fillColor: '#dbeafe', color: '#1e3a5f' },
-      th:      { fontSize: 9,   bold: true, fillColor: '#f0f4f8' },
-      td:      { fontSize: 9, margin: [0, 3, 0, 6], lineHeight: 1.3 },
-      tdSum:   { fontSize: 10,  fillColor: '#f9fafb' },
+      thGroup: { fontSize: 10, bold: true, fillColor: '#dbeafe', color: '#1e3a5f' },
+      th: { fontSize: 9, bold: true, fillColor: '#f0f4f8' },
+      td: { fontSize: 9, margin: [0, 3, 0, 6], lineHeight: 1.3 },
+      tdSum: { fontSize: 10, fillColor: '#f9fafb' },
     },
     defaultStyle: { font: 'Roboto' },
   };
@@ -668,8 +887,8 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
   if (!vpGui || !vpNhan) throw Object.assign(new Error('Không tìm thấy văn phòng'), { statusCode: 404 });
 
   const startOfRange = toVNStartOfDay(ngayTu);
-  const endOfRange   = toVNEndOfDay(ngayDen);
-  const ngayTuStr  = fmtDateStr(ngayTu);
+  const endOfRange = toVNEndOfDay(ngayDen);
+  const ngayTuStr = fmtDateStr(ngayTu);
   const ngayDenStr = fmtDateStr(ngayDen);
 
   const bienNhans = await prisma.bienNhan.findMany({
@@ -711,18 +930,18 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
 
   // ── Cấu hình cột ──────────────────────────────────────────────────────
   ws.columns = [
-    { key: 'stt',        width: 5  },  // A
-    { key: 'tgian',      width: 8  },  // B
-    { key: 'bien_nhan',  width: 18 },  // C
-    { key: 'nguoi_gui',  width: 16 },  // D
+    { key: 'stt', width: 5 },  // A
+    { key: 'tgian', width: 8 },  // B
+    { key: 'bien_nhan', width: 18 },  // C
+    { key: 'nguoi_gui', width: 16 },  // D
     { key: 'nguoi_nhan', width: 16 },  // E
-    { key: 'dc_cccd',    width: 22 },  // F
+    { key: 'dc_cccd', width: 22 },  // F
     { key: 'dien_thoai', width: 14 },  // G
-    { key: 'ten_hang',   width: 24 },  // H
-    { key: 'ht_giao',    width: 10 },  // I
-    { key: 'da_thu',     width: 14 },  // J
-    { key: 'chua_thu',   width: 14 },  // K
-    { key: 'ky_ten',     width: 12 },  // L
+    { key: 'ten_hang', width: 24 },  // H
+    { key: 'ht_giao', width: 10 },  // I
+    { key: 'da_thu', width: 14 },  // J
+    { key: 'chua_thu', width: 14 },  // K
+    { key: 'ky_ten', width: 12 },  // L
   ];
 
   // ── Header bảng — Tầng 1 (group) ─────────────────────────────────────
@@ -757,7 +976,7 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
   ws.mergeCells('L5:L6');
   ws.getCell('L5').value = 'Xác nhận';
 
-  ['A5','B5','C5','D5','E5','F5','G5','H5','I5','J5','K5','L5'].forEach(addr => {
+  ['A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5', 'I5', 'J5', 'K5', 'L5'].forEach(addr => {
     const c = ws.getCell(addr);
     c.fill = hdrFill; c.font = hdrFont; c.alignment = hdrAlign; c.border = thinBorder;
   });
@@ -776,7 +995,7 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
     c.border = thinBorder;
   });
   // Đảm bảo merged cells cũng có border
-  ['D6','H6','I6','L6'].forEach(addr => {
+  ['D6', 'H6', 'I6', 'L6'].forEach(addr => {
     const c = ws.getCell(addr);
     c.fill = subHdrFill; c.font = subHdrFont; c.border = thinBorder;
   });
@@ -807,9 +1026,8 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
 
     bns.forEach(bn => {
       stt++;
-      const timeStr = new Date(bn.ngay_bien_nhan).toLocaleTimeString('vi-VN', {
-        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh',
-      });
+      // Giờ thực tế lưu trong field gio_tao (String HH:mm), không parse từ ngay_bien_nhan
+      const timeStr = bn.gio_tao || '—';
 
       // ĐC/CCCD/Thu hộ
       const dcParts = [];
@@ -829,7 +1047,7 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
       const htGiao = bn.hinh_thuc_giao === 'tan_noi' ? 'Tận nơi'
         : bn.hinh_thuc_giao === 'goi_dien' ? 'Gọi điện' : 'Tự tới';
 
-      const daThu   = bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : '';
+      const daThu = bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : '';
       const chuaThu = bn.trang_thai_thu !== 'da_thu' ? Number(bn.gia_cuoc) : '';
 
       const dataRow = ws.addRow([
@@ -871,7 +1089,7 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
   }
 
   // ── Dòng tổng kết ─────────────────────────────────────────────────────
-  const tongDaThu   = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
+  const tongDaThu = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu === 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
   const tongChuaThu = bienNhans.reduce((s, bn) => s + (bn.trang_thai_thu !== 'da_thu' ? Number(bn.gia_cuoc) : 0), 0);
   const sumRowNum = ws.lastRow.number + 1;
   ws.mergeCells(`A${sumRowNum}:I${sumRowNum}`);
@@ -886,7 +1104,7 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
   ws.getCell(`K${sumRowNum}`).alignment = { horizontal: 'right', vertical: 'middle' };
 
   const sumFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F9FAFB' } };
-  ['A','B','C','D','E','F','G','H','I','J','K','L'].forEach(col => {
+  ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].forEach(col => {
     const c = ws.getCell(`${col}${sumRowNum}`);
     c.fill = sumFill;
     c.font = { bold: true, size: 10 };

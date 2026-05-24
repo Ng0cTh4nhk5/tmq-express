@@ -1,54 +1,91 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Colors — Primary */
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --primary-light: #dbeafe;
-  --primary-hover: #3b82f6;
+  /* ═══ CẤP ĐỘ 1: Neutral Foundation (dịu mắt) ═══ */
+  /* 4 lớp nền */
+  --bg-base: #f6f8fb;
+  --bg-elevated: #ffffff;
+  --bg-sunken: #eef1f6;
+  --bg-sidebar: #101827;
+  --bg-hover: rgba(0, 0, 0, 0.02);
 
-  /* Colors — Semantic */
-  --secondary: #0f172a;
-  --accent: #f59e0b;
-  --success: #10b981;
-  --success-light: #d1fae5;
-  --warning: #f59e0b;
-  --warning-light: #fef3c7;
-  --danger: #ef4444;
-  --danger-light: #fee2e2;
-  --info: #3b82f6;
-  --info-light: #dbeafe;
+  /* Backward-compat aliases */
+  --bg: var(--bg-base);
+  --bg-card: var(--bg-elevated);
 
-  /* Neutral */
-  --bg: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-sidebar: #0c1222;
-  --bg-hover: rgba(255, 255, 255, 0.04);
-  --text: #1e293b;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-light: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
+  /* 2 viền */
+  --border: #dde3ed;
+  --border-light: #eef1f6;
 
-  /* Layout — 720p optimized */
+  /* 3 biến thể chữ + placeholder */
+  --text: #0f1f3d;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+  --secondary: #0f1f3d;
+
+  /* ═══ CẤP ĐỘ 2: Brand Colors (từ logo) ═══ */
+  /* Navy (Primary — chữ "TMQ") */
+  --navy-50: #e8eef6;
+  --navy-100: #c5d4e8;
+  --navy-200: #8fa8cc;
+  --navy-300: #5a7db0;
+  --navy-400: #2a4f8a;
+  --navy-500: #1e3a6e;
+  --navy-600: #162d56;
+  --navy-700: #0f1f3d;
+  --navy-800: #091428;
+
+  /* Golden (Accent — chữ "EXPRESS") */
+  --gold-50: #fdf6e3;
+  --gold-100: #f9ecc5;
+  --gold-200: #f0d87a;
+  --gold-300: #e8c44a;
+  --gold-400: #d4a829;
+  --gold-500: #b8911f;
+  --gold-600: #8a6e14;
+  --gold-700: #5c490e;
+
+  /* Primary / Interactive aliases */
+  --primary: #2a4f8a;
+  --primary-dark: #1e3a6e;
+  --primary-light: #e8eef6;
+  --primary-hover: #1e3a6e;
+
+  /* ═══ CẤP ĐỘ 3: Semantic Communication ═══ */
+  --accent: #d4a829;
+  --success: #16a34a;
+  --success-light: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #b45309;
+  --warning-light: #fffbeb;
+  --warning-border: #fde68a;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --danger-border: #fecaca;
+  --info: #2a4f8a;
+  --info-light: #e8eef6;
+  --info-border: #c5d4e8;
+
+  /* ═══ Layout — 720p optimized ═══ */
   --sidebar-width: 56px;
   --sidebar-expanded: 220px;
-  --header-height: 44px;
-  --content-padding: 1rem;
+  --header-height: 48px;
+  --content-padding: 1.25rem;
 
-  /* Typography */
+  /* ═══ Typography ═══ */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.2);
+  /* ═══ Shadows (navy-tinted, dịu hơn) ═══ */
+  --shadow-xs: 0 1px 2px rgba(15, 31, 61, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 31, 61, 0.06), 0 1px 2px rgba(15, 31, 61, 0.03);
+  --shadow: 0 2px 6px rgba(15, 31, 61, 0.07), 0 1px 3px rgba(15, 31, 61, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 31, 61, 0.08), 0 2px 4px rgba(15, 31, 61, 0.04);
+  --shadow-lg: 0 8px 24px rgba(15, 31, 61, 0.10), 0 4px 8px rgba(15, 31, 61, 0.05);
+  --shadow-sidebar: 4px 0 24px rgba(15, 31, 61, 0.25);
 
-  /* Radius */
+  /* ═══ Radius ═══ */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius: 8px;
@@ -56,8 +93,8 @@
   --radius-xl: 14px;
   --radius-full: 9999px;
 
-  /* Transition */
-  --transition-fast: 0.15s ease;
+  /* ═══ Transition ═══ */
+  --transition-fast: 0.12s ease;
   --transition: 0.2s ease;
   --transition-slow: 0.3s ease;
 }
@@ -77,8 +114,8 @@ html {
 
 body {
   font-family: var(--font-family);
-  color: var(--text);
-  background: var(--bg);
+  color: var(--text-secondary);
+  background: var(--bg-base);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -123,7 +160,7 @@ button, input, select, textarea, .p-component {
 }
 
 .page-header h1 i {
-  color: var(--primary);
+  color: var(--navy-400);
   font-size: 1.1rem;
 }
 
@@ -156,7 +193,7 @@ button, input, select, textarea, .p-component {
   color: var(--secondary);
 }
 
-/* ─── Stat Cards ─── */
+/* ─── Stat Cards (left-border accent design) ─── */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -165,9 +202,10 @@ button, input, select, textarea, .p-component {
 }
 
 .stat-card {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--navy-400);
   padding: 0.85rem 1rem;
   display: flex;
   align-items: center;
@@ -177,8 +215,8 @@ button, input, select, textarea, .p-component {
 }
 
 .stat-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .stat-card .stat-icon {
@@ -190,6 +228,8 @@ button, input, select, textarea, .p-component {
   justify-content: center;
   font-size: 1rem;
   flex-shrink: 0;
+  background: var(--navy-50);
+  color: var(--navy-500);
 }
 
 .stat-card .stat-value {
@@ -205,7 +245,25 @@ button, input, select, textarea, .p-component {
   line-height: 1.3;
 }
 
-/* Gradient stat cards (for dashboard) */
+.stat-card .stat-subtitle {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Stat card semantic variants */
+.stat-card.success { border-left-color: var(--success); }
+.stat-card.success .stat-icon { background: var(--success-light); color: var(--success); }
+.stat-card.warning { border-left-color: var(--warning); }
+.stat-card.warning .stat-icon { background: var(--warning-light); color: var(--warning); }
+.stat-card.danger { border-left-color: var(--danger); }
+.stat-card.danger .stat-icon { background: var(--danger-light); color: var(--danger); }
+.stat-card.gold { border-left-color: var(--gold-400); }
+.stat-card.gold .stat-icon { background: var(--gold-50); color: var(--gold-500); }
+.stat-card.info { border-left-color: var(--info); }
+.stat-card.info .stat-icon { background: var(--info-light); color: var(--info); }
+
+/* ─── DEPRECATED: Gradient stat cards — kept for backward compat, will be removed ─── */
 .stat-card-gradient {
   border-radius: var(--radius-lg);
   padding: 0.85rem 1rem;
@@ -219,23 +277,24 @@ button, input, select, textarea, .p-component {
 
 .stat-card-gradient:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
-.stat-card-gradient.blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.stat-card-gradient.blue { background: linear-gradient(135deg, var(--navy-400), var(--navy-500)); }
 .stat-card-gradient.green { background: linear-gradient(135deg, #22c55e, #15803d); }
 .stat-card-gradient.purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
-.stat-card-gradient.orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.stat-card-gradient.orange { background: linear-gradient(135deg, var(--gold-300), var(--gold-500)); }
 .stat-card-gradient.cyan { background: linear-gradient(135deg, #06b6d4, #0891b2); }
 .stat-card-gradient.rose { background: linear-gradient(135deg, #f43f5e, #e11d48); }
+.stat-card-gradient.gray { background: linear-gradient(135deg, #6b7280, #4b5563); }
+.stat-card-gradient.indigo { background: linear-gradient(135deg, #6366f1, #4f46e5); }
 
 .stat-card-gradient .stat-icon { font-size: 1.5rem; flex-shrink: 0; opacity: 0.9; }
 .stat-card-gradient .stat-value { font-size: 1.15rem; font-weight: 800; }
 .stat-card-gradient .stat-label { font-size: 0.7rem; opacity: 0.85; }
 .stat-card-gradient .stat-subtitle { font-size: 0.68rem; opacity: 0.7; margin-top: 1px; }
-.stat-card .stat-subtitle { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
 
-/* ─── Filter Bar ─── */
+/* ─── Filter Bar (legacy) ─── */
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -251,10 +310,57 @@ button, input, select, textarea, .p-component {
   font-size: 0.85rem;
 }
 
-/* ─── Status Badges ─── */
+/* ─── Filter Section (unified) ─── */
+.filter-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.filter-section label,
+.filter-section .filter-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-right: 0.2rem;
+}
+
+.filter-section .filter-spacer {
+  margin-left: 0.75rem;
+}
+
+.filter-section select,
+.filter-section input[type="number"],
+.filter-section input[type="text"] {
+  padding: 0.38rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.filter-section select:focus,
+.filter-section input:focus {
+  border-color: var(--navy-400);
+  box-shadow: 0 0 0 2px rgba(42, 79, 138, 0.12);
+}
+
+/* ─── Status Badges (unified semantic) ─── */
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 0.3rem;
   padding: 0.15rem 0.5rem;
   border-radius: var(--radius-full);
   font-size: 0.7rem;
@@ -262,20 +368,22 @@ button, input, select, textarea, .p-component {
   white-space: nowrap;
 }
 
-.badge-cho-vc { background: #fef3c7; color: #92400e; }
-.badge-dang-vc { background: #dbeafe; color: #1e40af; }
-.badge-da-den-kho { background: #e0e7ff; color: #3730a3; }
-.badge-da-bao-khach { background: #fce7f3; color: #9d174d; }
-.badge-khach-da-nhan { background: #d1fae5; color: #065f46; }
-.badge-da-thu { background: #d1fae5; color: #065f46; }
-.badge-chua-thu { background: #fef3c7; color: #92400e; }
-.badge-cong-no { background: #fee2e2; color: #991b1b; }
-.badge-danger { background: #fee2e2; color: #991b1b; }
-/* COD Status badges */
-.badge-warning { background: #fef3c7; color: #92400e; }
-.badge-info { background: #dbeafe; color: #1e40af; }
-.badge-help { background: #ede9fe; color: #5b21b6; }
-.badge-success { background: #d1fae5; color: #065f46; }
+.badge-success { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+.badge-warning { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning-border); }
+.badge-danger { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger-border); }
+.badge-info { background: var(--info-light); color: var(--info); border: 1px solid var(--info-border); }
+.badge-help { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+.badge-neutral { background: var(--bg-sunken); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* Legacy badge aliases — mapped to unified */
+.badge-cho-vc { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning-border); }
+.badge-dang-vc { background: var(--info-light); color: var(--info); border: 1px solid var(--info-border); }
+.badge-da-den-kho { background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }
+.badge-da-bao-khach { background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8; }
+.badge-khach-da-nhan { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+.badge-da-thu { background: var(--success-light); color: var(--success); border: 1px solid var(--success-border); }
+.badge-chua-thu { background: var(--warning-light); color: var(--warning); border: 1px solid var(--warning-border); }
+.badge-cong-no { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger-border); }
 
 /* ─── Form Utilities ─── */
 .form-grid {
@@ -324,7 +432,7 @@ button, input, select, textarea, .p-component {
 .form-section-title {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--navy-500);
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border);
   grid-column: 1 / -1;
@@ -437,9 +545,52 @@ button, input, select, textarea, .p-component {
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease;
 }
+
+/* Stagger fade-in for grid items */
+.stagger-item {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeIn 0.3s ease forwards;
+}
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 60ms; }
+.stagger-item:nth-child(3) { animation-delay: 120ms; }
+.stagger-item:nth-child(4) { animation-delay: 180ms; }
+.stagger-item:nth-child(5) { animation-delay: 240ms; }
+.stagger-item:nth-child(6) { animation-delay: 300ms; }
+
+/* Skeleton loading */
+.skeleton {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+}
+
+/* Page transitions (used with <Transition name="page-fade">) */
+.page-fade-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.page-fade-leave-active { transition: opacity 0.1s ease; }
+.page-fade-enter-from { opacity: 0; transform: translateY(6px); }
+.page-fade-leave-to { opacity: 0; }
+
+/* ─── Text Color Utilities ─── */
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger { color: var(--danger); }
+.text-info { color: var(--info); }
+.text-muted { color: var(--text-muted); }
+.text-heading { color: var(--secondary); }
+.text-navy { color: var(--navy-500); }
+.text-gold { color: var(--gold-400); }
+.fw-600 { font-weight: 600; }
+.fw-700 { font-weight: 700; }
 
 /* ─── Misc ─── */
 .text-truncate {
@@ -453,7 +604,7 @@ button, input, select, textarea, .p-component {
 }
 
 .font-mono {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 
 /* ─── Input with unit addon ─────────── */
@@ -478,7 +629,7 @@ button, input, select, textarea, .p-component {
   display: flex;
   align-items: center;
   padding: 0 0.75rem;
-  background: var(--bg);
+  background: var(--bg-sunken);
   border: 1px solid var(--border);
   border-left: none;
   border-radius: 0 6px 6px 0;

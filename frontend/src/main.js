@@ -21,8 +21,16 @@ app.use(PrimeVue, {
   theme: {
     preset: Aura,
     options: {
-      darkModeSelector: '.dark-mode',
+      darkModeSelector: false,
       cssLayer: false,
+    },
+  },
+  pt: {
+    // Global passthrough overrides for PrimeVue components
+    button: {
+      root: ({ props }) => ({
+        style: props.severity === undefined ? { '--p-button-background': '#2a4f8a', '--p-button-hover-background': '#1e3a6e', '--p-button-active-background': '#162d56' } : undefined,
+      }),
     },
   },
   locale: {

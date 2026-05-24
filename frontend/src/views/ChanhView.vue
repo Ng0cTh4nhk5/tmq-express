@@ -6,16 +6,15 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
-import Select from 'primevue/select';
 import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
 import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
+import { formatPhone } from '../utils/format';
 
 const toast = useToast();
 const chanhs = ref([]);
-const vanPhongs = ref([]);
 const loading = ref(false);
 const dialogVisible = ref(false);
 const isEdit = ref(false);
@@ -26,28 +25,13 @@ const form = ref({
   dia_chi: '',
   dien_thoai: '',
   nguoi_lien_he: '',
-  van_phong_id: null,
   ghi_chu: '',
 });
-
-// Filter
-const filterVP = ref(null);
-
-async function loadVanPhongs() {
-  try {
-    const { data: res } = await api.get('/van-phong?active=true');
-    vanPhongs.value = res.data.map(vp => ({ label: `${vp.ma_vp} — ${vp.ten}`, value: vp.id }));
-  } catch (err) {
-    handleApiError(err, toast, 'Lỗi tải danh sách VP');
-  }
-}
 
 async function loadData() {
   loading.value = true;
   try {
-    const params = {};
-    if (filterVP.value) params.van_phong_id = filterVP.value;
-    const { data: res } = await api.get('/chanh', { params });
+    const { data: res } = await api.get('/chanh');
     chanhs.value = res.data;
   } catch (err) {
     handleApiError(err, toast, 'Lỗi tải danh sách chành');
@@ -57,7 +41,7 @@ async function loadData() {
 }
 
 function openNew() {
-  form.value = { ten: '', dia_chi: '', dien_thoai: '', nguoi_lien_he: '', van_phong_id: null, ghi_chu: '' };
+  form.value = { ten: '', dia_chi: '', dien_thoai: '', nguoi_lien_he: '', ghi_chu: '' };
   isEdit.value = false;
   dialogVisible.value = true;
 }
@@ -69,7 +53,6 @@ function openEdit(row) {
     dia_chi: row.dia_chi || '',
     dien_thoai: row.dien_thoai || '',
     nguoi_lien_he: row.nguoi_lien_he || '',
-    van_phong_id: row.van_phong_id,
     ghi_chu: row.ghi_chu || '',
   };
   isEdit.value = true;
@@ -79,10 +62,6 @@ function openEdit(row) {
 async function save() {
   if (!form.value.ten?.trim()) {
     toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Tên chành là bắt buộc', life: 3000 });
-    return;
-  }
-  if (!form.value.van_phong_id) {
-    toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Chọn văn phòng quản lý', life: 3000 });
     return;
   }
 
@@ -120,7 +99,6 @@ async function toggleActive(row) {
 }
 
 onMounted(() => {
-  loadVanPhongs();
   loadData();
 });
 </script>
@@ -133,17 +111,8 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <!-- Filter -->
+    <!-- Toolbar -->
     <div class="filter-bar">
-      <Select
-        v-model="filterVP"
-        :options="[{ label: 'Tất cả VP', value: null }, ...vanPhongs]"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="Lọc theo văn phòng"
-        @change="loadData"
-        style="width: 220px;"
-      />
       <Button icon="pi pi-refresh" text rounded size="small" @click="loadData" v-tooltip.top="'Tải lại'" />
     </div>
 
@@ -157,14 +126,11 @@ onMounted(() => {
             <span style="font-weight: 600;">{{ data.ten }}</span>
           </template>
         </Column>
-        <Column header="Văn phòng" style="width: 120px;">
-          <template #body="{ data }">
-            <Tag :value="data.van_phong?.ma_vp" severity="info" />
-          </template>
-        </Column>
         <Column field="dia_chi" header="Địa chỉ" />
-        <Column field="dien_thoai" header="Điện thoại" style="width: 120px;" />
-        <Column field="nguoi_lien_he" header="Liên hệ" style="width: 130px;" />
+        <Column header="Điện thoại" style="width: 140px;">
+          <template #body="{ data }">{{ formatPhone(data.dien_thoai) }}</template>
+        </Column>
+        <Column field="nguoi_lien_he" header="Liên hệ" style="width: 140px;" />
         <Column header="Trạng thái" style="width: 100px;">
           <template #body="{ data }">
             <Tag :value="data.active ? 'Hoạt động' : 'Ngừng'" :severity="data.active ? 'success' : 'danger'" />
@@ -196,42 +162,129 @@ onMounted(() => {
     <Dialog
       v-model:visible="dialogVisible"
       :header="isEdit ? 'Sửa chành' : 'Thêm chành mới'"
-      :style="{ width: '480px' }"
+      :style="{ width: '500px' }"
       modal
       class="compact-dialog"
     >
-      <div class="form-grid-1">
+      <!-- Section: Thông tin chành -->
+      <div class="dialog-section-title">
+        <i class="pi pi-map-marker"></i> Thông tin chành
+      </div>
+      <div class="form-grid-dialog-1">
         <div class="form-group">
-          <label class="form-label">Tên chành <span style="color: #ef4444;">*</span></label>
-          <InputText v-model="form.ten" placeholder="VD: Chành Miền Tây - Q.Bình Thạnh" fluid />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Văn phòng quản lý <span style="color: #ef4444;">*</span></label>
-          <Select v-model="form.van_phong_id" :options="vanPhongs" optionLabel="label" optionValue="value" placeholder="Chọn văn phòng" fluid />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Địa chỉ</label>
-          <InputText v-model="form.dia_chi" placeholder="Nhập địa chỉ chành" fluid />
-        </div>
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-          <div class="form-group">
-            <label class="form-label">Điện thoại</label>
-            <InputText v-model="form.dien_thoai" placeholder="Số ĐT liên hệ" fluid />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Người liên hệ</label>
-            <InputText v-model="form.nguoi_lien_he" placeholder="Tên người LH" fluid />
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Ghi chú</label>
-          <Textarea v-model="form.ghi_chu" rows="2" placeholder="Ghi chú thêm (giờ nhận hàng, khu vực...)" fluid />
+          <label class="form-label">Tên chành <span class="req">*</span></label>
+          <InputText
+            v-model="form.ten"
+            placeholder="VD: Chành Miền Tây - Bến xe Miền Tây"
+            fluid
+            spellcheck="false"
+          />
+          <small class="field-hint">Tên đầy đủ, rõ địa chỉ hoặc khu vực chành quản lý.</small>
         </div>
       </div>
+
+      <!-- Section: Liên hệ & Địa chỉ -->
+      <div class="dialog-section-title" style="margin-top: 1rem;">
+        <i class="pi pi-phone"></i> Liên hệ & Địa chỉ
+      </div>
+      <div class="form-grid-dialog-1">
+        <div class="form-group">
+          <label class="form-label">Địa chỉ chành</label>
+          <InputText
+            v-model="form.dia_chi"
+            placeholder="Số nhà, đường, phường/xã, quận/huyện"
+            fluid
+            spellcheck="false"
+          />
+        </div>
+      </div>
+      <div class="form-grid-dialog" style="margin-top: 0.5rem;">
+        <div class="form-group">
+          <label class="form-label">Điện thoại</label>
+          <InputText
+            v-model="form.dien_thoai"
+            placeholder="Số liên hệ chành"
+            inputmode="tel"
+            fluid
+            spellcheck="false"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Người liên hệ</label>
+          <InputText
+            v-model="form.nguoi_lien_he"
+            placeholder="Tên người liên hệ"
+            fluid
+            spellcheck="false"
+          />
+        </div>
+      </div>
+
+      <!-- Section: Ghi chú -->
+      <div class="dialog-section-title" style="margin-top: 1rem;">
+        <i class="pi pi-comment"></i> Ghi chú
+      </div>
+      <div class="form-group">
+        <Textarea
+          v-model="form.ghi_chu"
+          rows="2"
+          placeholder="Giờ nhận hàng, khu vực phụ trách, lưu ý..."
+          fluid
+          spellcheck="false"
+        />
+      </div>
+
       <template #footer>
         <Button label="Hủy" severity="secondary" text size="small" @click="dialogVisible = false" />
-        <Button :label="isEdit ? 'Cập nhật' : 'Tạo mới'" icon="pi pi-check" size="small" :loading="saving" @click="save" />
+        <Button :label="isEdit ? 'Cập nhật' : 'Tạo chành'" icon="pi pi-check" size="small" :loading="saving" @click="save" />
       </template>
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+.dialog-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 2 cột bằng nhau */
+.form-grid-dialog {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* 1 cột full-width */
+.form-grid-dialog-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.req { color: #ef4444; }
+
+.field-hint {
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+</style>

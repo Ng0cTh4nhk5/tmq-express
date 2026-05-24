@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
-  cacheDir: '.vite-cache',
+  cacheDir: 'node_modules/.vite',
   server: {
     proxy: {
       '/api': {

@@ -1,11 +1,10 @@
 import prisma from '../config/database.js';
 import { createWithCode } from '../utils/ma-so-generator.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
+import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 
 /**
  * Danh sách BN có COD (thu_ho > 0)
- * @param {Object} params - { trang_thai_cod, vp_gui, vp_nhan, from, to, page, limit, search }
- * @returns {{ data, pagination, summary }}
  */
 export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, page = 1, limit = 20, search }) {
   const p = parseInt(page, 10) || 1;
@@ -18,8 +17,8 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
 
   if (from || to) {
     where.ngay_bien_nhan = {};
-    if (from) where.ngay_bien_nhan.gte = new Date(from);
-    if (to) where.ngay_bien_nhan.lte = new Date(to + 'T23:59:59.999Z');
+    if (from) where.ngay_bien_nhan.gte = parseStartOfDayVN(from);
+    if (to)   where.ngay_bien_nhan.lte = parseEndOfDayVN(to);
   }
 
   if (search) {
@@ -42,13 +41,11 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
         van_phong_gui: { select: { ma_vp: true, ten: true } },
         van_phong_nhan: { select: { ma_vp: true, ten: true } },
         nhan_vien_nhap: { select: { ten: true } },
+        bien_nhan_thu_ho: { select: { id: true, ma_bnth: true, ngay_thu: true, nguoi_nop: true } },
+        chanh: { select: { ten: true } },
       },
     }),
-    prisma.bienNhan.aggregate({
-      where,
-      _sum: { thu_ho: true },
-      _count: true,
-    }),
+    prisma.bienNhan.aggregate({ where, _sum: { thu_ho: true }, _count: true }),
   ]);
 
   const total = agg._count;
@@ -60,8 +57,7 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
 }
 
 /**
- * Tổng hợp COD theo 4 trạng thái
- * @returns {{ cho_thu: {count, total}, da_thu: {count, total}, da_chuyen: {count, total}, da_tra: {count, total} }}
+ * Tổng hợp COD theo 6 trạng thái
  */
 export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}) {
   const baseWhere = { thu_ho: { gt: 0 } };
@@ -69,11 +65,10 @@ export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}) {
   if (vp_nhan) baseWhere.van_phong_nhan_id = Number(vp_nhan);
   if (from || to) {
     baseWhere.ngay_bien_nhan = {};
-    if (from) baseWhere.ngay_bien_nhan.gte = new Date(from);
-    if (to) baseWhere.ngay_bien_nhan.lte = new Date(to + 'T23:59:59.999Z');
+    if (from) baseWhere.ngay_bien_nhan.gte = parseStartOfDayVN(from);
+    if (to)   baseWhere.ngay_bien_nhan.lte = parseEndOfDayVN(to);
   }
 
-  // M2: 1 query groupBy thay vì 4 aggregate riêng
   const groups = await prisma.bienNhan.groupBy({
     by: ['trang_thai_cod'],
     where: baseWhere,
@@ -81,12 +76,13 @@ export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}) {
     _sum: { thu_ho: true },
   });
 
-  // Khởi tạo kết quả mặc định
   const results = {
-    cho_thu:   { count: 0, total: 0 },
-    da_thu:    { count: 0, total: 0 },
-    da_chuyen: { count: 0, total: 0 },
-    da_tra:    { count: 0, total: 0 },
+    cho_thu:            { count: 0, total: 0 },
+    da_thu_chanh:       { count: 0, total: 0 },
+    da_thu:             { count: 0, total: 0 },
+    cho_chuyen_pending: { count: 0, total: 0 },
+    da_chuyen:          { count: 0, total: 0 },
+    da_tra:             { count: 0, total: 0 },
   };
   for (const g of groups) {
     if (results[g.trang_thai_cod]) {
@@ -97,25 +93,29 @@ export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}) {
 }
 
 /**
- * Xác nhận thu COD — NV tại VP nhận thu tiền từ người nhận
- * Side effect: tạo PhieuThu tại VP nhận
+ * Xác nhận thu COD trực tiếp — VP Nhận thu từ người nhận hàng
+ * State: cho_thu → da_thu
+ * Side effect: PhieuThu @ VP Nhận + BienNhanThuHo
  */
-export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu } = {}, user) {
+export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop } = {}, user) {
   const bn = await prisma.bienNhan.findUnique({
     where: { id: bienNhanId },
-    include: {
-      van_phong_nhan: { select: { id: true, ten: true } },
-    },
+    include: { van_phong_nhan: { select: { id: true, ten: true } } },
   });
 
   if (!bn) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
-  // C3: Positive guard — chỉ cho_thu mới được thu
   if (bn.trang_thai_cod !== 'cho_thu') {
     const msg = bn.trang_thai_cod === 'khong_co'
       ? 'Biên nhận này không có tiền thu hộ (COD)'
       : 'COD đã được thu hoặc đang xử lý, không thể thu lại';
     throw Object.assign(new Error(msg), { statusCode: 400 });
   }
+  if (!bn.thu_ho || Number(bn.thu_ho) <= 0) {
+    throw Object.assign(new Error('Biên nhận không có tiền COD để thu'), { statusCode: 400 });
+  }
+
+  const tenNguoiNop = nguoi_nop || bn.don_vi_nhan || bn.nguoi_nhan || 'Không xác định';
+  const ht = hinh_thuc || 'tien_mat';
 
   const result = await prisma.$transaction(async (tx) => {
     // 1. Update trạng thái COD
@@ -124,40 +124,50 @@ export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu } = {}, use
       data: { trang_thai_cod: 'da_thu' },
     });
 
-    // 2. Tạo PhieuThu tại VP NHẬN — C1: pass tx vào createWithCode
+    // 2. Tạo PhieuThu @ VP Nhận
     const phieuThu = await createWithCode(
-      async (ma_phieu) => {
-        return tx.phieuThu.create({
-          data: {
-            ma_phieu,
-            doi_tuong: bn.don_vi_nhan || bn.nguoi_nhan || 'Không xác định',
-            ly_do: `Thu hộ COD BN ${bn.ma_so}`,
-            so_tien: bn.thu_ho,
-            hinh_thuc: hinh_thuc || 'tien_mat',
-            van_phong_id: bn.van_phong_nhan_id,
-            nhan_vien_id: user.id,
-            bien_nhan_id: bn.id,
-          },
-        });
-      },
+      async (ma_phieu) => tx.phieuThu.create({
+        data: {
+          ma_phieu,
+          doi_tuong: tenNguoiNop,
+          ly_do: `Thu hộ COD BN ${bn.ma_so}`,
+          so_tien: bn.thu_ho,
+          hinh_thuc: ht,
+          van_phong_id: bn.van_phong_nhan_id,
+          nhan_vien_id: user.id,
+          bien_nhan_id: bn.id,
+        },
+      }),
       'phieuThu', 'ma_phieu', 'PT', 4, tx,
     );
 
-    return { bn: updatedBN, phieu_thu: phieuThu };
+    // 3. Tạo BienNhanThuHo
+    const bnth = await createWithCode(
+      async (ma_bnth) => tx.bienNhanThuHo.create({
+        data: {
+          ma_bnth,
+          bien_nhan_id: bn.id,
+          so_tien: bn.thu_ho,
+          nguoi_nop: tenNguoiNop,
+          hinh_thuc: ht,
+          ghi_chu: ghi_chu || null,
+          van_phong_id: bn.van_phong_nhan_id,
+          nhan_vien_id: user.id,
+          la_qua_chanh: false,
+        },
+      }),
+      'bienNhanThuHo', 'ma_bnth', 'BNTH', 4, tx,
+    );
+
+    return { bn: updatedBN, phieu_thu: phieuThu, bien_nhan_thu_ho: bnth };
   });
 
-  writeAuditLog({
-    action: 'UPDATE',
-    entity: 'bien_nhan',
-    entityId: bienNhanId,
-    newData: { trang_thai_cod: 'da_thu', ghi_chu },
-  });
+  writeAuditLog({ action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId, newData: { trang_thai_cod: 'da_thu' } });
   return result;
 }
 
 /**
  * Auto thu COD — gọi từ PATCH trang-thai khi khach_da_nhan
- * Dùng defaults: tien_mat + ghi chú tự động
  */
 export async function xacNhanThuCODAuto(bienNhanId, user) {
   return xacNhanThuCOD(
@@ -168,139 +178,166 @@ export async function xacNhanThuCODAuto(bienNhanId, user) {
 }
 
 /**
- * Xác nhận chuyển COD — VP nhận chuyển tiền về VP gửi
- * Side effect: PhieuChi@VP_nhận + PhieuThu@VP_gửi
+ * Ghi nhận Chành đã thu — Chành thu từ người nhận, tiền chưa về VP
+ * State: cho_thu → da_thu_chanh
+ * Side effect: KHÔNG tạo PhieuThu (tiền chưa ở VP)
  */
-export async function xacNhanChuyenCOD(bienNhanId, { hinh_thuc, ghi_chu } = {}, user) {
+export async function xacNhanThuChanh(bienNhanId, { ghi_chu } = {}, user) {
+  const bn = await prisma.bienNhan.findUnique({ where: { id: bienNhanId } });
+
+  if (!bn) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
+  if (bn.trang_thai_cod !== 'cho_thu') {
+    throw Object.assign(new Error('Chỉ BN ở trạng thái "Chờ thu" mới có thể ghi nhận chành thu'), { statusCode: 400 });
+  }
+  if (!bn.chanh_id) {
+    throw Object.assign(new Error('Biên nhận này chưa được gán chành'), { statusCode: 400 });
+  }
+
+  const updatedBN = await prisma.bienNhan.update({
+    where: { id: bienNhanId },
+    data: { trang_thai_cod: 'da_thu_chanh' },
+  });
+
+  writeAuditLog({ action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId, newData: { trang_thai_cod: 'da_thu_chanh', ghi_chu } });
+  return updatedBN;
+}
+
+/**
+ * VP Nhận xác nhận đã nhận tiền từ Chành
+ * State: da_thu_chanh → da_thu
+ * Side effect: PhieuThu @ VP Nhận + BienNhanThuHo (la_qua_chanh = true)
+ */
+export async function xacNhanNhanTuChanh(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop } = {}, user) {
   const bn = await prisma.bienNhan.findUnique({
     where: { id: bienNhanId },
-    include: {
-      van_phong_gui: { select: { id: true, ten: true } },
-      van_phong_nhan: { select: { id: true, ten: true } },
-    },
+    include: { chanh: { select: { ten: true } } },
   });
 
   if (!bn) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
-  // C3: Positive guard — chỉ da_thu mới được chuyển
-  if (bn.trang_thai_cod !== 'da_thu') {
-    const msg = ['khong_co', 'cho_thu'].includes(bn.trang_thai_cod)
-      ? 'Chưa thu COD từ người nhận, không thể chuyển'
-      : 'COD đã được chuyển hoặc hoàn tất';
-    throw Object.assign(new Error(msg), { statusCode: 400 });
+  if (bn.trang_thai_cod !== 'da_thu_chanh') {
+    throw Object.assign(new Error('BN chưa ở trạng thái "Chành đã thu"'), { statusCode: 400 });
+  }
+
+  const tenNguoiNop = nguoi_nop || (bn.chanh ? `Chành ${bn.chanh.ten}` : 'Chành') ;
+  const ht = hinh_thuc || 'tien_mat';
+
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Update trạng thái
+    const updatedBN = await tx.bienNhan.update({
+      where: { id: bienNhanId },
+      data: { trang_thai_cod: 'da_thu' },
+    });
+
+    // 2. PhieuThu @ VP Nhận
+    const phieuThu = await createWithCode(
+      async (ma_phieu) => tx.phieuThu.create({
+        data: {
+          ma_phieu,
+          doi_tuong: tenNguoiNop,
+          ly_do: `Nhận COD BN ${bn.ma_so} từ chành`,
+          so_tien: bn.thu_ho,
+          hinh_thuc: ht,
+          van_phong_id: bn.van_phong_nhan_id,
+          nhan_vien_id: user.id,
+          bien_nhan_id: bn.id,
+        },
+      }),
+      'phieuThu', 'ma_phieu', 'PT', 4, tx,
+    );
+
+    // 3. BienNhanThuHo (la_qua_chanh = true)
+    const bnth = await createWithCode(
+      async (ma_bnth) => tx.bienNhanThuHo.create({
+        data: {
+          ma_bnth,
+          bien_nhan_id: bn.id,
+          so_tien: bn.thu_ho,
+          nguoi_nop: tenNguoiNop,
+          hinh_thuc: ht,
+          ghi_chu: ghi_chu || null,
+          van_phong_id: bn.van_phong_nhan_id,
+          nhan_vien_id: user.id,
+          la_qua_chanh: true,
+        },
+      }),
+      'bienNhanThuHo', 'ma_bnth', 'BNTH', 4, tx,
+    );
+
+    return { bn: updatedBN, phieu_thu: phieuThu, bien_nhan_thu_ho: bnth };
+  });
+
+  writeAuditLog({ action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId, newData: { trang_thai_cod: 'da_thu' } });
+  return result;
+}
+
+/**
+ * Trả COD cho người gửi — gom lô nhiều BN
+ * State: da_chuyen → da_tra (per BN)
+ * Side effect: PhieuChi per-BN @ VP Gửi (có bien_nhan_id)
+ */
+export async function traLo({ bien_nhan_ids, hinh_thuc, ghi_chu } = {}, user) {
+  if (!bien_nhan_ids?.length) {
+    throw Object.assign(new Error('Danh sách biên nhận không được rỗng'), { statusCode: 400 });
+  }
+
+  const bienNhans = await prisma.bienNhan.findMany({
+    where: { id: { in: bien_nhan_ids } },
+    include: { van_phong_gui: { select: { id: true, ten: true } } },
+  });
+
+  if (bienNhans.length !== bien_nhan_ids.length) {
+    throw Object.assign(new Error('Một hoặc nhiều biên nhận không tìm thấy'), { statusCode: 404 });
+  }
+
+  const notDaChuyen = bienNhans.filter(bn => bn.trang_thai_cod !== 'da_chuyen');
+  if (notDaChuyen.length > 0) {
+    throw Object.assign(new Error(`Các BN chưa ở trạng thái "Đã chuyển": ${notDaChuyen.map(b => b.ma_so).join(', ')}`), { statusCode: 400 });
+  }
+
+  const wrongVP = bienNhans.filter(bn => bn.van_phong_gui_id !== user.van_phong_id);
+  if (wrongVP.length > 0) {
+    throw Object.assign(new Error('Một số BN không thuộc VP của bạn (cần VP Gửi)'), { statusCode: 403 });
   }
 
   const ht = hinh_thuc || 'tien_mat';
 
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Update trạng thái COD
-    const updatedBN = await tx.bienNhan.update({
-      where: { id: bienNhanId },
-      data: { trang_thai_cod: 'da_chuyen' },
-    });
+    const phieuChiList = [];
 
-    // 2. Tạo PhieuChi tại VP NHẬN (chi ra) — C1: pass tx
-    const phieuChi = await createWithCode(
-      async (ma_phieu) => {
-        return tx.phieuChi.create({
-          data: {
-            ma_phieu,
-            nguoi_nhan: `VP ${bn.van_phong_gui.ten}`,
-            ly_do: `Chuyển COD BN ${bn.ma_so} về VP gửi`,
-            so_tien: bn.thu_ho,
-            hinh_thuc: ht,
-            van_phong_id: bn.van_phong_nhan_id,
-            nhan_vien_id: user.id,
-          },
-        });
-      },
-      'phieuChi', 'ma_phieu', 'PC', 4, tx,
-    );
-
-    // 3. Tạo PhieuThu tại VP GỬI (nhận vào) — C1: pass tx
-    const phieuThu = await createWithCode(
-      async (ma_phieu) => {
-        return tx.phieuThu.create({
-          data: {
-            ma_phieu,
-            doi_tuong: `VP ${bn.van_phong_nhan.ten}`,
-            ly_do: `Nhận COD BN ${bn.ma_so} từ VP nhận`,
-            so_tien: bn.thu_ho,
-            hinh_thuc: ht,
-            van_phong_id: bn.van_phong_gui_id,
-            nhan_vien_id: user.id,
-            bien_nhan_id: bn.id,
-          },
-        });
-      },
-      'phieuThu', 'ma_phieu', 'PT', 4, tx,
-    );
-
-    return { bn: updatedBN, phieu_chi: phieuChi, phieu_thu: phieuThu };
-  });
-
-  writeAuditLog({
-    action: 'UPDATE',
-    entity: 'bien_nhan',
-    entityId: bienNhanId,
-    newData: { trang_thai_cod: 'da_chuyen', ghi_chu },
-  });
-  return result;
-}
-
-/**
- * Xác nhận trả COD — VP gửi trả tiền cho người gửi
- * Side effect: PhieuChi@VP_gửi
- */
-export async function xacNhanTraCOD(bienNhanId, { hinh_thuc, ghi_chu } = {}, user) {
-  const bn = await prisma.bienNhan.findUnique({
-    where: { id: bienNhanId },
-    include: {
-      van_phong_gui: { select: { id: true, ten: true } },
-    },
-  });
-
-  if (!bn) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
-  // C3: Positive guard — chỉ da_chuyen mới được trả
-  if (bn.trang_thai_cod !== 'da_chuyen') {
-    const msg = bn.trang_thai_cod === 'da_tra'
-      ? 'COD đã hoàn tất cho biên nhận này'
-      : 'COD chưa được chuyển về VP gửi, không thể trả';
-    throw Object.assign(new Error(msg), { statusCode: 400 });
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    // 1. Update trạng thái COD
-    const updatedBN = await tx.bienNhan.update({
-      where: { id: bienNhanId },
-      data: { trang_thai_cod: 'da_tra' },
-    });
-
-    // 2. Tạo PhieuChi tại VP GỬI (chi ra cho người gửi) — C1: pass tx
-    const phieuChi = await createWithCode(
-      async (ma_phieu) => {
-        return tx.phieuChi.create({
+    for (const bn of bienNhans) {
+      const phieuChi = await createWithCode(
+        async (ma_phieu) => tx.phieuChi.create({
           data: {
             ma_phieu,
             nguoi_nhan: bn.don_vi_gui || bn.nguoi_gui || 'Không xác định',
             ly_do: `Trả COD BN ${bn.ma_so} cho người gửi`,
             so_tien: bn.thu_ho,
-            hinh_thuc: hinh_thuc || 'tien_mat',
-            van_phong_id: bn.van_phong_gui_id,
+            hinh_thuc: ht,
+            van_phong_id: user.van_phong_id,
             nhan_vien_id: user.id,
+            bien_nhan_id: bn.id,
           },
-        });
-      },
-      'phieuChi', 'ma_phieu', 'PC', 4, tx,
-    );
+        }),
+        'phieuChi', 'ma_phieu', 'PC', 4, tx,
+      );
+      phieuChiList.push(phieuChi);
 
-    return { bn: updatedBN, phieu_chi: phieuChi };
+      await tx.bienNhan.update({
+        where: { id: bn.id },
+        data: { trang_thai_cod: 'da_tra' },
+      });
+    }
+
+    return { count: phieuChiList.length, phieu_chi_list: phieuChiList };
   });
 
-  writeAuditLog({
-    action: 'UPDATE',
-    entity: 'bien_nhan',
-    entityId: bienNhanId,
-    newData: { trang_thai_cod: 'da_tra', ghi_chu },
-  });
+  // Log per-BN để có thể trace theo entity_id
+  for (const bn of bienNhans) {
+    writeAuditLog({
+      action: 'UPDATE', entity: 'bien_nhan', entityId: bn.id,
+      oldData: { trang_thai_cod: 'da_chuyen' },
+      newData:  { trang_thai_cod: 'da_tra' },
+    });
+  }
   return result;
 }

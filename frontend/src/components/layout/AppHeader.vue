@@ -1,10 +1,26 @@
 <script setup>
+import { computed } from 'vue';
 import { useAuthStore } from '../../stores/auth.store';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import Button from 'primevue/button';
 
 const auth = useAuthStore();
+const route = useRoute();
 const router = useRouter();
+
+// Breadcrumb auto-gen từ route meta
+const breadcrumbs = computed(() => {
+  const crumbs = [];
+  for (const matched of route.matched) {
+    if (matched.meta?.title) {
+      crumbs.push({
+        label: matched.meta.title,
+        to: matched.path || '/',
+      });
+    }
+  }
+  return crumbs;
+});
 
 function handleLogout() {
   auth.logout();
@@ -15,9 +31,16 @@ function handleLogout() {
 <template>
   <header class="app-header">
     <div class="header-left">
-      <div class="header-vp">
-        <i class="pi pi-building"></i>
-        <span>{{ auth.userVanPhong?.ten || 'TMQ Express' }}</span>
+      <div class="header-breadcrumb">
+        <span class="breadcrumb-vp">{{ auth.userVanPhong?.ten || 'TMQ Express' }}</span>
+        <template v-for="(crumb, i) in breadcrumbs" :key="i">
+          <i class="pi pi-chevron-right breadcrumb-sep"></i>
+          <router-link
+            :to="crumb.to"
+            class="breadcrumb-item"
+            :class="{ active: i === breadcrumbs.length - 1 }"
+          >{{ crumb.label }}</router-link>
+        </template>
       </div>
     </div>
     <div class="header-right">
@@ -46,12 +69,14 @@ function handleLogout() {
   left: var(--sidebar-width);
   right: 0;
   height: var(--header-height);
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
+  padding: 0 1.25rem;
   z-index: 90;
   transition: left var(--transition);
 }
@@ -60,26 +85,52 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 
-.header-vp {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--secondary);
+/* Breadcrumb */
+.header-breadcrumb {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  font-size: 0.82rem;
+  min-width: 0;
 }
 
-.header-vp i {
-  color: var(--primary);
-  font-size: 0.85rem;
+.breadcrumb-vp {
+  font-weight: 600;
+  color: var(--navy-500);
+  white-space: nowrap;
+}
+
+.breadcrumb-sep {
+  font-size: 0.55rem;
+  color: var(--text-light);
+}
+
+.breadcrumb-item {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.breadcrumb-item:hover {
+  color: var(--navy-400);
+}
+
+.breadcrumb-item.active {
+  color: var(--text-secondary);
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .header-user {

@@ -1,30 +1,37 @@
-import { listThuHo, tongHopThuHo, xacNhanThuCOD, xacNhanChuyenCOD, xacNhanTraCOD } from '../services/thu-ho.service.js';
+import {
+  listThuHo,
+  tongHopThuHo,
+  xacNhanThuChanh,
+  xacNhanNhanTuChanh,
+  traLo,
+} from '../services/thu-ho.service.js';
 
 const xacNhanBody = {
   type: 'object',
   properties: {
     hinh_thuc: { type: 'string', enum: ['tien_mat', 'chuyen_khoan'] },
-    ghi_chu: { type: 'string' },
+    ghi_chu:   { type: 'string' },
+    nguoi_nop: { type: 'string' },
   },
   additionalProperties: false,
 };
 
 export default async function thuHoRoutes(fastify) {
-  // GET /api/thu-ho — Danh sách COD
+  // GET /api/thu-ho
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
         properties: {
-          trang_thai_cod: { type: 'string', enum: ['cho_thu', 'da_thu', 'da_chuyen', 'da_tra'] },
-          vp_gui: { type: 'integer' },
+          trang_thai_cod: { type: 'string', enum: ['cho_thu', 'da_thu_chanh', 'da_thu', 'cho_chuyen_pending', 'da_chuyen', 'da_tra'] },
+          vp_gui:  { type: 'integer' },
           vp_nhan: { type: 'integer' },
-          from: { type: 'string', format: 'date' },
-          to: { type: 'string', format: 'date' },
-          page: { type: 'integer', minimum: 1 },
-          limit: { type: 'integer', minimum: 1, maximum: 100 },
-          search: { type: 'string' },
+          from:    { type: 'string', format: 'date' },
+          to:      { type: 'string', format: 'date' },
+          page:    { type: 'integer', minimum: 1 },
+          limit:   { type: 'integer', minimum: 1, maximum: 500 },
+          search:  { type: 'string' },
         },
       },
     },
@@ -34,17 +41,17 @@ export default async function thuHoRoutes(fastify) {
     },
   });
 
-  // GET /api/thu-ho/tong-hop — Tổng hợp 4 nhóm
+  // GET /api/thu-ho/tong-hop
   fastify.get('/tong-hop', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
         properties: {
-          vp_gui: { type: 'integer' },
+          vp_gui:  { type: 'integer' },
           vp_nhan: { type: 'integer' },
-          from: { type: 'string', format: 'date' },
-          to: { type: 'string', format: 'date' },
+          from:    { type: 'string', format: 'date' },
+          to:      { type: 'string', format: 'date' },
         },
       },
     },
@@ -54,42 +61,54 @@ export default async function thuHoRoutes(fastify) {
     },
   });
 
-  // POST /api/thu-ho/:id/xac-nhan-thu — Staff cũng được phép
-  fastify.post('/:id/xac-nhan-thu', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant', 'staff'])],
+  // POST /api/thu-ho/:id/xac-nhan-thu-chanh — Ghi nhận chành đã thu
+  fastify.post('/:id/xac-nhan-thu-chanh', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
-      body: xacNhanBody,
+      body: {
+        type: 'object',
+        properties: { ghi_chu: { type: 'string' } },
+        additionalProperties: false,
+      },
     },
     handler: async (request) => {
-      const result = await xacNhanThuCOD(Number(request.params.id), request.body || {}, request.user);
-      return { success: true, data: result, message: 'Đã xác nhận thu COD và tạo phiếu thu' };
+      const result = await xacNhanThuChanh(Number(request.params.id), request.body || {}, request.user);
+      return { success: true, data: result, message: 'Đã ghi nhận chành thu COD' };
     },
   });
 
-  // POST /api/thu-ho/:id/xac-nhan-chuyen — Admin + KT
-  fastify.post('/:id/xac-nhan-chuyen', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
+  // POST /api/thu-ho/:id/xac-nhan-nhan-tu-chanh — VP Nhận nhận tiền từ chành
+  fastify.post('/:id/xac-nhan-nhan-tu-chanh', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: xacNhanBody,
     },
     handler: async (request) => {
-      const result = await xacNhanChuyenCOD(Number(request.params.id), request.body || {}, request.user);
-      return { success: true, data: result, message: 'Đã chuyển COD về VP gửi và tạo phiếu thu/chi' };
+      const result = await xacNhanNhanTuChanh(Number(request.params.id), request.body || {}, request.user);
+      return { success: true, data: result, message: 'VP Nhận đã xác nhận nhận tiền từ chành và tạo biên nhận thu hộ' };
     },
   });
 
-  // POST /api/thu-ho/:id/xac-nhan-tra — Admin + KT
-  fastify.post('/:id/xac-nhan-tra', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
+  // POST /api/thu-ho/tra-lo — Trả nhiều BN cho người gửi (gom lô)
+  fastify.post('/tra-lo', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
-      params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
-      body: xacNhanBody,
+      body: {
+        type: 'object',
+        required: ['bien_nhan_ids'],
+        properties: {
+          bien_nhan_ids: { type: 'array', items: { type: 'integer' }, minItems: 1 },
+          hinh_thuc:     { type: 'string', enum: ['tien_mat', 'chuyen_khoan'] },
+          ghi_chu:       { type: 'string' },
+        },
+        additionalProperties: false,
+      },
     },
     handler: async (request) => {
-      const result = await xacNhanTraCOD(Number(request.params.id), request.body || {}, request.user);
-      return { success: true, data: result, message: 'Đã trả COD cho người gửi và tạo phiếu chi' };
+      const result = await traLo(request.body, request.user);
+      return { success: true, data: result, message: `Đã trả COD cho ${result.count} biên nhận` };
     },
   });
 }

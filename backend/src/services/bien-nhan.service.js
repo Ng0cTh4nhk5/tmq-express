@@ -1,5 +1,4 @@
 import prisma from '../config/database.js';
-import { createWithCode } from '../utils/ma-so-generator.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
 
 // Whitelist các field được phép sort — tránh injection qua query string
@@ -12,9 +11,17 @@ const ALLOWED_UPDATE_FIELDS = [
   'hang_hoa_json',
   'gia_tri_hang', 'trong_luong',
   'thu_ho', 'gia_cuoc', 'trang_thai_thu', 'can_xuat_hddt',
-  'hinh_thuc_giao', 'chanh_id', 'dia_chi_giao',
+  'hinh_thuc_giao', 'chanh_id', 'dia_chi_giao', // chanh_id handled specially below
   'hang_hu_khong_den', 'gio_tao',
 ];
+
+/**
+ * [NT-01] Kiểm tra đơn nội thành: VP gửi và VP nhận là cùng một văn phòng.
+ * Khi đúng → sinh prefix NT{VP}, set trang_thai ban đầu = 'da_den_kho'.
+ */
+function _isNoiThanh(vpGuiId, vpNhanId) {
+  return Number(vpGuiId) === Number(vpNhanId);
+}
 
 /**
  * Danh sách biên nhận (filter, search, pagination)
@@ -26,24 +33,31 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
   const l = Math.min(parseInt(limit, 10) || 20, 100);
   const where = {};
 
-  // Staff: chỉ thấy BN liên quan đến VP mình
+  // Staff: chỉ thấy BN liên quan đến VP mình — scope được enforce qua OR condition
   if (role === 'staff' && van_phong_id) {
     where.OR = [
       { van_phong_gui_id: van_phong_id },
       { van_phong_nhan_id: van_phong_id },
     ];
+    // [N-H01] KHÔNG áp dụng vp_gui/vp_nhan từ query khi là staff —
+    // filter đó sẽ ghi đè trực tiếp vào where và phá vỡ OR scope,
+    // cho phép bypass xem BN của VP khác.
+  } else {
+    // Admin / staff (không bị scope VP): áp dụng filter từ query
+    if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
+    if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
   }
 
-  // Filters
+  // Filters áp dụng cho tất cả roles
   if (trang_thai) where.trang_thai = trang_thai;
-  if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
-  if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
 
   if (from || to) {
     where.ngay_bien_nhan = {};
-    if (from) where.ngay_bien_nhan.gte = new Date(from);
-    if (to)   where.ngay_bien_nhan.lte = new Date(to + 'T23:59:59.999Z');
+    // [SVC-01] Dùng +07:00 để khớp với giờ VN, tránh lệch 7h khi server chạy UTC
+    if (from) where.ngay_bien_nhan.gte = new Date(from + 'T00:00:00.000+07:00');
+    if (to)   where.ngay_bien_nhan.lte = new Date(to   + 'T23:59:59.999+07:00');
   }
+
 
   if (search) {
     const searchOr = [
@@ -108,6 +122,27 @@ export async function getBienNhan(id) {
 }
 
 /**
+ * Helper nội bộ: đếm BN cùng prefix + cùng ngày (để tính số thứ tự tiếp theo).
+ * Tách ra để getNextMaSo và createBienNhan dùng chung — tránh drift khi sửa business rule.
+ * @param {PrismaClient|TransactionClient} client  — prisma hoặc tx bên trong transaction
+ * @param {string} prefix  — VD: "SGCT"
+ * @param {Date}   date    — ngày biên nhận
+ */
+async function _countBNByPrefixAndDate(client, prefix, date) {
+  // [C-02] Dùng +07:00 để boundary chính xác kể cả khi server chạy UTC
+  const d = date instanceof Date ? date : new Date(date);
+  const ymd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const startOfDay = new Date(`${ymd}T00:00:00.000+07:00`);
+  const endOfDay   = new Date(`${ymd}T23:59:59.999+07:00`);
+  return client.bienNhan.count({
+    where: {
+      ma_so: { startsWith: `${prefix}-` },
+      ngay_bien_nhan: { gte: startOfDay, lte: endOfDay },
+    },
+  });
+}
+
+/**
  * Lấy mã biên nhận tiếp theo (preview)
  * Format: SGCT-0001 (tuyến + số thứ tự, reset mỗi ngày)
  * Khoá kết hợp: ngay_bien_nhan + ma_so
@@ -118,21 +153,11 @@ export async function getNextMaSo(vpGuiId, vpNhanId, ngayBienNhan) {
   if (!vpGui || !vpNhan) throw Object.assign(new Error('VP không tồn tại'), { statusCode: 400 });
 
   const date = ngayBienNhan ? new Date(ngayBienNhan) : new Date();
-  const prefix = `${vpGui.ma_vp}${vpNhan.ma_vp}`;
-
-  // Đếm BN cùng prefix + cùng ngay_bien_nhan để reset số thứ tự theo ngày
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const count = await prisma.bienNhan.count({
-    where: {
-      ma_so: { startsWith: `${prefix}-` },
-      ngay_bien_nhan: { gte: startOfDay, lte: endOfDay },
-    },
-  });
-
+  // [NT-01] Đơn nội thành dùng prefix NT{VP} để tránh nhầm lẫn với tuyến liên VP
+  const prefix = _isNoiThanh(vpGuiId, vpNhanId)
+    ? `NT${vpGui.ma_vp}`
+    : `${vpGui.ma_vp}${vpNhan.ma_vp}`;
+  const count = await _countBNByPrefixAndDate(prisma, prefix, date);
   return `${prefix}-${String(count + 1).padStart(4, '0')}`;
 }
 
@@ -148,7 +173,7 @@ async function autoCreateKhachHang(tx, tenDonVi, nguoiLienHe, dienThoai, soCccd,
   });
   if (existing) return null;
 
-  const ma_kh = await generateKHCode();
+  const ma_kh = generateKHCode(); // [H-06] sync call — generateKHCode không còn là async
   // Có đủ 3 trường (Đơn vị + Người LH + SĐT) → doanh nghiệp; chỉ có Tên + SĐT → cá nhân
   const loai_kh = nguoiLienHe?.trim() ? 'doanh_nghiep' : 'ca_nhan';
   await tx.khachHang.create({
@@ -182,7 +207,11 @@ function buildTenHangHoa(hangHoaJson) {
  * Build the data object for Prisma bienNhan.create.
  * Extracted to avoid duplication between custom-code and auto-gen paths.
  */
-function _buildBienNhanFields(ma_so, ngayBN, data, userId) {
+/**
+ * @param {boolean} noiThanh - true khi VP gửi = VP nhận (đơn nội thành)
+ *   → override trang_thai = 'da_den_kho' (bỏ qua giai đoạn vận chuyển liên tỉnh)
+ */
+function _buildBienNhanFields(ma_so, ngayBN, data, userId, noiThanh = false) {
   return {
     ma_so,
     ngay_bien_nhan: ngayBN,
@@ -211,11 +240,18 @@ function _buildBienNhanFields(ma_so, ngayBN, data, userId) {
     trang_thai_cod: (data.thu_ho && Number(data.thu_ho) > 0) ? 'cho_thu' : 'khong_co',
     gia_cuoc: data.gia_cuoc || 0,
     trang_thai_thu: data.trang_thai_thu || 'da_thu',
+    // [CuocNhan] Nếu cước chưa thu thì khởi tạo state máy trạng thái thu cước
+    trang_thai_cuoc_nhan: (data.trang_thai_thu === 'chua_thu') ? 'cho_thu' : null,
     can_xuat_hddt: data.can_xuat_hddt || false,
     hang_hu_khong_den: data.hang_hu_khong_den || false,
     hinh_thuc_giao: data.hinh_thuc_giao ?? undefined, // enum with @default; null not allowed
-    chanh_id: data.chanh_id ?? undefined,
+    // chanh_id is a relation FK — must use connect/disconnect syntax
+    ...(data.chanh_id && Number(data.chanh_id) > 0
+      ? { chanh: { connect: { id: Number(data.chanh_id) } } }
+      : {}),
     dia_chi_giao: data.dia_chi_giao || null,
+    // [NT-01] Đơn nội thành: bỏ qua giai đoạn xe liên tỉnh, tiếp nhận thẳng vào kho
+    ...(noiThanh ? { trang_thai: 'da_den_kho' } : {}),
   };
 }
 
@@ -231,36 +267,60 @@ export async function createBienNhan(data, userId) {
 
   // Ngày biên nhận (cho phép back-dating)
   const ngayBN = data.ngay_bien_nhan ? new Date(data.ngay_bien_nhan) : new Date();
-  const prefix = `${vpGui.ma_vp}${vpNhan.ma_vp}`;
+  // [NT-01] Phát hiện đơn nội thành để dùng prefix NT và trạng thái ban đầu phù hợp
+  const noiThanh = _isNoiThanh(data.van_phong_gui_id, data.van_phong_nhan_id);
+  const prefix = noiThanh
+    ? `NT${vpGui.ma_vp}`
+    : `${vpGui.ma_vp}${vpNhan.ma_vp}`;
 
-  // Nếu có mã custom → validate unique rồi dùng
+  // Nếu có mã custom → validate unique (composite: mã + ngày) rồi dùng
   if (data.ma_so_custom?.trim()) {
     const customCode = data.ma_so_custom.trim();
-    const existing = await prisma.bienNhan.findUnique({ where: { ma_so: customCode } });
+    // Kiểm tra trùng theo composite key: cùng mã + cùng ngày
+    // [C-02] Dùng +07:00 boundary thay vì setHours()
+    const ymdCustom = `${ngayBN.getFullYear()}-${String(ngayBN.getMonth()+1).padStart(2,'0')}-${String(ngayBN.getDate()).padStart(2,'0')}`;
+    const ngayStart = new Date(`${ymdCustom}T00:00:00.000+07:00`);
+    const ngayEnd   = new Date(`${ymdCustom}T23:59:59.999+07:00`);
+    const existing = await prisma.bienNhan.findFirst({
+      where: {
+        ma_so: customCode,
+        ngay_bien_nhan: { gte: ngayStart, lte: ngayEnd },
+      },
+    });
     if (existing) {
-      throw Object.assign(new Error(`Mã biên nhận "${customCode}" đã tồn tại`), { statusCode: 409 });
+      throw Object.assign(new Error(`Mã biên nhận "${customCode}" đã tồn tại trong ngày này`), { statusCode: 409 });
     }
     // Tạo trực tiếp với mã custom
     const result = await prisma.$transaction(async (tx) => {
-      const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(customCode, ngayBN, data, userId) });
-      await _createBienNhanSideEffects(tx, bn, data, userId);
+      const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(customCode, ngayBN, data, userId, noiThanh) });
+      await _createBienNhanSideEffects(tx, bn, data, userId, noiThanh);
       return { bn, autoCreated: await _autoCreateKH(tx, data) };
     });
     writeAuditLog({ action: 'CREATE', entity: 'bien_nhan', entityId: result.bn.id, newData: result.bn });
     return result;
   }
 
-  // Auto-gen mã: dùng createWithCode pattern
-  const result = await createWithCode(
-    async (ma_so) => {
-      return prisma.$transaction(async (tx) => {
-        const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(ma_so, ngayBN, data, userId) });
-        await _createBienNhanSideEffects(tx, bn, data, userId);
+  // Auto-gen mã: retry loop reset theo ngày (mỗi ngày bắt đầu lại từ 0001)
+  const MAX_RETRIES = 10;
+  let result;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // Dùng helper chung — cùng logic với getNextMaSo
+    const count = await _countBNByPrefixAndDate(prisma, prefix, ngayBN);
+    const ma_so = `${prefix}-${String(count + 1 + attempt).padStart(4, '0')}`;
+
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(ma_so, ngayBN, data, userId, noiThanh) });
+        await _createBienNhanSideEffects(tx, bn, data, userId, noiThanh);
         return { bn, autoCreated: await _autoCreateKH(tx, data) };
       });
-    },
-    'bienNhan', 'ma_so', prefix,
-  );
+      break; // Tạo thành công
+    } catch (err) {
+      if (err.code === 'P2002' && attempt < MAX_RETRIES - 1) continue; // Retry
+      throw err;
+    }
+  }
+  if (!result) throw new Error(`Không thể tạo mã ${prefix} sau ${MAX_RETRIES} lần thử`);
 
   writeAuditLog({ action: 'CREATE', entity: 'bien_nhan', entityId: result.bn.id, newData: result.bn });
   return result;
@@ -268,16 +328,22 @@ export async function createBienNhan(data, userId) {
 
 /**
  * Side effects: lịch sử trạng thái + công nợ
+ * @param {boolean} noiThanh - true khi VP gửi = VP nhận
+ *   → lịch sử ban đầu ghi nhận thẳng tại da_den_kho với ghi chú nội thành
  */
-async function _createBienNhanSideEffects(tx, bn, data, userId) {
-  // Lịch sử trạng thái đầu tiên
+async function _createBienNhanSideEffects(tx, bn, data, userId, noiThanh = false) {
+  // [NT-01] Lịch sử trạng thái đầu tiên
+  // - Liên VP: bắt đầu tại cho_vc (hàng chờ xếp xe)
+  // - Nội thành: bắt đầu tại da_den_kho (hàng tiếp nhận ngay tại VP, không có xe liên tỉnh)
   await tx.lichSuTrangThai.create({
     data: {
       bien_nhan_id: bn.id,
-      trang_thai_moi: 'cho_vc',
+      trang_thai_moi: noiThanh ? 'da_den_kho' : 'cho_vc',
       nhan_vien_id: userId,
       phuong_thuc: 'manual',
-      ghi_chu: 'Tạo biên nhận mới',
+      ghi_chu: noiThanh
+        ? 'Đơn nội thành — hàng tiếp nhận tại VP, sẵn sàng giao'
+        : 'Tạo biên nhận mới',
     },
   });
   // Tự tạo công nợ nếu cần
@@ -299,20 +365,20 @@ async function _createBienNhanSideEffects(tx, bn, data, userId) {
 async function _autoCreateKH(tx, data) {
   const autoCreated = [];
   try {
-    // Fix 1.2: dùng id desc thay vì ma_kh desc — sort string không đáng tin
-    const generateKHCode = async () => {
-      const last = await tx.khachHang.findFirst({
-        where: { ma_kh: { startsWith: 'KH-' } },
-        orderBy: { id: 'desc' },
-        select: { ma_kh: true },
-      });
-      let nextNum = 1;
-      if (last) {
-        const num = parseInt(last.ma_kh.split('-').pop(), 10);
-        if (!isNaN(num)) nextNum = num + 1;
-      }
-      return `KH-${String(nextNum).padStart(4, '0')}`;
-    };
+    // [H-06] Đọc counter một lần duy nhất TRƯỚC loop — tránh 2 KH cùng mã trong cùng tx
+    // (PostgreSQL read isolation: lần 2 không thấy KH lần 1 vừa tạo trong cùng tx)
+    const lastKH = await tx.khachHang.findFirst({
+      where: { ma_kh: { startsWith: 'KH-' } },
+      orderBy: { id: 'desc' },
+      select: { ma_kh: true },
+    });
+    let khCounter = 1;
+    if (lastKH) {
+      const n = parseInt(lastKH.ma_kh.split('-').pop(), 10);
+      if (!isNaN(n)) khCounter = n + 1;
+    }
+    // Sync closure — tự tăng counter mỗi lần gọi, không cần async
+    const generateKHCode = () => `KH-${String(khCounter++).padStart(4, '0')}`;
     // Fix 3.4: loop thay vì duplicate code
     const parties = [
       [data.don_vi_gui,  data.nguoi_gui,  data.dien_thoai_gui,  data.so_cccd_gui,  data.dia_chi_gui],
@@ -357,7 +423,18 @@ export async function updateBienNhan(id, data, userId, userRole) {
   // S-02: Whitelist — only pick allowed fields from request body
   const updateData = {};
   for (const key of ALLOWED_UPDATE_FIELDS) {
+    if (key === 'chanh_id') continue; // handled separately as relation
     if (data[key] !== undefined) updateData[key] = data[key];
+  }
+
+  // chanh_id → convert to Prisma relation syntax
+  if (data.chanh_id !== undefined) {
+    const chanhId = Number(data.chanh_id);
+    if (chanhId > 0) {
+      updateData.chanh = { connect: { id: chanhId } };
+    } else {
+      updateData.chanh = { disconnect: true };
+    }
   }
 
   // Nếu cập nhật hang_hoa_json → rebuild ten_hang_hoa & so_luong
@@ -385,6 +462,25 @@ export async function updateBienNhan(id, data, userId, userRole) {
           { statusCode: 400 },
         );
       }
+    }
+  }
+
+  // [CuocNhan] Sync trang_thai_cuoc_nhan khi đổi trang_thai_thu
+  if (updateData.trang_thai_thu !== undefined) {
+    const oldTTThu = existing.trang_thai_thu;
+    const newTTThu = updateData.trang_thai_thu;
+    if (oldTTThu !== 'chua_thu' && newTTThu === 'chua_thu') {
+      // Chuyển sang chua_thu → khởi tạo state
+      updateData.trang_thai_cuoc_nhan = 'cho_thu';
+    } else if (oldTTThu === 'chua_thu' && newTTThu !== 'chua_thu') {
+      // Bỏ chua_thu → chỉ cho phép nếu chưa thu cước
+      if (existing.trang_thai_cuoc_nhan && existing.trang_thai_cuoc_nhan !== 'cho_thu') {
+        throw Object.assign(
+          new Error('Không thể thay đổi trạng thái thu khi cước đang được xử lý'),
+          { statusCode: 400 },
+        );
+      }
+      updateData.trang_thai_cuoc_nhan = null;
     }
   }
 

@@ -37,6 +37,11 @@ async function main() {
   await prisma.loginLog.deleteMany();
   await prisma.bangKeChiTiet.deleteMany();
   await prisma.bangKe.deleteMany();
+  await prisma.phieuChuyenCuocChiTiet.deleteMany();
+  await prisma.phieuChuyenCuoc.deleteMany();
+  await prisma.phieuChuyenCODChiTiet.deleteMany();
+  await prisma.phieuChuyenCOD.deleteMany();
+  await prisma.bienNhanThuHo.deleteMany();
   await prisma.congNo.deleteMany();
   await prisma.phieuThu.deleteMany();
   await prisma.phieuChi.deleteMany();
@@ -44,13 +49,17 @@ async function main() {
   await prisma.bienNhan.deleteMany();
   await prisma.khachHang.deleteMany();
   await prisma.nhanVien.deleteMany();
+  await prisma.chanh.deleteMany();
   await prisma.vanPhong.deleteMany();
 
   // Reset auto-increment sequences
   const sequences = [
     'van_phong', 'nhan_vien', 'khach_hang', 'bien_nhan',
     'lich_su_trang_thai', 'bang_ke', 'bang_ke_chi_tiet',
-    'phieu_thu', 'phieu_chi', 'cong_no', 'login_log', 'audit_log',
+    'phieu_thu', 'phieu_chi', 'cong_no', 'login_log', 'audit_log', 'chanh',
+    'bien_nhan_thu_ho',
+    'phieu_chuyen_cod', 'phieu_chuyen_cod_chi_tiet',
+    'phieu_chuyen_cuoc', 'phieu_chuyen_cuoc_chi_tiet',
   ];
   for (const seq of sequences) {
     await prisma.$executeRawUnsafe(`ALTER SEQUENCE ${seq}_id_seq RESTART WITH 1`);
@@ -62,29 +71,30 @@ async function main() {
   // 1. VĂN PHÒNG (3)
   // ══════════════════════════════════════════════════════════════
   const vpSG = await prisma.vanPhong.create({
-    data: { ma_vp: 'SG', ten: 'VP Tp.HCM', dia_chi: '491 Lê Hồng Phong, Phường 2, Quận 10, TP.HCM', dien_thoai: '(028) 383.338.79' },
+    data: { ma_vp: 'SG', ten: 'Văn phòng TP. Hồ Chí Minh', dia_chi: '491 Lê Hồng Phong, Phường 2, Quận 10, TP.HCM', dien_thoai: '02838333879' },
   });
   const vpCT = await prisma.vanPhong.create({
-    data: { ma_vp: 'CT', ten: 'VP Cần Thơ', dia_chi: '20 Đại lộ Hòa Bình, Q.Ninh Kiều, TP Cần Thơ', dien_thoai: '(0292) 222.333' },
+    data: { ma_vp: 'CT', ten: 'Văn phòng Cần Thơ', dia_chi: '20 Đại lộ Hòa Bình, Phường Tân An, Quận Ninh Kiều, TP Cần Thơ', dien_thoai: '02922223344' },
   });
   const vpRG = await prisma.vanPhong.create({
-    data: { ma_vp: 'RG', ten: 'VP Rạch Giá', dia_chi: '15 Nguyễn Trung Trực, TP Rạch Giá, Kiên Giang', dien_thoai: '(0297) 444.555' },
+    data: { ma_vp: 'RG', ten: 'Văn phòng Rạch Giá', dia_chi: '15 Nguyễn Trung Trực, Phường Vĩnh Thanh, TP Rạch Giá, Kiên Giang', dien_thoai: '02973866444' },
   });
   console.log('  ✅ 3 văn phòng');
 
   // ══════════════════════════════════════════════════════════════
-  // 2. NHÂN VIÊN (7)
+  // 2. NHÂN VIÊN (9)
   // ══════════════════════════════════════════════════════════════
   const hash = await bcrypt.hash('Tmq@1234', 10);
   const nvData = [
-    { ma_nv: 'NV-SG-001', ten: 'Trần Minh Quang (Admin)', van_phong_id: vpSG.id, role: 'admin', username: 'admin' },
-    { ma_nv: 'NV-SG-002', ten: 'Nguyễn Thị Thu Hà', van_phong_id: vpSG.id, role: 'accountant', username: 'ketoan' },
-    { ma_nv: 'NV-SG-003', ten: 'Lê Văn Hùng', van_phong_id: vpSG.id, role: 'staff', username: 'staff_sg' },
-    { ma_nv: 'NV-CT-001', ten: 'Phạm Thanh Tùng', van_phong_id: vpCT.id, role: 'staff', username: 'staff_ct' },
-    { ma_nv: 'NV-CT-002', ten: 'Võ Thị Ngọc Hân', van_phong_id: vpCT.id, role: 'accountant', username: 'ketoan_ct' },
-    { ma_nv: 'NV-RG-001', ten: 'Đặng Hoàng Phúc', van_phong_id: vpRG.id, role: 'staff', username: 'staff_rg' },
-    // NV inactive — để demo quản lý nhân viên
-    { ma_nv: 'NV-RG-002', ten: 'Huỳnh Văn Tài (đã nghỉ)', van_phong_id: vpRG.id, role: 'staff', username: 'staff_rg_old', active: false },
+    { ma_nv: 'NV-SG-001', ten: 'Trần Minh Quang', van_phong_id: vpSG.id, role: 'admin', username: 'admin', require_password_change: false },
+    { ma_nv: 'NV-SG-002', ten: 'Nguyễn Thị Thu Hà', van_phong_id: vpSG.id, role: 'staff', username: 'ketoan', require_password_change: false },
+    { ma_nv: 'NV-SG-003', ten: 'Lê Văn Hùng', van_phong_id: vpSG.id, role: 'staff', username: 'staff_sg', require_password_change: false },
+    { ma_nv: 'NV-CT-001', ten: 'Phạm Thanh Tùng', van_phong_id: vpCT.id, role: 'staff', username: 'staff_ct', require_password_change: false },
+    { ma_nv: 'NV-CT-002', ten: 'Võ Thị Ngọc Hân', van_phong_id: vpCT.id, role: 'staff', username: 'ketoan_ct', require_password_change: false },
+    { ma_nv: 'NV-RG-001', ten: 'Đặng Hoàng Phúc', van_phong_id: vpRG.id, role: 'staff', username: 'staff_rg', require_password_change: false },
+    { ma_nv: 'NV-RG-002', ten: 'Huỳnh Văn Tài', van_phong_id: vpRG.id, role: 'staff', username: 'staff_rg_old', active: false, require_password_change: false },
+    { ma_nv: 'NV-SG-004', ten: 'Bùi Quốc Toàn', van_phong_id: vpSG.id, role: 'staff', username: 'nv_new', active: true, require_password_change: true },
+    { ma_nv: 'NV-CT-003', ten: 'Trương Văn Khải', van_phong_id: vpCT.id, role: 'staff', username: 'nv_locked', active: true, require_password_change: true },
   ];
   const nvList = [];
   for (const u of nvData) {
@@ -93,429 +103,292 @@ async function main() {
     nvList.push(nv);
   }
   const [nvAdmin, nvKeToan, nvStaffSG, nvStaffCT, nvKeToanCT, nvStaffRG] = nvList;
-  console.log('  ✅ 7 nhân viên (6 active + 1 inactive)');
+  console.log('  ✅ 9 nhân viên');
 
   // ══════════════════════════════════════════════════════════════
-  // 3. KHÁCH HÀNG (15) — mix doanh nghiệp + cá nhân + inactive
+  // 3. KHÁCH HÀNG (18)
   // ══════════════════════════════════════════════════════════════
   const customers = [
-    // Doanh nghiệp (10)
-    { ma_kh: 'KH-001', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Tâm An Logistics', nguoi_lien_he: 'Nguyễn Văn Tâm', dien_thoai: '0901234567', ma_so_thue: '0312345678' },
-    { ma_kh: 'KH-002', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty CP Hoàng Long Phát', nguoi_lien_he: 'Trần Hoàng Long', dien_thoai: '0912345678', ma_so_thue: '0301234567' },
-    { ma_kh: 'KH-003', loai_kh: 'doanh_nghiep', ten_don_vi: 'DNTN Minh Phát', nguoi_lien_he: 'Lê Minh Phát', dien_thoai: '0923456789' },
-    { ma_kh: 'KH-004', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Phú Quốc Express', nguoi_lien_he: 'Phạm Quốc Việt', dien_thoai: '0934567890' },
-    { ma_kh: 'KH-005', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cửa Hàng Thanh Bình', nguoi_lien_he: 'Võ Thanh Bình', dien_thoai: '0945678901' },
-    { ma_kh: 'KH-006', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Đại Phong', nguoi_lien_he: 'Đặng Đại Phong', dien_thoai: '0956789012', ma_so_thue: '0398765432' },
-    { ma_kh: 'KH-007', loai_kh: 'doanh_nghiep', ten_don_vi: 'DNTN Hòa Phát Vận Tải', nguoi_lien_he: 'Trương Hòa Phát', dien_thoai: '0967890123' },
-    { ma_kh: 'KH-008', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty CP Sao Việt', nguoi_lien_he: 'Lý Sao Việt', dien_thoai: '0978901234', ma_so_thue: '0309876543' },
-    { ma_kh: 'KH-009', loai_kh: 'doanh_nghiep', ten_don_vi: 'Nông Sản Cần Thơ', nguoi_lien_he: 'Huỳnh Thanh Nông', dien_thoai: '0989012345' },
-    { ma_kh: 'KH-010', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Thiên Phú', nguoi_lien_he: 'Ngô Thiên Phú', dien_thoai: '0990123456', ma_so_thue: '0316789012' },
-    // Cá nhân (4)
-    { ma_kh: 'KH-011', loai_kh: 'ca_nhan', ten_don_vi: 'Anh Tuấn (cá nhân)', nguoi_lien_he: 'Nguyễn Anh Tuấn', dien_thoai: '0371234567' },
-    { ma_kh: 'KH-012', loai_kh: 'ca_nhan', ten_don_vi: 'Chị Mai (cá nhân)', nguoi_lien_he: 'Trần Thị Mai', dien_thoai: '0382345678' },
-    { ma_kh: 'KH-013', loai_kh: 'ca_nhan', ten_don_vi: 'Anh Khoa (cá nhân)', nguoi_lien_he: 'Lê Đăng Khoa', dien_thoai: '0393456789' },
-    { ma_kh: 'KH-014', loai_kh: 'ca_nhan', ten_don_vi: 'Chị Linh (cá nhân)', nguoi_lien_he: 'Phạm Thùy Linh', dien_thoai: '0364567890' },
-    // KH inactive — demo toggle
-    { ma_kh: 'KH-015', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH ABC (ngưng HĐ)', nguoi_lien_he: 'Nguyễn Văn A', dien_thoai: '0901111222', active: false },
+    { ma_kh: 'KH-001', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Tâm An Logistics', nguoi_lien_he: 'Nguyễn Văn Tâm', dien_thoai: '0901234567', email: 'tamanlogistics@gmail.com', dia_chi: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', ma_so_thue: '0312345678', so_cccd: '079201012345', ghi_chu: 'Gửi hàng đều đặn cuối tháng, ưu tiên giao tận nơi' },
+    { ma_kh: 'KH-002', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty CP Hoàng Long Phát', nguoi_lien_he: 'Trần Hoàng Long', dien_thoai: '0912345678', email: 'hoanglong.phat@company.vn', dia_chi: '456 Điện Biên Phủ, P.25, Q.Bình Thạnh, TP.HCM', ma_so_thue: '0301234567', ghi_chu: 'Hàng điện tử, cần đóng gói cẩn thận' },
+    { ma_kh: 'KH-003', loai_kh: 'doanh_nghiep', ten_don_vi: 'DNTN Minh Phát', nguoi_lien_he: 'Lê Minh Phát', dien_thoai: '0923456789', email: 'minhphat.dn@gmail.com', dia_chi: '78 Trần Phú, P.4, Q.5, TP.HCM', so_cccd: '079080011222', ghi_chu: 'Thường gửi hàng thực phẩm khô' },
+    { ma_kh: 'KH-004', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Phú Quốc Express', nguoi_lien_he: 'Phạm Quốc Việt', dien_thoai: '0934567890', email: 'phuquocexpress@outlook.com', dia_chi: '12 Hùng Vương, Dương Đông, Phú Quốc, Kiên Giang', ma_so_thue: '0100234567', ghi_chu: 'Hàng hải sản đông lạnh, yêu cầu giao nhanh' },
+    { ma_kh: 'KH-005', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cửa Hàng Thanh Bình', nguoi_lien_he: 'Võ Thanh Bình', dien_thoai: '0945678901', email: 'thanhbinh.shop@gmail.com', dia_chi: '234 Đề Thám, P.Cô Giang, Q.1, TP.HCM', so_cccd: '079090033444' },
+    { ma_kh: 'KH-006', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Đại Phong Trading', nguoi_lien_he: 'Đặng Đại Phong', dien_thoai: '0956789012', email: 'daiphong.trading@company.vn', dia_chi: '89 Lý Thường Kiệt, P.7, Q.10, TP.HCM', ma_so_thue: '0398765432', ghi_chu: 'Thanh toán chuyển khoản, xuất HĐĐT' },
+    { ma_kh: 'KH-007', loai_kh: 'doanh_nghiep', ten_don_vi: 'DNTN Hòa Phát Vận Tải', nguoi_lien_he: 'Trương Hòa Phát', dien_thoai: '0967890123', email: 'hoaphat.vt@gmail.com', dia_chi: '56 Cách Mạng Tháng 8, Q.Ninh Kiều, TP Cần Thơ', so_cccd: '092070055666', ghi_chu: 'Đối tác vận tải khu vực ĐBSCL' },
+    { ma_kh: 'KH-008', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty CP Sao Việt', nguoi_lien_he: 'Lý Sao Việt', dien_thoai: '0978901234', email: 'saoviet.corp@saoviet.com.vn', dia_chi: '10 Võ Văn Kiệt, P.An Hòa, Q.Ninh Kiều, TP Cần Thơ', ma_so_thue: '0309876543', ghi_chu: 'Gửi hàng nông sản định kỳ hàng tuần' },
+    { ma_kh: 'KH-009', loai_kh: 'doanh_nghiep', ten_don_vi: 'HTX Nông Sản Sạch Cần Thơ', nguoi_lien_he: 'Huỳnh Thanh Nông', dien_thoai: '0989012345', email: 'htxnongsancantho@gmail.com', dia_chi: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, H.Phong Điền, TP Cần Thơ', ghi_chu: 'Hàng trái cây tươi, cần giao trong ngày' },
+    { ma_kh: 'KH-010', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH Thiên Phú', nguoi_lien_he: 'Ngô Thiên Phú', dien_thoai: '0990123456', email: 'thienphuco@thienphuco.com', dia_chi: '321 Nguyễn Trung Trực, TP Rạch Giá, Kiên Giang', ma_so_thue: '0316789012', so_cccd: '086198001234', ghi_chu: 'Khách hàng VIP, thường xuyên nợ cước cuối tháng' },
+    { ma_kh: 'KH-011', loai_kh: 'ca_nhan', ten_don_vi: 'Nguyễn Anh Tuấn', dien_thoai: '0371234567', email: 'anhtuannguyen@gmail.com', dia_chi: '15/3 Nguyễn Kiệm, P.3, Q.Phú Nhuận, TP.HCM', so_cccd: '079095077888', ghi_chu: 'Hay gửi quà tặng về quê Cần Thơ' },
+    { ma_kh: 'KH-012', loai_kh: 'ca_nhan', ten_don_vi: 'Trần Thị Mai', dien_thoai: '0382345678', email: 'maitran.ct@gmail.com', dia_chi: '88 Mậu Thân, P.An Hòa, Q.Ninh Kiều, TP Cần Thơ', so_cccd: '092190099000' },
+    { ma_kh: 'KH-013', loai_kh: 'ca_nhan', ten_don_vi: 'Lê Đăng Khoa', dien_thoai: '0393456789', dia_chi: 'Khu phố 3, P.Vĩnh Thanh Vân, TP Rạch Giá, Kiên Giang', ghi_chu: 'Gửi hàng về quê theo mùa' },
+    { ma_kh: 'KH-014', loai_kh: 'ca_nhan', ten_don_vi: 'Phạm Thùy Linh', dien_thoai: '0364567890', email: 'thuylinhpham@yahoo.com', dia_chi: '23 Trần Hưng Đạo, P.An Thới, Q.Bình Thủy, TP Cần Thơ', so_cccd: '092185011333' },
+    { ma_kh: 'KH-015', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH ABC Thương Mại', nguoi_lien_he: 'Nguyễn Văn A', dien_thoai: '0901111222', email: 'abc.thuongmai@gmail.com', dia_chi: '99 Hai Bà Trưng, Q.1, TP.HCM', ma_so_thue: '0300111222', ghi_chu: 'Ngưng hợp tác từ tháng 01/2026', active: false },
+    { ma_kh: 'KH-016', loai_kh: 'ca_nhan', ten_don_vi: 'Võ Minh Tuấn', dien_thoai: '0333444555', dia_chi: 'Ấp 2, Xã Thạnh Lộc, H.Giồng Riềng, Kiên Giang', so_cccd: '086088022444', ghi_chu: 'Không còn liên lạc được', active: false },
+    { ma_kh: 'KH-017', loai_kh: 'doanh_nghiep', ten_don_vi: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_lien_he: 'Bà Nguyễn Thị Thanh Thảo', dien_thoai: '0907777888', email: 'dongbangxanh.xnk@dongbangxanh.com.vn', dia_chi: 'Lô B5, KCN Trà Nóc, P.Trà Nóc, Q.Bình Thủy, TP Cần Thơ', ma_so_thue: '1800123456', so_cccd: '092080088123', ghi_chu: 'Khách hàng chiến lược, xuất hóa đơn VAT hàng tháng, thanh toán CK ngày 25' },
+    { ma_kh: 'KH-018', loai_kh: 'ca_nhan', ten_don_vi: 'Ngô Thanh Hải', dien_thoai: '0358999000', so_cccd: '079096055789', ghi_chu: 'Tự động tạo từ biên nhận SGCT-0055 ngày 04/05/2026' },
   ];
 
   for (const c of customers) {
     const active = c.active !== undefined ? c.active : true;
     await prisma.khachHang.create({ data: { ...c, active } });
   }
-  console.log('  ✅ 15 khách hàng (10 DN + 4 cá nhân + 1 inactive)');
+  console.log('  ✅ 18 khách hàng');
 
   // ══════════════════════════════════════════════════════════════
-  // 4. BIÊN NHẬN (50) — trải đều 6 tuyến × nhiều trạng thái
-  //    + dữ liệu 30 ngày gần nhất để dashboard đẹp
+  // 4. CHÀNH (4)
   // ══════════════════════════════════════════════════════════════
-  const trangThaiFlow = ['cho_vc', 'dang_vc', 'da_den_kho', 'da_bao_khach', 'khach_da_nhan'];
-
-  const routes = [
-    { vpGui: vpSG, vpNhan: vpCT, nv: nvStaffSG },
-    { vpGui: vpCT, vpNhan: vpSG, nv: nvStaffCT },
-    { vpGui: vpSG, vpNhan: vpRG, nv: nvAdmin },
-    { vpGui: vpRG, vpNhan: vpSG, nv: nvStaffRG },
-    { vpGui: vpCT, vpNhan: vpRG, nv: nvStaffCT },
-    { vpGui: vpRG, vpNhan: vpCT, nv: nvStaffRG },
+  const chanhData = [
+    { ten: 'Chành Ba Gác Q7 - Nhà Bè', dia_chi: 'Khu dân cư Him Lam, Phường Tân Hưng, Quận 7, TP.HCM', dien_thoai: '0903111222', nguoi_lien_he: 'Chú Tư (tài xế ba gác)', ghi_chu: 'Chuyên nhận chở hàng cồng kềnh từ VP SG đi giao tận nơi các quận ven (Q7, Nhà Bè, Bình Chánh)', active: true },
+    { ten: 'Chành Tàu Thủy Cần Thơ - Phong Điền', dia_chi: 'Bến phà Cần Thơ cũ, Phường Tân An, Q.Ninh Kiều, TP Cần Thơ', dien_thoai: '0912333444', nguoi_lien_he: 'Anh Sáu (chủ tàu)', ghi_chu: 'Chở hàng nông sản dọc tuyến sông đi các huyện Phong Điền, Thới Lai (giao tuyến huyện)', active: true },
+    { ten: 'Chành Tàu Cao Tốc Superdong', dia_chi: 'Bến tàu Rạch Giá, Đường Nguyễn Công Trứ, TP Rạch Giá', dien_thoai: '02973980111', nguoi_lien_he: 'Phòng nhận hàng', ghi_chu: 'Nhận hàng chuyển ra đảo Phú Quốc, Hòn Tre. Chuyến sớm nhất 7h sáng', active: true },
+    { ten: 'Chành Xe Khách Rạch Giá - Hà Tiên (cũ)', dia_chi: 'Bến xe Rạch Sỏi, TP Rạch Giá', dien_thoai: '0901119999', nguoi_lien_he: 'Ông Năm', ghi_chu: 'Đã ngưng hoạt động từ 03/2026 do đổi chủ', active: false },
   ];
+  for (const ch of chanhData) {
+    await prisma.chanh.create({ data: ch });
+  }
+  console.log('  ✅ 4 chành');
 
-  const hangHoaList = [
-    'Linh kiện điện tử Samsung', 'Vải may mặc xuất khẩu', 'Phụ tùng xe máy Honda',
-    'Mỹ phẩm nhập khẩu Hàn Quốc', 'Thực phẩm khô đặc sản', 'Đồ gia dụng Sunhouse',
-    'Sách vở - Văn phòng phẩm', 'Thuốc tây dược phẩm', 'Giày dép Biti\'s',
-    'Nông sản sạch Cần Thơ', 'Thiết bị y tế Omron', 'Quần áo thời trang Việt',
-    'Phụ kiện điện thoại', 'Đồ chơi trẻ em Lego', 'Hàng tạp hóa tổng hợp',
-    'Laptop Dell Inspiron', 'Dụng cụ cơ khí Bosch', 'Hóa chất công nghiệp',
-    'Nội thất gỗ Đức Thành', 'Hải sản đông lạnh Phú Quốc',
-    'Gạo nếp cẩm Tây Ninh', 'Trái cây miền Tây (xoài, sầu riêng)',
-    'Bánh kẹo nhập khẩu', 'Rượu vang Chile', 'Đèn LED trang trí Rạng Đông',
-    'Áo mưa công nghiệp', 'Giỏ quà Tết doanh nghiệp', 'Hạt điều rang muối Bình Phước',
-    'Dây cáp điện Cadivi', 'Nước mắm Phú Quốc truyền thống',
-    'Máy bơm nước Panasonic', 'Bình ắc quy GS Yuasa', 'Gạch ốp lát Viglacera',
-    'Sơn nước Dulux', 'Máy lọc nước Kangaroo', 'Tủ lạnh Toshiba',
-    'Quạt công nghiệp Lifan', 'Giấy in A4 Double A', 'Mực in HP LaserJet',
-    'Bao bì carton 5 lớp', 'Kệ sắt V lỗ', 'Ống nhựa Bình Minh',
-    'Xi măng Hà Tiên', 'Gỗ ván ép MDF', 'Phân bón Đầu Trâu',
-    'Thuốc trừ sâu sinh học', 'Thức ăn chăn nuôi CP', 'Cà phê rang xay',
-    'Trà oolong Đài Loan', 'Nệm mousse Kim Đan',
+  // Lookup map chành cho BN data
+  const allChanhs = await prisma.chanh.findMany();
+  const chanhs = Object.fromEntries(allChanhs.map(c => [c.ten, c]));
+
+  /*
+  // ══════════════════════════════════════════════════════════════
+  // 5. BIÊN NHẬN (38 test cases)
+  // ══════════════════════════════════════════════════════════════
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // Ngày historical
+  const d35ago = new Date(); d35ago.setDate(d35ago.getDate() - 35); d35ago.setHours(9, 0, 0, 0);   // ~28/03
+  const d14ago = new Date(); d14ago.setDate(d14ago.getDate() - 14); d14ago.setHours(8, 15, 0, 0); // ~20/04 (BN-11)
+  const d7ago = new Date(); d7ago.setDate(d7ago.getDate() - 7); d7ago.setHours(7, 0, 0, 0);   // ~28/04 (BN-10)
+  // Ngày tháng 4 (BN-21→30): trải đều 7..17 ngày trước
+  const apr = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(8, 0, 0, 0); return d; };
+  // Ngày tháng 3 (BN-31→38): trải đều 40..57 ngày trước
+  const mar = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(8, 0, 0, 0); return d; };
+
+  const bienNhanData = [
+    // BN-01
+    { ma_so: 'SGCT-0001', ngay_bien_nhan: today, gio_tao: '09:15', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Tâm An Logistics', nguoi_gui: 'Nguyễn Văn Tâm', dien_thoai_gui: '0901234567', dia_chi_gui: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', so_cccd_gui: '079201012345', don_vi_nhan: 'HTX Nông Sản Sạch Cần Thơ', nguoi_nhan: 'Huỳnh Thanh Nông', dien_thoai_nhan: '0989012345', dia_chi_nhan: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, H.Phong Điền, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '2 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 2, ghi_chu: 'Hàng giá trị cao, dễ vỡ' }], gia_tri_hang: 5000000, trong_luong: 12.50, thu_ho: 0, gia_cuoc: 150000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: chanhs['Chành Tàu Thủy Cần Thơ - Phong Điền'].id, dia_chi_giao: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, H.Phong Điền, TP Cần Thơ', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-02
+    { ma_so: 'SGCT-0002', ngay_bien_nhan: today, gio_tao: '08:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, P.25, Q.Bình Thạnh, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty CP Sao Việt', nguoi_nhan: 'Lý Sao Việt', dien_thoai_nhan: '0978901234', dia_chi_nhan: '10 Võ Văn Kiệt, P.An Hòa, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '5 Cuộn, 3 Túi', hang_hoa_json: [{ don_vi: 'Cuộn', so_luong: 5, ghi_chu: '' }, { don_vi: 'Túi', so_luong: 3, ghi_chu: '' }], gia_tri_hang: 12000000, trong_luong: 35.00, thu_ho: 0, gia_cuoc: 250000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'goi_dien', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-03
+    { ma_so: 'SGCT-0003', ngay_bien_nhan: today, gio_tao: '14:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'DNTN Minh Phát', nguoi_gui: 'Lê Minh Phát', dien_thoai_gui: '0923456789', dia_chi_gui: '78 Trần Phú, P.4, Q.5, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '10 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 10, ghi_chu: 'Tránh ẩm ướt' }], gia_tri_hang: 8000000, trong_luong: 28.00, thu_ho: 0, gia_cuoc: 200000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tu_toi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-04 — Cước chưa thu, KHÔNG COD (test case chính)
+    { ma_so: 'CTRG-0001', ngay_bien_nhan: today, gio_tao: '10:45', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_gui: 'Nguyễn Thị Thanh Thảo', dien_thoai_gui: '0907777888', dia_chi_gui: 'Lô B5, KCN Trà Nóc, Q.Bình Thủy, TP Cần Thơ', so_cccd_gui: '086198001234', don_vi_nhan: 'Cty TNHH Phú Quốc Express', nguoi_nhan: 'Phạm Quốc Việt', dien_thoai_nhan: '0934567890', dia_chi_nhan: '12 Hùng Vương, Dương Đông, Phú Quốc, Kiên Giang', so_cccd_nhan: null, ten_hang_hoa: '35 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 20, ghi_chu: 'Hàng dễ dập nát' }, { don_vi: 'Thùng xốp', so_luong: 15, ghi_chu: 'Hàng nặng' }], gia_tri_hang: 15000000, trong_luong: 70.00, thu_ho: 0, gia_cuoc: 350000, trang_thai_thu: 'chua_thu', trang_thai_cuoc_nhan: 'cho_thu', hinh_thuc_giao: 'tan_noi', chanh_id: chanhs['Chành Tàu Cao Tốc Superdong'].id, dia_chi_giao: '12 Hùng Vương, Dương Đông, Phú Quốc', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'da_den_kho', trang_thai_cod: 'khong_co' },
+    // BN-05
+    { ma_so: 'RGSG-0001', ngay_bien_nhan: today, gio_tao: '07:30', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Phú Quốc Express', nguoi_gui: 'Phạm Quốc Việt', dien_thoai_gui: '0934567890', dia_chi_gui: '12 Hùng Vương, Dương Đông, Phú Quốc, Kiên Giang', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', so_cccd_nhan: '079201012345', ten_hang_hoa: '20 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 8, ghi_chu: 'Hàng cấp đông' }, { don_vi: 'Thùng xốp', so_luong: 12, ghi_chu: 'Hàng đông lạnh' }], gia_tri_hang: 25000000, trong_luong: 45.00, thu_ho: 0, gia_cuoc: 500000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: chanhs['Chành Ba Gác Q7 - Nhà Bè'].id, dia_chi_giao: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
   ];
+  for (const bn of bienNhanData) { await prisma.bienNhan.create({ data: bn }); }
+  console.log('  ✅ 38 biên nhận (đợt 1/4: BN-01→05)');
 
-  const cuocValues = [50000, 80000, 100000, 120000, 150000, 180000, 200000, 250000, 300000, 350000, 400000, 500000, 650000, 750000, 1000000, 1200000, 1500000, 2000000, 2500000, 3000000];
+  const bienNhanData2 = [
+    // BN-06
+    { ma_so: 'SGCT-0004', ngay_bien_nhan: today, gio_tao: '11:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Đại Phong Trading', nguoi_gui: 'Đặng Đại Phong', dien_thoai_gui: '0956789012', dia_chi_gui: '89 Lý Thường Kiệt, P.7, Q.10, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '4 Thùng, 20 Hộp', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 4, ghi_chu: '' }, { don_vi: 'Hộp', so_luong: 20, ghi_chu: 'Chất lỏng, cẩn thận' }], gia_tri_hang: 18000000, trong_luong: 55.00, thu_ho: 0, gia_cuoc: 400000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '321 Nguyễn Trung Trực, TP Rạch Giá', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-07 — ngày 28/03 (>30 ngày) để test badge "Quá hạn"
+    { ma_so: 'SGCT-0005', ngay_bien_nhan: d35ago, gio_tao: '09:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH Thiên Phú', nguoi_gui: 'Ngô Thiên Phú', dien_thoai_gui: '0990123456', dia_chi_gui: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_gui: null, don_vi_nhan: 'Cty CP Hoàng Long Phát', nguoi_nhan: 'Trần Hoàng Long', dien_thoai_nhan: '0912345678', dia_chi_nhan: '456 Điện Biên Phủ, Q.Bình Thạnh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '30 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 30, ghi_chu: 'Hàng chất lỏng dễ vỡ' }], gia_tri_hang: 9000000, trong_luong: 42.00, thu_ho: 0, gia_cuoc: 300000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'goi_dien', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-08 COD bước 1
+    { ma_so: 'CTSG-0001', ngay_bien_nhan: today, gio_tao: '08:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty CP Sao Việt', nguoi_gui: 'Lý Sao Việt', dien_thoai_gui: '0978901234', dia_chi_gui: '10 Võ Văn Kiệt, Q.Ninh Kiều, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, Q.7, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '25 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 15, ghi_chu: 'Giao trong ngày' }, { don_vi: 'Thùng xốp', so_luong: 10, ghi_chu: 'Tránh nóng' }], gia_tri_hang: 7500000, trong_luong: 60.00, thu_ho: 2500000, gia_cuoc: 300000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'cho_thu' },
+    // BN-09 COD bước 2
+    { ma_so: 'CTSG-0002', ngay_bien_nhan: today, gio_tao: '09:30', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'HTX Nông Sản Sạch Cần Thơ', nguoi_gui: 'Huỳnh Thanh Nông', dien_thoai_gui: '0989012345', dia_chi_gui: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cửa Hàng Thanh Bình', nguoi_nhan: 'Võ Thanh Bình', dien_thoai_nhan: '0945678901', dia_chi_nhan: '234 Đề Thám, P.Cô Giang, Q.1, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '50 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 50, ghi_chu: '' }], gia_tri_hang: 6000000, trong_luong: 25.00, thu_ho: 3000000, gia_cuoc: 200000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '234 Đề Thám, P.Cô Giang, Q.1, TP.HCM', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'da_thu' },
+    // BN-10 COD bước 3 — ~28/04
+    { ma_so: 'RGSG-0002', ngay_bien_nhan: d7ago, gio_tao: '07:00', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Thiên Phú', nguoi_gui: 'Ngô Thiên Phú', dien_thoai_gui: '0990123456', dia_chi_gui: '321 Nguyễn Trung Trực, TP Rạch Giá, Kiên Giang', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, Q.7, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '20 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 20, ghi_chu: 'Hàng chất lỏng dễ vỡ' }], gia_tri_hang: 4000000, trong_luong: 30.00, thu_ho: 1500000, gia_cuoc: 250000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: chanhs['Chành Ba Gác Q7 - Nhà Bè'].id, dia_chi_giao: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'da_chuyen' },
+    // BN-11 COD bước 4 — ~20/04
+    { ma_so: 'SGCT-0006', ngay_bien_nhan: d14ago, gio_tao: '08:15', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'DNTN Minh Phát', nguoi_gui: 'Lê Minh Phát', dien_thoai_gui: '0923456789', dia_chi_gui: '78 Trần Phú, P.4, Q.5, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Nguyễn Anh Tuấn', nguoi_nhan: 'Nguyễn Anh Tuấn', dien_thoai_nhan: '0371234567', dia_chi_nhan: '15/3 Nguyễn Kiệm, P.3, Q.Phú Nhuận, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '5 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 3, ghi_chu: 'Hàng điện tử' }, { don_vi: 'Thùng', so_luong: 2, ghi_chu: 'Hàng dễ vỡ' }], gia_tri_hang: 3500000, trong_luong: 18.00, thu_ho: 4200000, gia_cuoc: 180000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'goi_dien', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'da_tra' },
+    // BN-12 HĐĐT chờ xuất
+    { ma_so: 'SGCT-0007', ngay_bien_nhan: today, gio_tao: '11:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Đại Phong Trading', nguoi_gui: 'Đặng Đại Phong', dien_thoai_gui: '0956789012', dia_chi_gui: '89 Lý Thường Kiệt, P.7, Q.10, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty CP Sao Việt', nguoi_nhan: 'Lý Sao Việt', dien_thoai_nhan: '0978901234', dia_chi_nhan: '10 Võ Văn Kiệt, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '5 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 5, ghi_chu: 'Hàng nặng' }], gia_tri_hang: 10000000, trong_luong: 22.50, thu_ho: 0, gia_cuoc: 350000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '10 Võ Văn Kiệt, Q.Ninh Kiều, TP Cần Thơ', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-13 HĐĐT chờ xuất
+    { ma_so: 'SGCT-0008', ngay_bien_nhan: today, gio_tao: '10:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_gui: 'Nguyễn Thị Thanh Thảo', dien_thoai_gui: '0907777888', dia_chi_gui: 'Lô B5, KCN Trà Nóc, Q.Bình Thủy, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '3 Cuộn', hang_hoa_json: [{ don_vi: 'Cuộn', so_luong: 3, ghi_chu: 'Hàng nặng' }], gia_tri_hang: 4500000, trong_luong: 40.00, thu_ho: 0, gia_cuoc: 200000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tu_toi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-14 HĐĐT chờ xuất | SG→RG | Công nợ
+    { ma_so: 'SGRG-0001', ngay_bien_nhan: today, gio_tao: '09:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Tâm An Logistics', nguoi_gui: 'Nguyễn Văn Tâm', dien_thoai_gui: '0901234567', dia_chi_gui: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', so_cccd_gui: '079201012345', don_vi_nhan: 'Cty TNHH Phú Quốc Express', nguoi_nhan: 'Phạm Quốc Việt', dien_thoai_nhan: '0934567890', dia_chi_nhan: '12 Hùng Vương, Dương Đông, Phú Quốc, Kiên Giang', so_cccd_nhan: null, ten_hang_hoa: '15 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 10, ghi_chu: 'Thiết bị điện tử' }, { don_vi: 'Thùng', so_luong: 5, ghi_chu: 'Hàng giá trị cao' }], gia_tri_hang: 20000000, trong_luong: 15.00, thu_ho: 0, gia_cuoc: 500000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'goi_dien', chanh_id: chanhs['Chành Tàu Cao Tốc Superdong'].id, dia_chi_giao: '12 Hùng Vương, Dương Đông, Phú Quốc', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-15 HĐĐT chờ xuất | CT→RG
+    { ma_so: 'CTRG-0002', ngay_bien_nhan: today, gio_tao: '14:30', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, P.25, Q.Bình Thạnh, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '2 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 2, ghi_chu: 'Hàng giá trị cao, dễ vỡ' }], gia_tri_hang: 28000000, trong_luong: 6.00, thu_ho: 0, gia_cuoc: 300000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '321 Nguyễn Trung Trực, TP Rạch Giá', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+  ];
+  for (const bn of bienNhanData2) { await prisma.bienNhan.create({ data: bn }); }
+  console.log('  ✅ 38 biên nhận (đợt 2/4: BN-06→15)');
 
-  const allBienNhan = [];
-  let bnIndex = 0;
+  const bienNhanData3 = [
+    // BN-16 HĐĐT đã vào BK
+    { ma_so: 'SGCT-0009', ngay_bien_nhan: today, gio_tao: '08:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Đại Phong Trading', nguoi_gui: 'Đặng Đại Phong', dien_thoai_gui: '0956789012', dia_chi_gui: '89 Lý Thường Kiệt, P.7, Q.10, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty CP Sao Việt', nguoi_nhan: 'Lý Sao Việt', dien_thoai_nhan: '0978901234', dia_chi_nhan: '10 Võ Văn Kiệt, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '10 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 10, ghi_chu: 'Hàng cồng kềnh' }], gia_tri_hang: 15000000, trong_luong: 20.00, thu_ho: 0, gia_cuoc: 400000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '10 Võ Văn Kiệt, Q.Ninh Kiều, TP Cần Thơ', can_xuat_hddt: true, da_vao_bang_ke: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-17 HĐĐT đã vào BK
+    { ma_so: 'SGCT-0010', ngay_bien_nhan: today, gio_tao: '09:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_gui: 'Nguyễn Thị Thanh Thảo', dien_thoai_gui: '0907777888', dia_chi_gui: 'Lô B5, KCN Trà Nóc, Q.Bình Thủy, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'HTX Nông Sản Sạch Cần Thơ', nguoi_nhan: 'Huỳnh Thanh Nông', dien_thoai_nhan: '0989012345', dia_chi_nhan: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, H.Phong Điền, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '80 Thùng', hang_hoa_json: [{ don_vi: 'Hộp', so_luong: 50, ghi_chu: 'Hàng dễ vỡ' }, { don_vi: 'Hộp', so_luong: 30, ghi_chu: 'Tránh nhiệt độ cao' }], gia_tri_hang: 35000000, trong_luong: 10.00, thu_ho: 0, gia_cuoc: 500000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: 'Ấp Nhơn Lộc, Xã Nhơn Nghĩa, H.Phong Điền, TP Cần Thơ', can_xuat_hddt: true, da_vao_bang_ke: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-18 Hàng hư không đến
+    { ma_so: 'RGCT-0001', ngay_bien_nhan: today, gio_tao: '13:00', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Thiên Phú', nguoi_gui: 'Ngô Thiên Phú', dien_thoai_gui: '0990123456', dia_chi_gui: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_gui: '086198009999', don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, Q.Ninh Kiều, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '50 Kiện', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 50, ghi_chu: 'Hàng rất dễ vỡ, vỡ 1 phần trong vận chuyển' }], gia_tri_hang: 8000000, trong_luong: 150.00, thu_ho: 0, gia_cuoc: 650000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tu_toi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: true, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-19 Tối thiểu
+    { ma_so: 'CTSG-0003', ngay_bien_nhan: today, gio_tao: null, van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: null, nguoi_gui: null, dien_thoai_gui: null, dia_chi_gui: null, so_cccd_gui: null, don_vi_nhan: null, nguoi_nhan: null, dien_thoai_nhan: null, dia_chi_nhan: null, so_cccd_nhan: null, ten_hang_hoa: 'Hàng tạp hóa', hang_hoa_json: [], gia_tri_hang: null, trong_luong: null, thu_ho: 0, gia_cuoc: 80000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-20 Đầy đủ + COD
+    { ma_so: 'SGRG-0002', ngay_bien_nhan: today, gio_tao: '10:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH Tâm An Logistics', nguoi_gui: 'Nguyễn Văn Tâm', dien_thoai_gui: '0901234567', dia_chi_gui: '123 Nguyễn Văn Linh, P.Tân Phong, Q.7, TP.HCM', so_cccd_gui: '079201012345', don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: '086198001234', ten_hang_hoa: '9 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 3, ghi_chu: 'Hàng điện tử giá trị cao' }, { don_vi: 'Kiện', so_luong: 3, ghi_chu: '' }, { don_vi: 'Kiện', so_luong: 3, ghi_chu: '' }], gia_tri_hang: 45000000, trong_luong: 9.50, thu_ho: 45000000, gia_cuoc: 500000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: chanhs['Chành Tàu Cao Tốc Superdong'].id, dia_chi_giao: '12 Hùng Vương, Dương Đông, Phú Quốc, Kiên Giang', can_xuat_hddt: true, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'cho_thu' },
+    // BN-20b — Cước chưa thu + COD (test cả 2 luồng)
+    { ma_so: 'SGRG-0020', ngay_bien_nhan: today, gio_tao: '11:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, P.25, Q.Bình Thạnh, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '3 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 3, ghi_chu: 'Hàng điện tử' }], gia_tri_hang: 12000000, trong_luong: 8.00, thu_ho: 12000000, gia_cuoc: 280000, trang_thai_thu: 'chua_thu', trang_thai_cuoc_nhan: 'cho_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: '321 Nguyễn Trung Trực, TP Rạch Giá', can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'da_den_kho', trang_thai_cod: 'cho_thu' },
+    // BN-21 (tháng 4 — 7 ngày trước)
+    { ma_so: 'SGCT-0011', ngay_bien_nhan: apr(7), gio_tao: '08:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Tâm An Logistics', nguoi_gui: 'Nguyễn Văn Tâm', dien_thoai_gui: '0901234567', dia_chi_gui: '123 Nguyễn Văn Linh, Q.7, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'HTX Nông Sản Sạch Cần Thơ', nguoi_nhan: 'Huỳnh Thanh Nông', dien_thoai_nhan: '0989012345', dia_chi_nhan: 'Ấp Nhơn Lộc, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '5 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 5, ghi_chu: '' }], gia_tri_hang: 3000000, trong_luong: 15.00, thu_ho: 0, gia_cuoc: 150000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-22
+    { ma_so: 'SGCT-0012', ngay_bien_nhan: apr(8), gio_tao: '09:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '3 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 3, ghi_chu: '' }], gia_tri_hang: 4000000, trong_luong: 20.00, thu_ho: 0, gia_cuoc: 200000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-23
+    { ma_so: 'CTSG-0004', ngay_bien_nhan: apr(9), gio_tao: '10:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty CP Sao Việt', nguoi_gui: 'Lý Sao Việt', dien_thoai_gui: '0978901234', dia_chi_gui: '10 Võ Văn Kiệt, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '10 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 10, ghi_chu: '' }], gia_tri_hang: 5000000, trong_luong: 30.00, thu_ho: 0, gia_cuoc: 300000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-24
+    { ma_so: 'CTSG-0005', ngay_bien_nhan: apr(10), gio_tao: '11:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'HTX Nông Sản Sạch Cần Thơ', nguoi_gui: 'Huỳnh Thanh Nông', dien_thoai_gui: '0989012345', dia_chi_gui: 'Ấp Nhơn Lộc, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cửa Hàng Thanh Bình', nguoi_nhan: 'Võ Thanh Bình', dien_thoai_nhan: '0945678901', dia_chi_nhan: '234 Đề Thám, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '5 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 5, ghi_chu: '' }], gia_tri_hang: 2500000, trong_luong: 10.00, thu_ho: 0, gia_cuoc: 250000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-25
+    { ma_so: 'SGRG-0003', ngay_bien_nhan: apr(11), gio_tao: '08:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH Đại Phong Trading', nguoi_gui: 'Đặng Đại Phong', dien_thoai_gui: '0956789012', dia_chi_gui: '89 Lý Thường Kiệt, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '2 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 2, ghi_chu: '' }], gia_tri_hang: 8000000, trong_luong: 12.00, thu_ho: 0, gia_cuoc: 400000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-26
+    { ma_so: 'RGSG-0003', ngay_bien_nhan: apr(12), gio_tao: '07:30', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Thiên Phú', nguoi_gui: 'Ngô Thiên Phú', dien_thoai_gui: '0990123456', dia_chi_gui: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '8 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 8, ghi_chu: '' }], gia_tri_hang: 10000000, trong_luong: 25.00, thu_ho: 0, gia_cuoc: 500000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-27
+    { ma_so: 'CTRG-0003', ngay_bien_nhan: apr(13), gio_tao: '09:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvKeToanCT.id, don_vi_gui: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_gui: 'Nguyễn Thị Thanh Thảo', dien_thoai_gui: '0907777888', dia_chi_gui: 'Lô B5, KCN Trà Nóc, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '20 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 20, ghi_chu: '' }], gia_tri_hang: 6000000, trong_luong: 40.00, thu_ho: 0, gia_cuoc: 350000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+  ];
+  for (const bn of bienNhanData3) { await prisma.bienNhan.create({ data: bn }); }
+  console.log('  ✅ 38 biên nhận (đợt 3/4: BN-16→27)');
 
-  // === PHASE A: 30 BN trong 7 ngày gần nhất (cho biểu đồ doanh thu 7 ngày) ===
-  for (let day = 6; day >= 0; day--) {
-    const bnPerDay = day === 0 ? 6 : (day <= 2 ? 5 : 4); // Hôm nay nhiều hơn
-    for (let i = 0; i < bnPerDay; i++) {
-      const route = routes[bnIndex % routes.length];
-      const prefix = `${route.vpGui.ma_vp}${route.vpNhan.ma_vp}`;
-      const khIdx = bnIndex % customers.length;
-      const nhIdx = (khIdx + 3 + bnIndex) % (customers.length - 1); // -1 to skip inactive
-      const cuoc = cuocValues[bnIndex % cuocValues.length];
-      const ngay = daysAgo(day, i * 2);
+  const bienNhanData4 = [
+    // BN-28
+    { ma_so: 'RGCT-0002', ngay_bien_nhan: apr(14), gio_tao: '10:30', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Phú Quốc Express', nguoi_gui: 'Phạm Quốc Việt', dien_thoai_gui: '0934567890', dia_chi_gui: '12 Hùng Vương, Phú Quốc', so_cccd_gui: null, don_vi_nhan: 'Cty CP Sao Việt', nguoi_nhan: 'Lý Sao Việt', dien_thoai_nhan: '0978901234', dia_chi_nhan: '10 Võ Văn Kiệt, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '10 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 10, ghi_chu: '' }], gia_tri_hang: 4000000, trong_luong: 22.00, thu_ho: 0, gia_cuoc: 180000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-29
+    { ma_so: 'SGCT-0013', ngay_bien_nhan: apr(15), gio_tao: '11:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'DNTN Minh Phát', nguoi_gui: 'Lê Minh Phát', dien_thoai_gui: '0923456789', dia_chi_gui: '78 Trần Phú, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '3 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 3, ghi_chu: '' }], gia_tri_hang: 3500000, trong_luong: 8.00, thu_ho: 0, gia_cuoc: 120000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-30
+    { ma_so: 'CTSG-0006', ngay_bien_nhan: apr(16), gio_tao: '14:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '5 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 5, ghi_chu: '' }], gia_tri_hang: 2000000, trong_luong: 18.00, thu_ho: 0, gia_cuoc: 100000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-31 (tháng 3 — 40 ngày trước)
+    { ma_so: 'SGCT-0014', ngay_bien_nhan: mar(40), gio_tao: '08:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty TNHH Tâm An Logistics', nguoi_gui: 'Nguyễn Văn Tâm', dien_thoai_gui: '0901234567', dia_chi_gui: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '2 Kiện', hang_hoa_json: [{ don_vi: 'Kiện', so_luong: 2, ghi_chu: '' }], gia_tri_hang: 3000000, trong_luong: 6.00, thu_ho: 0, gia_cuoc: 250000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-32
+    { ma_so: 'SGCT-0015', ngay_bien_nhan: mar(43), gio_tao: '09:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvAdmin.id, don_vi_gui: 'Cty TNHH Đại Phong Trading', nguoi_gui: 'Đặng Đại Phong', dien_thoai_gui: '0956789012', dia_chi_gui: '89 Lý Thường Kiệt, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty CP Sao Việt', nguoi_nhan: 'Lý Sao Việt', dien_thoai_nhan: '0978901234', dia_chi_nhan: '10 Võ Văn Kiệt, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '4 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 4, ghi_chu: '' }], gia_tri_hang: 5000000, trong_luong: 15.00, thu_ho: 0, gia_cuoc: 300000, trang_thai_thu: 'cong_no', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-33
+    { ma_so: 'CTSG-0007', ngay_bien_nhan: mar(46), gio_tao: '10:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffCT.id, don_vi_gui: 'Cty CP Sao Việt', nguoi_gui: 'Lý Sao Việt', dien_thoai_gui: '0978901234', dia_chi_gui: '10 Võ Văn Kiệt, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '5 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 5, ghi_chu: '' }], gia_tri_hang: 4000000, trong_luong: 20.00, thu_ho: 0, gia_cuoc: 150000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-34
+    { ma_so: 'SGRG-0004', ngay_bien_nhan: mar(48), gio_tao: '08:30', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'DNTN Minh Phát', nguoi_gui: 'Lê Minh Phát', dien_thoai_gui: '0923456789', dia_chi_gui: '78 Trần Phú, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '2 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 2, ghi_chu: '' }], gia_tri_hang: 2000000, trong_luong: 8.00, thu_ho: 0, gia_cuoc: 100000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-35
+    { ma_so: 'RGSG-0004', ngay_bien_nhan: mar(50), gio_tao: '07:30', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpSG.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Thiên Phú', nguoi_gui: 'Ngô Thiên Phú', dien_thoai_gui: '0990123456', dia_chi_gui: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Tâm An Logistics', nguoi_nhan: 'Nguyễn Văn Tâm', dien_thoai_nhan: '0901234567', dia_chi_nhan: '123 Nguyễn Văn Linh, TP.HCM', so_cccd_nhan: null, ten_hang_hoa: '10 Thùng xốp', hang_hoa_json: [{ don_vi: 'Thùng xốp', so_luong: 10, ghi_chu: '' }], gia_tri_hang: 7000000, trong_luong: 30.00, thu_ho: 0, gia_cuoc: 450000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-36
+    { ma_so: 'CTRG-0004', ngay_bien_nhan: mar(53), gio_tao: '09:00', van_phong_gui_id: vpCT.id, van_phong_nhan_id: vpRG.id, nhan_vien_nhap_id: nvKeToanCT.id, don_vi_gui: 'Cty TNHH XNK Đồng Bằng Xanh', nguoi_gui: 'Nguyễn Thị Thanh Thảo', dien_thoai_gui: '0907777888', dia_chi_gui: 'Lô B5, KCN Trà Nóc, TP Cần Thơ', so_cccd_gui: null, don_vi_nhan: 'Cty TNHH Thiên Phú', nguoi_nhan: 'Ngô Thiên Phú', dien_thoai_nhan: '0990123456', dia_chi_nhan: '321 Nguyễn Trung Trực, TP Rạch Giá', so_cccd_nhan: null, ten_hang_hoa: '15 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 15, ghi_chu: '' }], gia_tri_hang: 5000000, trong_luong: 35.00, thu_ho: 0, gia_cuoc: 200000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-37
+    { ma_so: 'RGCT-0003', ngay_bien_nhan: mar(55), gio_tao: '10:00', van_phong_gui_id: vpRG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffRG.id, don_vi_gui: 'Cty TNHH Phú Quốc Express', nguoi_gui: 'Phạm Quốc Việt', dien_thoai_gui: '0934567890', dia_chi_gui: '12 Hùng Vương, Phú Quốc', so_cccd_gui: null, don_vi_nhan: 'DNTN Hòa Phát Vận Tải', nguoi_nhan: 'Trương Hòa Phát', dien_thoai_nhan: '0967890123', dia_chi_nhan: '56 Cách Mạng Tháng 8, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '10 Thùng', hang_hoa_json: [{ don_vi: 'Thùng', so_luong: 10, ghi_chu: '' }], gia_tri_hang: 3500000, trong_luong: 25.00, thu_ho: 0, gia_cuoc: 120000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+    // BN-38
+    { ma_so: 'SGCT-0016', ngay_bien_nhan: mar(57), gio_tao: '11:00', van_phong_gui_id: vpSG.id, van_phong_nhan_id: vpCT.id, nhan_vien_nhap_id: nvStaffSG.id, don_vi_gui: 'Cty CP Hoàng Long Phát', nguoi_gui: 'Trần Hoàng Long', dien_thoai_gui: '0912345678', dia_chi_gui: '456 Điện Biên Phủ, TP.HCM', so_cccd_gui: null, don_vi_nhan: 'HTX Nông Sản Sạch Cần Thơ', nguoi_nhan: 'Huỳnh Thanh Nông', dien_thoai_nhan: '0989012345', dia_chi_nhan: 'Ấp Nhơn Lộc, TP Cần Thơ', so_cccd_nhan: null, ten_hang_hoa: '5 Bao', hang_hoa_json: [{ don_vi: 'Bao', so_luong: 5, ghi_chu: '' }], gia_tri_hang: 2500000, trong_luong: 12.00, thu_ho: 0, gia_cuoc: 180000, trang_thai_thu: 'da_thu', hinh_thuc_giao: 'tan_noi', chanh_id: null, dia_chi_giao: null, can_xuat_hddt: false, hang_hu_khong_den: false, trang_thai: 'cho_vc', trang_thai_cod: 'khong_co' },
+  ];
+  for (const bn of bienNhanData4) { await prisma.bienNhan.create({ data: bn }); }
+  console.log('  ✅ 38 biên nhận (đợt 4/4: BN-28→38)');
 
-      // Trạng thái: BN cũ hơn → hoàn thành hơn
-      let trangThaiIdx;
-      if (day >= 5) trangThaiIdx = 4; // khach_da_nhan
-      else if (day >= 3) trangThaiIdx = rand(2, 4); // da_den_kho → khach_da_nhan
-      else if (day >= 1) trangThaiIdx = rand(1, 3); // dang_vc → da_bao_khach
-      else trangThaiIdx = rand(0, 1); // cho_vc hoặc dang_vc (mới tạo hôm nay)
+  // ══════════════════════════════════════════════════════════════
+  // 6. CÔNG NỢ — tự tạo cho các BN có trang_thai_thu: cong_no
+  // ══════════════════════════════════════════════════════════════
+  // Lookup BN cần công nợ
+  const bnCongNo = await prisma.bienNhan.findMany({
+    where: { ma_so: { in: ['SGCT-0004', 'SGCT-0005', 'SGRG-0001', 'CTSG-0005', 'SGCT-0013', 'SGCT-0015'] } },
+    select: { id: true, ma_so: true, gia_cuoc: true, don_vi_gui: true, nguoi_gui: true, ngay_bien_nhan: true },
+  });
+  const bnMap = Object.fromEntries(bnCongNo.map(b => [b.ma_so, b]));
 
-      // Thanh toán
-      const isCongNo = bnIndex % 5 === 4; // ~20% là công nợ
-      const trangThaiThu = isCongNo ? 'cong_no' : (bnIndex % 7 === 6 ? 'chua_thu' : 'da_thu');
-
-      // HĐĐT — 8 BN cần xuất, phần lớn chưa vào bảng kê
-      const canXuatHddt = bnIndex < 10;
-
-      const bn = await prisma.bienNhan.create({
-        data: {
-          ma_so: `${prefix}-${String(bnIndex + 1).padStart(4, '0')}`,
-          ngay_nhan: ngay,
-          van_phong_gui_id: route.vpGui.id,
-          van_phong_nhan_id: route.vpNhan.id,
-          nhan_vien_nhap_id: route.nv.id,
-          don_vi_gui: customers[khIdx].ten_don_vi,
-          nguoi_gui: customers[khIdx].nguoi_lien_he,
-          dien_thoai_gui: customers[khIdx].dien_thoai,
-          don_vi_nhan: customers[nhIdx].ten_don_vi,
-          nguoi_nhan: customers[nhIdx].nguoi_lien_he,
-          dien_thoai_nhan: customers[nhIdx].dien_thoai,
-          so_cccd: bnIndex % 4 === 0 ? `0${rand(60, 99)}${rand(100, 999)}${rand(100, 999)}${rand(10, 99)}` : null,
-          ten_hang_hoa: hangHoaList[bnIndex % hangHoaList.length],
-          gia_tri_hang: cuoc * rand(2, 10),
-          trong_luong: parseFloat((0.5 + Math.random() * 80).toFixed(2)),
-          thu_ho: bnIndex % 3 === 0 ? cuoc * rand(1, 3) : 0,
-          gia_cuoc: cuoc,
-          trang_thai: trangThaiFlow[trangThaiIdx],
-          trang_thai_thu: trangThaiThu,
-          can_xuat_hddt: canXuatHddt,
-          da_vao_bang_ke: false,
-          hang_hu_khong_den: bnIndex === 7, // 1 BN demo checkbox này
-          hinh_thuc_giao: ['tan_noi', 'goi_dien', 'tu_toi'][bnIndex % 3],
-          created_at: ngay,
-          updated_at: ngay,
-        },
-      });
-      allBienNhan.push(bn);
-
-      // Lịch sử trạng thái
-      for (let s = 0; s <= trangThaiIdx; s++) {
-        const logDate = new Date(ngay);
-        logDate.setHours(logDate.getHours() + s * rand(2, 6));
-        await prisma.lichSuTrangThai.create({
-          data: {
-            bien_nhan_id: bn.id,
-            trang_thai_cu: s === 0 ? null : trangThaiFlow[s - 1],
-            trang_thai_moi: trangThaiFlow[s],
-            nhan_vien_id: route.nv.id,
-            phuong_thuc: s === 0 ? 'manual' : (s > 2 ? 'manual' : pick(['batch', 'manual', 'qr_scan'])),
-            ghi_chu: s === 0 ? 'Tạo biên nhận mới' : `Cập nhật trạng thái → ${trangThaiFlow[s]}`,
-            created_at: logDate,
-          },
-        });
+  const congNoList = [
+    { ma_so: 'SGCT-0004', doi_tuong: 'Cty TNHH Đại Phong Trading', so_tien_no: 400000 },
+    { ma_so: 'SGCT-0005', doi_tuong: 'Cty TNHH Thiên Phú', so_tien_no: 300000 },
+    { ma_so: 'SGRG-0001', doi_tuong: 'Cty TNHH Tâm An Logistics', so_tien_no: 500000 },
+    { ma_so: 'CTSG-0005', doi_tuong: 'HTX Nông Sản Sạch Cần Thơ', so_tien_no: 250000 },
+    { ma_so: 'SGCT-0013', doi_tuong: 'DNTN Minh Phát', so_tien_no: 120000 },
+    { ma_so: 'SGCT-0015', doi_tuong: 'Cty TNHH Đại Phong Trading', so_tien_no: 300000 },
+  ];
+  for (const cn of congNoList) {
+    const bn = bnMap[cn.ma_so];
+    if (!bn) continue;
+    await prisma.congNo.create({
+      data: {
+        bien_nhan_id: bn.id,
+        doi_tuong: cn.doi_tuong,
+        so_tien_no: cn.so_tien_no,
+        ngay_phat_sinh: bn.ngay_bien_nhan,
+        trang_thai: 'chua_thu',
       }
+    });
+  }
+  console.log('  ✅ 6 công nợ');
 
-      // Công nợ
-      if (isCongNo) {
-        await prisma.congNo.create({
-          data: {
-            bien_nhan_id: bn.id,
-            doi_tuong: customers[khIdx].ten_don_vi,
-            so_tien_no: cuoc,
-            ngay_phat_sinh: ngay,
-            trang_thai: 'chua_thu',
-          },
-        });
+  // ══════════════════════════════════════════════════════════════
+  // 7. BIÊN NHẬN THU HỘ — BN-09 (da_thu) và BN-10 (da_chuyen)
+  // ══════════════════════════════════════════════════════════════
+  const bn09 = await prisma.bienNhan.findFirst({ where: { ma_so: 'CTSG-0002' } });
+  const bn10 = await prisma.bienNhan.findFirst({ where: { ma_so: 'RGSG-0002' } });
+
+  if (bn09) {
+    await prisma.bienNhanThuHo.create({
+      data: {
+        ma_bnth: 'BNTH-0001',
+        bien_nhan_id: bn09.id,
+        so_tien: 3000000,
+        nguoi_nop: 'Võ Thanh Bình',
+        hinh_thuc: 'tien_mat',
+        van_phong_id: vpSG.id,
+        nhan_vien_id: nvAdmin.id,
+        la_qua_chanh: false,
+        ghi_chu: 'Thu COD từ người nhận BN CTSG-0002',
       }
-
-      bnIndex++;
-    }
-  }
-
-  // === PHASE B: 20 BN cũ hơn (8–30 ngày trước) — cho tổng biên nhận ấn tượng ===
-  for (let i = 0; i < 20; i++) {
-    const day = rand(8, 30);
-    const route = routes[bnIndex % routes.length];
-    const prefix = `${route.vpGui.ma_vp}${route.vpNhan.ma_vp}`;
-    const khIdx = bnIndex % (customers.length - 1);
-    const nhIdx = (khIdx + 5) % (customers.length - 1);
-    const cuoc = cuocValues[bnIndex % cuocValues.length];
-    const ngay = daysAgo(day, i % 4);
-
-    const trangThaiIdx = 4; // tất cả đã hoàn thành
-    const isCongNo = i % 6 === 5;
-    const trangThaiThu = isCongNo ? 'cong_no' : 'da_thu';
-
-    const bn = await prisma.bienNhan.create({
-      data: {
-        ma_so: `${prefix}-${String(bnIndex + 1).padStart(4, '0')}`,
-        ngay_nhan: ngay,
-        van_phong_gui_id: route.vpGui.id,
-        van_phong_nhan_id: route.vpNhan.id,
-        nhan_vien_nhap_id: route.nv.id,
-        don_vi_gui: customers[khIdx].ten_don_vi,
-        nguoi_gui: customers[khIdx].nguoi_lien_he,
-        dien_thoai_gui: customers[khIdx].dien_thoai,
-        don_vi_nhan: customers[nhIdx].ten_don_vi,
-        nguoi_nhan: customers[nhIdx].nguoi_lien_he,
-        dien_thoai_nhan: customers[nhIdx].dien_thoai,
-        ten_hang_hoa: hangHoaList[bnIndex % hangHoaList.length],
-        gia_tri_hang: cuoc * rand(2, 8),
-        trong_luong: parseFloat((1 + Math.random() * 60).toFixed(2)),
-        thu_ho: i % 4 === 0 ? cuoc * 2 : 0,
-        gia_cuoc: cuoc,
-        trang_thai: trangThaiFlow[trangThaiIdx],
-        trang_thai_thu: trangThaiThu,
-        can_xuat_hddt: i < 5, // 5 BN có HĐĐT, đã vào bảng kê
-        da_vao_bang_ke: i < 5,
-        hinh_thuc_giao: ['tan_noi', 'goi_dien', 'tu_toi'][i % 3],
-        created_at: ngay,
-        updated_at: ngay,
-      },
-    });
-    allBienNhan.push(bn);
-
-    // Lịch sử trạng thái tóm gọn
-    for (let s = 0; s <= trangThaiIdx; s++) {
-      const logDate = new Date(ngay);
-      logDate.setHours(logDate.getHours() + s * rand(3, 8));
-      await prisma.lichSuTrangThai.create({
-        data: {
-          bien_nhan_id: bn.id,
-          trang_thai_cu: s === 0 ? null : trangThaiFlow[s - 1],
-          trang_thai_moi: trangThaiFlow[s],
-          nhan_vien_id: route.nv.id,
-          phuong_thuc: s === 0 ? 'manual' : pick(['batch', 'manual']),
-          ghi_chu: s === 0 ? 'Tạo biên nhận mới' : `Cập nhật trạng thái`,
-          created_at: logDate,
-        },
-      });
-    }
-
-    if (isCongNo) {
-      // Một số CN đã thu, một số chưa
-      const daThu = i % 2 === 0;
-      await prisma.congNo.create({
-        data: {
-          bien_nhan_id: bn.id,
-          doi_tuong: customers[khIdx].ten_don_vi,
-          so_tien_no: cuoc,
-          ngay_phat_sinh: ngay,
-          trang_thai: daThu ? 'da_thu' : 'chua_thu',
-          ngay_thu: daThu ? daysAgo(day - 2) : null,
-        },
-      });
-    }
-
-    bnIndex++;
-  }
-
-  console.log(`  ✅ ${allBienNhan.length} biên nhận + lịch sử trạng thái + công nợ`);
-
-  // ══════════════════════════════════════════════════════════════
-  // 5. PHIẾU THU (20) — trải 6 tháng cho biểu đồ thu/chi đẹp
-  //    + 1 phiếu bị hủy (demo soft delete)
-  // ══════════════════════════════════════════════════════════════
-  const ptData = [
-    // Tháng hiện tại (8 phiếu)
-    { doi_tuong: 'Cty TNHH Tâm An Logistics', ly_do: 'Thu cước vận chuyển lô hàng SG-CT', so_tien: 2500000, vp: vpSG.id, nv: nvKeToan.id, bn: allBienNhan[0]?.id, ngay: daysAgo(1) },
-    { doi_tuong: 'Cty CP Hoàng Long Phát', ly_do: 'Thu cước gửi hàng SG-RG', so_tien: 1200000, vp: vpSG.id, nv: nvKeToan.id, bn: allBienNhan[2]?.id, ngay: daysAgo(2) },
-    { doi_tuong: 'DNTN Minh Phát', ly_do: 'Thu tiền thu hộ COD', so_tien: 3500000, vp: vpSG.id, nv: nvAdmin.id, ngay: daysAgo(3) },
-    { doi_tuong: 'Anh Tuấn (cá nhân)', ly_do: 'Thu cước gửi hàng cá nhân', so_tien: 200000, vp: vpSG.id, nv: nvStaffSG.id, ngay: daysAgo(4) },
-    { doi_tuong: 'Cửa Hàng Thanh Bình', ly_do: 'Thu cước tuyến CT→SG', so_tien: 850000, vp: vpCT.id, nv: nvKeToanCT.id, bn: allBienNhan[6]?.id, ngay: daysAgo(2) },
-    { doi_tuong: 'DNTN Hòa Phát Vận Tải', ly_do: 'Thu cước vận chuyển RG→SG', so_tien: 1500000, vp: vpRG.id, nv: nvStaffRG.id, bn: allBienNhan[8]?.id, ngay: daysAgo(3) },
-    { doi_tuong: 'Cty CP Sao Việt', ly_do: 'Thu cước theo hợp đồng tháng', so_tien: 5000000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: daysAgo(5) },
-    { doi_tuong: 'Cty TNHH Thiên Phú', ly_do: 'Thu nợ cước vận chuyển', so_tien: 3000000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: daysAgo(6) },
-    // Tháng -1 (4 phiếu)
-    { doi_tuong: 'Cty TNHH Đại Phong', ly_do: 'Thu cước vận chuyển tháng trước', so_tien: 4200000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(1, 25) },
-    { doi_tuong: 'Nông Sản Cần Thơ', ly_do: 'Thu cước gửi nông sản đi SG', so_tien: 1800000, vp: vpCT.id, nv: nvKeToanCT.id, ngay: monthsAgo(1, 20) },
-    { doi_tuong: 'Chị Mai (cá nhân)', ly_do: 'Thu cước gửi hàng', so_tien: 150000, vp: vpCT.id, nv: nvStaffCT.id, ngay: monthsAgo(1, 15) },
-    { doi_tuong: 'Cty TNHH Phú Quốc Express', ly_do: 'Thu cước theo hợp đồng', so_tien: 6500000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(1, 10) },
-    // Tháng -2 (3 phiếu)
-    { doi_tuong: 'Cty TNHH Tâm An Logistics', ly_do: 'Thu cước tháng 2', so_tien: 3800000, vp: vpSG.id, nv: nvKeToan.id, ngay: monthsAgo(2, 22) },
-    { doi_tuong: 'Cửa Hàng Thanh Bình', ly_do: 'Thu cước tuyến CT', so_tien: 920000, vp: vpCT.id, nv: nvKeToanCT.id, ngay: monthsAgo(2, 15) },
-    { doi_tuong: 'DNTN Hòa Phát Vận Tải', ly_do: 'Thu cước RG-CT', so_tien: 1100000, vp: vpRG.id, nv: nvStaffRG.id, ngay: monthsAgo(2, 8) },
-    // Tháng -3, -4, -5 (mỗi tháng 1-2 phiếu)
-    { doi_tuong: 'Cty CP Hoàng Long Phát', ly_do: 'Thu cước quý I', so_tien: 8000000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(3, 20) },
-    { doi_tuong: 'Cty TNHH Đại Phong', ly_do: 'Thu cước', so_tien: 2200000, vp: vpSG.id, nv: nvAdmin.id, ngay: monthsAgo(4, 15) },
-    { doi_tuong: 'Nông Sản Cần Thơ', ly_do: 'Thu cước vận chuyển', so_tien: 1500000, vp: vpCT.id, nv: nvKeToanCT.id, ngay: monthsAgo(4, 10) },
-    { doi_tuong: 'DNTN Minh Phát', ly_do: 'Thu cước vận chuyển', so_tien: 2800000, vp: vpSG.id, nv: nvKeToan.id, ngay: monthsAgo(5, 20) },
-    // 1 phiếu bị hủy (demo soft delete)
-    { doi_tuong: 'Cty TNHH ABC (ngưng HĐ)', ly_do: 'Thu cước — HỦY do sai thông tin', so_tien: 500000, vp: vpSG.id, nv: nvKeToan.id, da_huy: true, ngay: daysAgo(4) },
-  ];
-
-  for (let i = 0; i < ptData.length; i++) {
-    const pt = ptData[i];
-    await prisma.phieuThu.create({
-      data: {
-        ma_phieu: `PT-${String(i + 1).padStart(4, '0')}`,
-        ngay_thu: pt.ngay,
-        doi_tuong: pt.doi_tuong,
-        ly_do: pt.ly_do,
-        so_tien: pt.so_tien,
-        hinh_thuc: pt.hinh_thuc || 'tien_mat',
-        van_phong_id: pt.vp,
-        nhan_vien_id: pt.nv,
-        bien_nhan_id: pt.bn || null,
-        da_huy: pt.da_huy || false,
-      },
     });
   }
-  console.log('  ✅ 20 phiếu thu (19 active + 1 đã hủy)');
-
-  // ══════════════════════════════════════════════════════════════
-  // 6. PHIẾU CHI (12) — trải 6 tháng
-  //    + 1 phiếu bị hủy
-  // ══════════════════════════════════════════════════════════════
-  const pcData = [
-    // Tháng hiện tại (5)
-    { nguoi_nhan: 'Nhà xe Phương Trang', ly_do: 'Chi phí vận chuyển tuyến SG→CT', so_tien: 3500000, vp: vpSG.id, nv: nvAdmin.id, ngay: daysAgo(2) },
-    { nguoi_nhan: 'Nhà xe Kumho Samco', ly_do: 'Chi phí vận chuyển tuyến SG→RG', so_tien: 4200000, vp: vpSG.id, nv: nvKeToan.id, ngay: daysAgo(3) },
-    { nguoi_nhan: 'FPT Telecom', ly_do: 'Tiền Internet VP Tp.HCM tháng 4/2026', so_tien: 550000, vp: vpSG.id, nv: nvKeToan.id, hinh_thuc: 'chuyen_khoan', ngay: daysAgo(5) },
-    { nguoi_nhan: 'Nhân viên bốc xếp - Anh Bảy', ly_do: 'Tiền công bốc xếp hàng tuần', so_tien: 800000, vp: vpCT.id, nv: nvKeToanCT.id, ngay: daysAgo(4) },
-    { nguoi_nhan: 'Nhân viên bốc xếp - Anh Tám', ly_do: 'Tiền công bốc xếp RG', so_tien: 500000, vp: vpRG.id, nv: nvStaffRG.id, ngay: daysAgo(1) },
-    // Tháng -1 (3)
-    { nguoi_nhan: 'Chủ nhà VP Cần Thơ', ly_do: 'Tiền thuê mặt bằng tháng 3/2026', so_tien: 8000000, vp: vpCT.id, nv: nvKeToanCT.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(1, 5) },
-    { nguoi_nhan: 'Cửa hàng Văn phòng phẩm Thành Đạt', ly_do: 'Mua giấy in, mực in, bút', so_tien: 350000, vp: vpSG.id, nv: nvAdmin.id, ngay: monthsAgo(1, 12) },
-    { nguoi_nhan: 'Nhà xe Phương Trang', ly_do: 'Chi vận chuyển tháng 3', so_tien: 2800000, vp: vpSG.id, nv: nvKeToan.id, ngay: monthsAgo(1, 20) },
-    // Tháng -2, -3, -4 (mỗi tháng 1)
-    { nguoi_nhan: 'Chủ nhà VP Rạch Giá', ly_do: 'Tiền thuê mặt bằng tháng 2/2026', so_tien: 5000000, vp: vpRG.id, nv: nvStaffRG.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(2, 5) },
-    { nguoi_nhan: 'Nhà xe Phương Trang', ly_do: 'Chi vận chuyển tháng 1', so_tien: 3200000, vp: vpSG.id, nv: nvKeToan.id, ngay: monthsAgo(3, 18) },
-    { nguoi_nhan: 'Công ty TNHH Bảo hiểm PVI', ly_do: 'Bảo hiểm hàng hóa quý IV/2025', so_tien: 2500000, vp: vpSG.id, nv: nvAdmin.id, hinh_thuc: 'chuyen_khoan', ngay: monthsAgo(4, 10) },
-    // 1 phiếu bị hủy
-    { nguoi_nhan: 'Nhà xe ABC', ly_do: 'Chi phí vận chuyển — HỦY do trùng', so_tien: 1000000, vp: vpSG.id, nv: nvKeToan.id, da_huy: true, ngay: daysAgo(3) },
-  ];
-
-  for (let i = 0; i < pcData.length; i++) {
-    const pc = pcData[i];
-    await prisma.phieuChi.create({
+  if (bn10) {
+    await prisma.bienNhanThuHo.create({
       data: {
-        ma_phieu: `PC-${String(i + 1).padStart(4, '0')}`,
-        ngay_chi: pc.ngay,
-        nguoi_nhan: pc.nguoi_nhan,
-        ly_do: pc.ly_do,
-        so_tien: pc.so_tien,
-        hinh_thuc: pc.hinh_thuc || 'tien_mat',
-        van_phong_id: pc.vp,
-        nhan_vien_id: pc.nv,
-        da_huy: pc.da_huy || false,
-      },
+        ma_bnth: 'BNTH-0002',
+        bien_nhan_id: bn10.id,
+        so_tien: 1500000,
+        nguoi_nop: 'Nguyễn Văn Tâm',
+        hinh_thuc: 'tien_mat',
+        van_phong_id: vpSG.id,
+        nhan_vien_id: nvAdmin.id,
+        la_qua_chanh: false,
+        ghi_chu: 'Thu COD từ người nhận BN RGSG-0002',
+      }
     });
   }
-  console.log('  ✅ 12 phiếu chi (11 active + 1 đã hủy)');
+  console.log('  ✅ 2 biên nhận thu hộ (BNTH-0001, BNTH-0002)');
 
   // ══════════════════════════════════════════════════════════════
-  // 7. BẢNG KÊ HĐĐT (2) — 1 bảng kê cũ hoàn chỉnh
-  //    + BN chờ còn lại cho demo xuất bảng kê
+  // 8. PHIẾU CHUYỂN COD — BN-10 (da_chuyen): SG → RG
   // ══════════════════════════════════════════════════════════════
-  // Bảng kê 1: 5 BN cũ (Phase B, đánh dấu da_vao_bang_ke)
-  const bnDaVaoBK = allBienNhan.filter(bn => bn.da_vao_bang_ke); // Phase B đã đánh dấu 5 BN
-  if (bnDaVaoBK.length > 0) {
-    const tongCuoc1 = bnDaVaoBK.reduce((sum, bn) => sum + Number(bn.gia_cuoc), 0);
-    await prisma.bangKe.create({
+  if (bn10) {
+    const pcCod = await prisma.phieuChuyenCOD.create({
       data: {
-        ma_bang_ke: 'BK-0001',
-        ngay_xuat: daysAgo(10),
-        so_bien_nhan: bnDaVaoBK.length,
-        tong_cuoc: tongCuoc1,
-        ten_file: 'BK-0001_20260326.xlsx',
-        chi_tiet: {
-          create: bnDaVaoBK.map(bn => ({ bien_nhan_id: bn.id })),
-        },
-      },
+        ma_phieu: 'PC-COD-0001',
+        van_phong_nhan_id: vpSG.id,   // SG đang giữ tiền
+        van_phong_gui_id: vpRG.id,    // RG sẽ nhận tiền về
+        so_tien_tong: 1500000,
+        hinh_thuc: 'chuyen_khoan',
+        trang_thai: 'da_chuyen',
+        nhan_vien_lap_id: nvAdmin.id,
+        ghi_chu: 'Chuyển COD từ VP SG về VP RG — BN RGSG-0002',
+        ngay_chuyen: d7ago,
+      }
+    });
+    await prisma.phieuChuyenCODChiTiet.create({
+      data: {
+        phieu_id: pcCod.id,
+        bien_nhan_id: bn10.id,
+        so_tien: 1500000,
+      }
     });
   }
-  // Còn lại BN có can_xuat_hddt=true, da_vao_bang_ke=false → sẽ thấy trong tab "BN chờ"
-  console.log(`  ✅ 1 bảng kê lịch sử (${bnDaVaoBK.length} BN) + ${allBienNhan.filter(b => !b.da_vao_bang_ke && b.can_xuat_hddt).length} BN chờ xuất`);
+  console.log('  ✅ 1 phiếu chuyển COD (PC-COD-0001)');
 
   // ══════════════════════════════════════════════════════════════
-  // 8. LOGIN LOG (15) — demo nhật ký đăng nhập
+  // TEST DATA: PhieuChuyenCuoc (BN-04 = CTRG-0001 đã ở da_thu)
   // ══════════════════════════════════════════════════════════════
-  const loginEntries = [
-    { nv: nvAdmin, username: 'admin', action: 'login_success', days: 0 },
-    { nv: nvAdmin, username: 'admin', action: 'login_success', days: 1 },
-    { nv: nvAdmin, username: 'admin', action: 'login_success', days: 2 },
-    { nv: nvKeToan, username: 'ketoan', action: 'login_success', days: 0 },
-    { nv: nvKeToan, username: 'ketoan', action: 'login_success', days: 1 },
-    { nv: nvStaffSG, username: 'staff_sg', action: 'login_success', days: 0 },
-    { nv: nvStaffCT, username: 'staff_ct', action: 'login_success', days: 0 },
-    { nv: nvStaffCT, username: 'staff_ct', action: 'login_success', days: 1 },
-    { nv: nvStaffRG, username: 'staff_rg', action: 'login_success', days: 0 },
-    { nv: nvKeToanCT, username: 'ketoan_ct', action: 'login_success', days: 1 },
-    // Login thất bại (demo brute force detection)
-    { nv: null, username: 'admin', action: 'login_failed', days: 3 },
-    { nv: null, username: 'admin', action: 'login_failed', days: 3 },
-    { nv: null, username: 'hacker', action: 'login_failed', days: 2 },
-    { nv: null, username: 'test', action: 'login_failed', days: 1 },
-    { nv: null, username: 'admin123', action: 'login_failed', days: 0 },
-  ];
-  for (const entry of loginEntries) {
-    await prisma.loginLog.create({
+  // Để test luồng chuyển cước, cập nhật BN-04 lên da_thu trước
+  const bn04 = await prisma.bienNhan.findFirst({ where: { ma_so: 'CTRG-0001' } });
+  if (bn04) {
+    // Tạo PhieuThu giả lập thu cước từ người nhận
+    const ptCuoc = await prisma.phieuThu.create({
       data: {
-        nhan_vien_id: entry.nv?.id || null,
-        username: entry.username,
-        action: entry.action,
-        ip_address: entry.action === 'login_failed' ? `103.${rand(1, 255)}.${rand(1, 255)}.${rand(1, 255)}` : '127.0.0.1',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        timestamp: daysAgo(entry.days),
+        ma_phieu: 'PT-CUOC-T01',
+        doi_tuong: 'Cty TNHH Phú Quốc Express',
+        ly_do: `Thu cước BN ${bn04.ma_so} — Người nhận trả (seed)`,
+        so_tien: 350000,
+        hinh_thuc: 'tien_mat',
+        van_phong_id: vpRG.id,
+        nhan_vien_id: nvStaffRG.id,
+        bien_nhan_id: bn04.id,
       },
     });
-  }
-  console.log('  ✅ 15 login logs (10 thành công + 5 thất bại)');
-
-  // ══════════════════════════════════════════════════════════════
-  // 9. AUDIT LOG (8) — demo nhật ký thao tác
-  // ══════════════════════════════════════════════════════════════
-  const auditEntries = [
-    { nv: nvStaffSG.id, action: 'CREATE', entity: 'bien_nhan', entityId: allBienNhan[0]?.id, days: 6 },
-    { nv: nvStaffCT.id, action: 'CREATE', entity: 'bien_nhan', entityId: allBienNhan[5]?.id, days: 4 },
-    { nv: nvAdmin.id, action: 'UPDATE', entity: 'bien_nhan', entityId: allBienNhan[0]?.id, days: 5, old: { gia_cuoc: 50000 }, new_: { gia_cuoc: 80000 } },
-    { nv: nvKeToan.id, action: 'CREATE', entity: 'phieu_thu', entityId: 1, days: 1 },
-    { nv: nvKeToan.id, action: 'CREATE', entity: 'phieu_thu', entityId: 2, days: 2 },
-    { nv: nvAdmin.id, action: 'CREATE', entity: 'phieu_chi', entityId: 1, days: 2 },
-    { nv: nvKeToan.id, action: 'DELETE', entity: 'phieu_thu', entityId: 20, days: 4, old: { doi_tuong: 'Cty TNHH ABC', so_tien: 500000 } },
-    { nv: nvStaffRG.id, action: 'CREATE', entity: 'bien_nhan', entityId: allBienNhan[8]?.id, days: 3 },
-  ];
-  for (const a of auditEntries) {
-    await prisma.auditLog.create({
-      data: {
-        nhan_vien_id: a.nv,
-        action: a.action,
-        entity: a.entity,
-        entity_id: a.entityId || null,
-        old_data: a.old || null,
-        new_data: a.new_ || null,
-        ip_address: '127.0.0.1',
-        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        timestamp: daysAgo(a.days),
-      },
+    await prisma.bienNhan.update({
+      where: { id: bn04.id },
+      data: { trang_thai_cuoc_nhan: 'da_thu' },
     });
+    console.log('  ✅ BN CTRG-0001: trang_thai_cuoc_nhan → da_thu (sẵn sàng lập PhieuChuyenCuoc)');
   }
-  console.log('  ✅ 8 audit logs');
+  */
 
   // ══════════════════════════════════════════════════════════════
   // SUMMARY
@@ -524,15 +397,7 @@ async function main() {
     vanPhong: await prisma.vanPhong.count(),
     nhanVien: await prisma.nhanVien.count(),
     khachHang: await prisma.khachHang.count(),
-    bienNhan: await prisma.bienNhan.count(),
-    lichSuTrangThai: await prisma.lichSuTrangThai.count(),
-    congNo: await prisma.congNo.count(),
-    phieuThu: await prisma.phieuThu.count(),
-    phieuChi: await prisma.phieuChi.count(),
-    bangKe: await prisma.bangKe.count(),
-    bangKeChiTiet: await prisma.bangKeChiTiet.count(),
-    loginLog: await prisma.loginLog.count(),
-    auditLog: await prisma.auditLog.count(),
+    chanh: await prisma.chanh.count(),
   };
 
   console.log('\n╔══════════════════════════════════════╗');
@@ -544,16 +409,19 @@ async function main() {
   console.log('╚══════════════════════════════════════╝');
 
   console.log('\n🔑 Tài khoản đăng nhập:');
-  console.log('   ┌──────────────┬──────────┬─────────────┐');
-  console.log('   │ Username     │ Role     │ Văn phòng   │');
-  console.log('   ├──────────────┼──────────┼─────────────┤');
-  console.log('   │ admin        │ admin    │ VP Tp.HCM   │');
-  console.log('   │ ketoan       │ kế toán  │ VP Tp.HCM   │');
-  console.log('   │ staff_sg     │ staff    │ VP Tp.HCM   │');
-  console.log('   │ staff_ct     │ staff    │ VP Cần Thơ  │');
-  console.log('   │ ketoan_ct    │ kế toán  │ VP Cần Thơ  │');
-  console.log('   │ staff_rg     │ staff    │ VP Rạch Giá │');
-  console.log('   └──────────────┴──────────┴─────────────┘');
+  console.log('   ┌──────────────┬───────┬─────────────┐');
+  console.log('   │ Username     │ Role  │ Văn phòng   │');
+  console.log('   ├──────────────┼───────┼─────────────┤');
+  console.log('   │ admin        │ admin │ VP Tp.HCM   │');
+  console.log('   │ ketoan       │ staff │ VP Tp.HCM   │');
+  console.log('   │ staff_sg     │ staff │ VP Tp.HCM   │');
+  console.log('   │ staff_ct     │ staff │ VP Cần Thơ  │');
+  console.log('   │ ketoan_ct    │ staff │ VP Cần Thơ  │');
+  console.log('   │ staff_rg     │ staff │ VP Rạch Giá │');
+  console.log('   │ staff_rg_old │ staff │ VP Rạch Giá │');
+  console.log('   │ nv_new       │ staff │ VP Tp.HCM   │');
+  console.log('   │ nv_locked    │ staff │ VP Cần Thơ  │');
+  console.log('   └──────────────┴───────┴─────────────┘');
   console.log('   🔒 Mật khẩu chung: Tmq@1234\n');
   console.log('🎉 Seed complete!');
 }

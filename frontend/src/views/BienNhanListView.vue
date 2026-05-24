@@ -17,6 +17,8 @@ import BienNhanRightPanel from '../components/bien-nhan/BienNhanRightPanel.vue';
 import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
+import { formatCurrency, formatDate, toISODate, formatPhone } from '../utils/format';
+import { downloadBase64File, createBlobUrl } from '../utils/file';
 
 const toast = useToast();
 const auth = useAuthStore();
@@ -31,7 +33,9 @@ const page = ref(1);
 const limit = 20;
 
 // ── Header filters ────────────────────────────────────────────────
-const vpGiaoDich = ref(null);
+// [H-04] Tách làm 2 filter riêng: VP Gửi và VP Nhận (thay vì 1 vpGiaoDich)
+const vpGui = ref(null);
+const vpNhan = ref(null);
 const dateFrom = ref(new Date());
 const dateTo = ref(new Date());
 const searchText = ref('');
@@ -44,8 +48,11 @@ const trangThaiOptions = [
   { label: 'Đang vận chuyển', value: 'dang_vc' },
   { label: 'Đã đến kho', value: 'da_den_kho' },
   { label: 'Đã báo khách', value: 'da_bao_khach' },
+  { label: 'Đang giao hàng', value: 'dang_giao' },
+  { label: 'Đã giao Chành', value: 'da_giao_chanh' },
   { label: 'Khách đã nhận', value: 'khach_da_nhan' },
 ];
+
 
 // ── Right panel state ─────────────────────────────────────────────
 const panelMode = ref('empty'); // empty | view | edit | create
@@ -66,12 +73,7 @@ const sortOrder = ref(-1); // -1 = DESC
 const deleteDialogVisible = ref(false);
 const deleting = ref(false);
 
-// ── Batch status update ──────────────────────────────────────────
-const batchSelected = ref([]);
-const batchDialogVisible = ref(false);
-const batchTrangThai = ref(null);
-const batchGhiChu = ref('');
-const batchUpdating = ref(false);
+
 
 // ── Receipt logbook dialog ────────────────────────────────────────
 const logbookDialogVisible = ref(false);
@@ -82,34 +84,28 @@ const logbookVpNhan = ref(null);
 const logbookLoadingType = ref(null); // 'pdf' | 'excel' | null
 
 // ── Helpers ───────────────────────────────────────────────────────
-function toLocalDateStr(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function formatCurrency(val) {
-  if (!val) return '—';
-  return Number(val).toLocaleString('vi-VN') + 'đ';
-}
-
-function formatDate(dt) {
-  if (!dt) return '';
-  return new Date(dt).toLocaleDateString('vi-VN');
-}
+// formatCurrency, formatDate, toISODate — import từ utils/format
+// downloadBase64File — import từ utils/file
 
 // ── Load data ─────────────────────────────────────────────────────
 async function loadVanPhongs() {
-  const { data: res } = await api.get('/van-phong?active=true');
-  vanPhongs.value = res.data.map(v => ({ label: `${v.ma_vp} — ${v.ten}`, value: v.id }));
+  try {
+    const { data: res } = await api.get('/van-phong?active=true');
+    vanPhongs.value = res.data.map(v => ({ label: `${v.ma_vp} — ${v.ten}`, value: v.id }));
+  } catch (err) {
+    handleApiError(err, toast, 'Không thể tải danh sách văn phòng');
+    vanPhongs.value = [];
+  }
 }
 
 async function loadChanhs() {
   try {
     const { data: res } = await api.get('/chanh?active=true');
     allChanhs.value = res.data;
-  } catch { allChanhs.value = []; }
+  } catch (err) {
+    handleApiError(err, toast, 'Không thể tải danh sách chành — dropdown chành sẽ trống'); // [M-04]
+    allChanhs.value = [];
+  }
 }
 
 async function loadData() {
@@ -122,9 +118,10 @@ async function loadData() {
       sortBy: sortField.value,
       sortOrder: sortOrder.value === 1 ? 'asc' : 'desc',
     };
-    if (vpGiaoDich.value) params.vp_gui = vpGiaoDich.value;
-    if (dateFrom.value) params.from = toLocalDateStr(dateFrom.value);
-    if (dateTo.value) params.to = toLocalDateStr(dateTo.value);
+    if (vpGui.value)  params.vp_gui  = vpGui.value;  // [H-04] VP Gửi filter
+    if (vpNhan.value) params.vp_nhan = vpNhan.value; // [H-04] VP Nhận filter
+    if (dateFrom.value) params.from = toISODate(dateFrom.value);
+    if (dateTo.value) params.to = toISODate(dateTo.value);
     if (filterTrangThai.value) params.trang_thai = filterTrangThai.value;
 
     const { data: res } = await api.get('/bien-nhan', { params });
@@ -188,33 +185,7 @@ async function onStatusUpdated() {
   }
 }
 
-// ── Batch status update ────────────────────────────────────────
-function openBatchDialog() {
-  batchTrangThai.value = null;
-  batchGhiChu.value = '';
-  batchDialogVisible.value = true;
-}
 
-async function confirmBatchUpdate() {
-  if (!batchTrangThai.value || batchSelected.value.length === 0) return;
-  batchUpdating.value = true;
-  try {
-    const ids = batchSelected.value.map(b => b.id);
-    await api.patch('/bien-nhan/batch-trang-thai', {
-      ids,
-      trang_thai: batchTrangThai.value,
-      ghi_chu: batchGhiChu.value || `Batch: ${ids.length} biên nhận`,
-    });
-    toast.add({ severity: 'success', summary: 'Thành công', detail: `Đã cập nhật ${ids.length} biên nhận`, life: 3000 });
-    batchDialogVisible.value = false;
-    batchSelected.value = [];
-    await loadData();
-  } catch (err) {
-    handleApiError(err, toast, 'Lỗi cập nhật hàng loạt');
-  } finally {
-    batchUpdating.value = false;
-  }
-}
 
 // ── Action bar: Thêm ──────────────────────────────────────────────
 function onAddNew() {
@@ -346,7 +317,7 @@ async function confirmDelete() {
 function openLogbookDialog() {
   logbookDateFrom.value = dateFrom.value || new Date();
   logbookDateTo.value = dateTo.value || new Date();
-  logbookVpGui.value = vpGiaoDich.value || auth.userVanPhong?.id || null;
+  logbookVpGui.value = vpGui.value || auth.userVanPhong?.id || null;
   logbookVpNhan.value = null;
   logbookPreset.value = null;
   logbookDialogVisible.value = true;
@@ -402,6 +373,16 @@ function applyPreset(preset) {
   logbookDateTo.value = to;
 }
 
+// Chuyển Date object → 'YYYY-MM-DD' theo múi giờ local (tránh lệch ngày do UTC)
+function toLocalDateStr(d) {
+  if (!d) return '';
+  const date = d instanceof Date ? d : new Date(d);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function validateLogbookParams() {
   if (!logbookDateFrom.value || !logbookDateTo.value || !logbookVpGui.value || !logbookVpNhan.value) {
     toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Chọn ngày, VP gửi và VP nhận', life: 3000 });
@@ -425,11 +406,7 @@ async function printLogbook() {
   logbookLoadingType.value = 'pdf';
   try {
     const { data: res } = await api.get('/bien-nhan/so-bien-nhan-preview', { params: v.params });
-    const binary = atob(res.data.base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const blobUrl = URL.createObjectURL(blob);
+    const blobUrl = createBlobUrl(res.data.base64, 'application/pdf');
     window.open(blobUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     logbookDialogVisible.value = false;
@@ -446,16 +423,8 @@ async function downloadExcel() {
   logbookLoadingType.value = 'excel';
   try {
     const { data: res } = await api.get('/bien-nhan/so-bien-nhan-excel-preview', { params: v.params });
-    const binary = atob(res.data.base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `so-bien-nhan-${v.ngayTu === v.ngayDen ? v.ngayTu : `${v.ngayTu}_den_${v.ngayDen}`}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const filename = `so-bien-nhan-${v.ngayTu === v.ngayDen ? v.ngayTu : `${v.ngayTu}_den_${v.ngayDen}`}.xlsx`;
+    downloadBase64File(res.data.base64, filename);
     logbookDialogVisible.value = false;
   } catch (err) {
     handleApiError(err, toast, 'Không thể tải Excel sổ biên nhận');
@@ -465,6 +434,14 @@ async function downloadExcel() {
 }
 
 // ── VP dropdown with "all" option ─────────────────────────────────
+// [H-03] canDelete: admin luôn xóa được; staff chỉ xóa BN mình tạo
+const canDelete = computed(() => {
+  if (!selectedBienNhan.value) return false;
+  if (auth.isAdmin) return true;
+  if (auth.isStaff) return selectedBienNhan.value.nhan_vien_nhap_id === auth.user?.id;
+  return false;
+});
+
 const vpOptions = computed(() => [
   { label: 'Tất cả VP', value: null },
   ...vanPhongs.value,
@@ -481,9 +458,9 @@ watch(searchText, onSearch);
 onMounted(async () => {
   await loadVanPhongs();
   await loadChanhs();
-  // Default VP = user's VP
+  // Default VP Gửi = VP của NV đăng nhập [H-04]
   if (auth.userVanPhong) {
-    vpGiaoDich.value = auth.userVanPhong.id;
+    vpGui.value = auth.userVanPhong.id;
   }
   loadData();
 });
@@ -499,8 +476,12 @@ onMounted(async () => {
       </div>
       <div class="bn-header-right">
         <div class="header-field">
-          <label class="header-lbl">VP giao dịch:</label>
-          <Select v-model="vpGiaoDich" :options="vpOptions" optionLabel="label" optionValue="value" @change="onFilterChange" class="header-select" />
+          <label class="header-lbl">VP gửi:</label>
+          <Select v-model="vpGui" :options="vpOptions" optionLabel="label" optionValue="value" @change="onFilterChange" class="header-select" /> <!-- [H-04] -->
+        </div>
+        <div class="header-field">
+          <label class="header-lbl">VP nhận:</label>
+          <Select v-model="vpNhan" :options="vpOptions" optionLabel="label" optionValue="value" @change="onFilterChange" class="header-select" /> <!-- [H-04] -->
         </div>
         <div class="header-field">
           <label class="header-lbl">Từ ngày:</label>
@@ -537,7 +518,6 @@ onMounted(async () => {
           :first="(page - 1) * limit"
           @page="onPage"
           @row-click="(e) => onRowSelect(e)"
-          v-model:selection="batchSelected"
           dataKey="id"
           stripedRows
           size="small"
@@ -551,34 +531,32 @@ onMounted(async () => {
           :sortOrder="sortOrder"
           @sort="onSort"
         >
-          <!-- Checkbox column for batch-->
-          <Column selectionMode="multiple" headerStyle="width: 3rem" v-if="auth.hasRole('admin', 'staff')" />
           <!-- ── Header nhóm 2 tầng ── -->
           <ColumnGroup type="header">
             <Row>
-              <Column header="Mã số" field="ma_so" :rowspan="2" :sortable="true" frozen style="background:#eff6ff;color:#1d4ed8;font-weight:700;border-right:2px solid #bfdbfe;vertical-align:middle;min-width:130px;" />
-              <Column header="Biên nhận" :colspan="3" style="text-align:center;background:#eff6ff;color:#1d4ed8;font-weight:700;border-right:2px solid #bfdbfe;" />
-              <Column header="Người gửi" :colspan="3" style="text-align:center;background:#f0fdf4;color:#166534;font-weight:700;border-right:2px solid #bbf7d0;" />
-              <Column header="Người nhận" :colspan="3" style="text-align:center;background:#fefce8;color:#854d0e;font-weight:700;border-right:2px solid #fef08a;" />
-              <Column header="Hàng hóa" :colspan="2" style="text-align:center;background:#fdf4ff;color:#6b21a8;font-weight:700;border-right:2px solid #e9d5ff;" />
-              <Column header="Thanh toán" :colspan="2" style="text-align:center;background:#fff7ed;color:#9a3412;font-weight:700;" />
+              <Column header="Mã số" field="ma_so" :rowspan="2" :sortable="true" frozen class="col-hdr-bn" style="vertical-align:middle;min-width:130px;" />
+              <Column header="Biên nhận" :colspan="3" class="col-hdr-bn" style="text-align:center;" />
+              <Column header="Người gửi" :colspan="3" class="col-hdr-gui" style="text-align:center;" />
+              <Column header="Người nhận" :colspan="3" class="col-hdr-nhan" style="text-align:center;" />
+              <Column header="Hàng hóa" :colspan="2" class="col-hdr-hang" style="text-align:center;" />
+              <Column header="Thanh toán" :colspan="2" class="col-hdr-tt" style="text-align:center;" />
             </Row>
             <Row>
               <!-- Biên nhận -->
               <Column header="Ngày" :sortable="true" sortField="ngay_bien_nhan" style="min-width:90px;" />
               <Column header="Giờ" style="min-width:60px;" />
-              <Column header="Tuyến" style="min-width:85px;border-right:2px solid #bfdbfe;" />
+              <Column header="Tuyến" class="col-border-bn" style="min-width:85px;" />
               <!-- Người gửi -->
               <Column header="Đơn vị" :sortable="true" field="don_vi_gui" style="min-width:140px;" />
               <Column header="Tên" field="nguoi_gui" style="min-width:120px;" />
-              <Column header="ĐT" field="dien_thoai_gui" style="min-width:110px;border-right:2px solid #bbf7d0;" />
+              <Column header="ĐT" field="dien_thoai_gui" class="col-border-gui" style="min-width:110px;" />
               <!-- Người nhận -->
               <Column header="Đơn vị" :sortable="true" field="don_vi_nhan" style="min-width:140px;" />
               <Column header="Tên" field="nguoi_nhan" style="min-width:120px;" />
-              <Column header="ĐT" field="dien_thoai_nhan" style="min-width:110px;border-right:2px solid #fef08a;" />
+              <Column header="ĐT" field="dien_thoai_nhan" class="col-border-nhan" style="min-width:110px;" />
               <!-- Hàng hóa -->
               <Column header="Tên hàng" field="ten_hang_hoa" style="min-width:150px;" />
-              <Column header="Cước" :sortable="true" sortField="gia_cuoc" style="min-width:90px;text-align:right;border-right:2px solid #e9d5ff;" />
+              <Column header="Cước" :sortable="true" sortField="gia_cuoc" class="col-border-hang" style="min-width:90px;text-align:right;" />
               <!-- Thanh toán -->
               <Column header="TT Thu" style="min-width:85px;" />
               <Column header="Trạng thái" style="min-width:110px;" />
@@ -600,14 +578,21 @@ onMounted(async () => {
             <template #body="{ data }"><span class="text-truncate" style="max-width:140px;display:inline-block;">{{ data.don_vi_gui || '—' }}</span></template>
           </Column>
           <Column field="nguoi_gui" style="min-width:120px;" />
-          <Column field="dien_thoai_gui" style="min-width:110px;" />
+          <Column style="min-width:110px;">
+            <template #body="{ data }">{{ formatPhone(data.dien_thoai_gui) }}</template>
+          </Column>
           <Column field="don_vi_nhan" style="min-width:140px;">
             <template #body="{ data }"><span class="text-truncate" style="max-width:140px;display:inline-block;">{{ data.don_vi_nhan || '—' }}</span></template>
           </Column>
           <Column field="nguoi_nhan" style="min-width:120px;" />
-          <Column field="dien_thoai_nhan" style="min-width:110px;" />
+          <Column style="min-width:110px;">
+            <template #body="{ data }">{{ formatPhone(data.dien_thoai_nhan) }}</template>
+          </Column>
           <Column field="ten_hang_hoa" style="min-width:150px;">
-            <template #body="{ data }"><span class="text-truncate" style="max-width:150px;display:inline-block;">{{ data.ten_hang_hoa || '—' }}</span></template>
+            <template #body="{ data }">
+              <span class="text-truncate" style="max-width:140px;display:inline-block;">{{ data.ten_hang_hoa || '—' }}</span>
+              <i v-if="data.hang_hu_khong_den" class="pi pi-exclamation-triangle" style="color:#dc2626;margin-left:4px;font-size:0.75rem;" title="Hàng hư/hỏng/bể không đền" /> <!-- [L-01] -->
+            </template>
           </Column>
           <Column sortField="gia_cuoc" style="min-width:90px;text-align:right;">
             <template #body="{ data }">{{ formatCurrency(data.gia_cuoc) }}</template>
@@ -627,13 +612,11 @@ onMounted(async () => {
           ref="rightPanelRef"
           :mode="panelMode"
           :bien-nhan="selectedBienNhan"
-          :vp-giao-dich="vpGiaoDich"
+          :vp-giao-dich="vpGui"
           :ngay-giao-dich="dateFrom"
           :van-phongs="vanPhongs"
           :chanhs="allChanhs"
           :nv-ten="auth.user?.ten || ''"
-          @save="onSave"
-          @save-continue="onSaveContinue"
           @delete="onDeleteRequest"
           @cancel="onCancel"
           @edit="onEdit"
@@ -646,21 +629,20 @@ onMounted(async () => {
     <!-- ═══ ACTION BAR ═══ -->
     <div class="bn-action-bar">
       <div class="action-left">
-        <div class="action-check" v-if="panelMode === 'create' || panelMode === 'edit'">
+        <div class="action-check" v-if="panelMode === 'create'"> <!-- [H-05] chỉ hiện khi create -->
           <Checkbox v-model="autoAddNew" :binary="true" inputId="ck_add" />
-          <label for="ck_add" class="action-check-lbl">Lưu & thêm mới</label>
+          <label for="ck_add" class="action-check-lbl">Lưu &amp; thêm mới</label>
         </div>
         <div class="action-check" v-if="panelMode === 'create' || panelMode === 'edit'">
           <Checkbox v-model="autoPrint" :binary="true" inputId="ck_print" />
-          <label for="ck_print" class="action-check-lbl"><i class="pi pi-print"></i> Lưu & in</label>
+          <label for="ck_print" class="action-check-lbl"><i class="pi pi-print"></i> Lưu &amp; in</label>
         </div>
       </div>
       <div class="action-right">
         <Button v-if="panelMode === 'view'" icon="pi pi-print" label="In" severity="info" outlined size="small" @click="onPrint" />
         <Button icon="pi pi-plus" label="Thêm" severity="primary" size="small" @click="onAddNew" />
-        <Button v-if="panelMode === 'view' && auth.hasRole('admin', 'staff')" icon="pi pi-trash" label="Xóa" severity="danger" outlined size="small" @click="onDeleteRequest" />
+        <Button v-if="panelMode === 'view' && canDelete" icon="pi pi-trash" label="Xóa" severity="danger" outlined size="small" @click="onDeleteRequest" /> <!-- [H-03] -->
         <Button v-if="panelMode === 'view' && auth.hasRole('admin', 'staff')" icon="pi pi-pencil" label="Sửa" severity="warn" size="small" @click="onEdit" />
-        <Button v-if="batchSelected.length > 0" icon="pi pi-sync" :label="'Cập nhật TT (' + batchSelected.length + ')'" severity="help" size="small" @click="openBatchDialog" />
         <Button v-if="panelMode === 'edit' || panelMode === 'create'" icon="pi pi-save" label="Lưu" severity="success" size="small" :loading="saving" @click="handleSaveClick" />
         <Button v-if="panelMode === 'edit' || panelMode === 'create'" icon="pi pi-times" label="Hủy" severity="danger" outlined size="small" @click="onCancel" />
         <Button icon="pi pi-book" label="In sổ BN" severity="secondary" outlined size="small" @click="openLogbookDialog" />
@@ -678,68 +660,86 @@ onMounted(async () => {
       </template>
     </Dialog>
 
-    <!-- ═══ BATCH STATUS DIALOG ═══ -->
-    <Dialog v-model:visible="batchDialogVisible" header="Cập nhật trạng thái hàng loạt" :modal="true" :style="{ width: '440px' }">
-      <div style="margin-bottom:0.75rem;">
-        <p style="font-size:0.85rem; margin-bottom:0.5rem;">Đã chọn <strong>{{ batchSelected.length }}</strong> biên nhận</p>
-        <label class="form-label" style="font-size:0.78rem;">Chuyển sang trạng thái:</label>
-        <Select v-model="batchTrangThai" :options="trangThaiOptions.filter(o => o.value)" optionLabel="label" optionValue="value" placeholder="Chọn trạng thái..." fluid />
-      </div>
-      <div style="margin-bottom:0.75rem;">
-        <label class="form-label" style="font-size:0.78rem;">Ghi chú (tùy chọn):</label>
-        <InputText v-model="batchGhiChu" placeholder="Nhập ghi chú..." fluid />
-      </div>
-      <div style="max-height:150px; overflow-y:auto; font-size:0.75rem; color:#64748b; border:1px solid var(--border-light); border-radius:8px; padding:0.4rem 0.6rem;">
-        <div v-for="bn in batchSelected" :key="bn.id" style="padding:0.15rem 0; border-bottom:1px solid #f1f5f9;">
-          <strong>{{ bn.ma_so }}</strong> — {{ bn.don_vi_gui || bn.nguoi_gui || '—' }} → {{ bn.don_vi_nhan || bn.nguoi_nhan || '—' }}
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Hủy" severity="secondary" text size="small" @click="batchDialogVisible = false" />
-        <Button label="Xác nhận" icon="pi pi-check" size="small" :loading="batchUpdating" :disabled="!batchTrangThai" @click="confirmBatchUpdate" />
-      </template>
-    </Dialog>
 
     <!-- ═══ LOGBOOK DIALOG ═══ -->
-    <Dialog v-model:visible="logbookDialogVisible" header="In sổ biên nhận hàng gửi" :modal="true" :style="{ width: '440px' }">
-      <!-- Preset chips -->
-      <div class="logbook-presets">
-        <button
-          v-for="p in presetOptions" :key="p.value"
-          class="preset-chip" :class="{ active: logbookPreset === p.value }"
-          @click="applyPreset(p.value)"
-        >{{ p.label }}</button>
+    <Dialog v-model:visible="logbookDialogVisible" :modal="true" :style="{ width: '460px' }" :pt="{ header: { class: 'logbook-dlg-header' } }">
+      <template #header>
+        <div class="logbook-header-custom">
+          <div class="logbook-header-icon">
+            <i class="pi pi-book"></i>
+          </div>
+          <div>
+            <div class="logbook-header-title">In sổ biên nhận hàng gửi</div>
+            <div class="logbook-header-sub">Chọn khoảng thời gian và văn phòng để xuất báo cáo</div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── Khoảng thời gian ── -->
+      <div class="logbook-section">
+        <div class="logbook-section-title">
+          <i class="pi pi-calendar"></i>
+          <span>Khoảng thời gian</span>
+        </div>
+        <!-- Preset chips -->
+        <div class="logbook-presets">
+          <button
+            v-for="p in presetOptions" :key="p.value"
+            class="preset-chip" :class="{ active: logbookPreset === p.value }"
+            @click="applyPreset(p.value)"
+          >{{ p.label }}</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label"><i class="pi pi-calendar-plus" style="font-size:0.7rem;margin-right:0.3rem;"></i>Từ ngày</label>
+            <DatePicker v-model="logbookDateFrom" dateFormat="dd/mm/yy" showIcon fluid placeholder="Từ ngày..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="pi pi-calendar-minus" style="font-size:0.7rem;margin-right:0.3rem;"></i>Đến ngày</label>
+            <DatePicker v-model="logbookDateTo" dateFormat="dd/mm/yy" showIcon fluid placeholder="Đến ngày..." />
+          </div>
+        </div>
       </div>
-      <div class="form-grid" style="margin-bottom:0.75rem;">
-        <div class="form-group">
-          <label class="form-label">Từ ngày</label>
-          <DatePicker v-model="logbookDateFrom" dateFormat="dd/mm/yy" showIcon fluid placeholder="Từ ngày..." />
+
+      <!-- ── Văn phòng ── -->
+      <div class="logbook-section">
+        <div class="logbook-section-title">
+          <i class="pi pi-building"></i>
+          <span>Văn phòng</span>
         </div>
-        <div class="form-group">
-          <label class="form-label">Đến ngày</label>
-          <DatePicker v-model="logbookDateTo" dateFormat="dd/mm/yy" showIcon fluid placeholder="Đến ngày..." />
+        <div class="form-group logbook-vp-row">
+          <label class="form-label">
+            <span class="vp-badge vp-gui">GỬI</span>
+            Văn phòng gửi
+          </label>
+          <Select v-model="logbookVpGui" :options="vpLogbookOptions" optionLabel="label" optionValue="value" placeholder="Chọn văn phòng gửi..." fluid />
+        </div>
+        <div class="logbook-vp-arrow">
+          <i class="pi pi-arrow-down"></i>
+        </div>
+        <div class="form-group logbook-vp-row">
+          <label class="form-label">
+            <span class="vp-badge vp-nhan">NHẬN</span>
+            Văn phòng nhận
+          </label>
+          <Select v-model="logbookVpNhan" :options="vpLogbookOptions" optionLabel="label" optionValue="value" placeholder="Chọn văn phòng nhận..." fluid />
         </div>
       </div>
-      <div class="form-grid" style="margin-bottom:0.75rem;">
-        <div class="form-group">
-          <label class="form-label">VP gửi</label>
-          <Select v-model="logbookVpGui" :options="vpLogbookOptions" optionLabel="label" optionValue="value" placeholder="Chọn VP gửi" fluid />
-        </div>
-        <div class="form-group">
-          <label class="form-label">VP nhận</label>
-          <Select v-model="logbookVpNhan" :options="vpLogbookOptions" optionLabel="label" optionValue="value" placeholder="Chọn VP nhận" fluid />
-        </div>
-      </div>
+
       <template #footer>
-        <Button label="Hủy" severity="secondary" text size="small" @click="logbookDialogVisible = false" />
-        <Button label="Xuất Excel" icon="pi pi-file-excel" severity="success" outlined size="small"
-                :loading="logbookLoadingType === 'excel'"
-                :disabled="logbookLoadingType === 'pdf' || (logbookVpGui != null && logbookVpGui === logbookVpNhan)"
-                @click="downloadExcel" />
-        <Button label="In PDF" icon="pi pi-print" severity="success" size="small"
-                :loading="logbookLoadingType === 'pdf'"
-                :disabled="logbookLoadingType === 'excel' || (logbookVpGui != null && logbookVpGui === logbookVpNhan)"
-                @click="printLogbook" />
+        <div class="logbook-footer">
+          <Button label="Hủy" severity="secondary" text size="small" @click="logbookDialogVisible = false" />
+          <div class="logbook-footer-actions">
+            <Button label="Xuất Excel" icon="pi pi-file-excel" severity="success" outlined size="small"
+                    :loading="logbookLoadingType === 'excel'"
+                    :disabled="logbookLoadingType === 'pdf'"
+                    @click="downloadExcel" />
+            <Button label="In PDF" icon="pi pi-print" severity="primary" size="small"
+                    :loading="logbookLoadingType === 'pdf'"
+                    :disabled="logbookLoadingType === 'excel'"
+                    @click="printLogbook" />
+          </div>
+        </div>
       </template>
     </Dialog>
   </div>
@@ -747,6 +747,19 @@ onMounted(async () => {
 
 <style scoped>
 /* ═══ Page layout ═══ */
+/* ═══ Column Header Groups (brand-aligned) ═══ */
+:deep(.col-hdr-bn)  { background: var(--navy-50) !important; color: var(--navy-500) !important; font-weight: 700 !important; border-right: 2px solid var(--navy-100) !important; }
+:deep(.col-hdr-gui)  { background: var(--success-light) !important; color: #166534 !important; font-weight: 700 !important; border-right: 2px solid var(--success-border) !important; }
+:deep(.col-hdr-nhan) { background: var(--gold-50) !important; color: var(--gold-600) !important; font-weight: 700 !important; border-right: 2px solid var(--gold-200) !important; }
+:deep(.col-hdr-hang) { background: #f5f3ff !important; color: #6b21a8 !important; font-weight: 700 !important; border-right: 2px solid #ddd6fe !important; }
+:deep(.col-hdr-tt)   { background: var(--warning-light) !important; color: #9a3412 !important; font-weight: 700 !important; }
+
+/* Sub-row border separators */
+:deep(.col-border-bn)   { border-right: 2px solid var(--navy-100) !important; }
+:deep(.col-border-gui)  { border-right: 2px solid var(--success-border) !important; }
+:deep(.col-border-nhan) { border-right: 2px solid var(--gold-200) !important; }
+:deep(.col-border-hang) { border-right: 2px solid #ddd6fe !important; }
+
 .bn-page {
   display: flex;
   flex-direction: column;
@@ -830,6 +843,8 @@ onMounted(async () => {
   flex: 0 0 calc(50% - 0.25rem);
   max-width: calc(50% - 0.25rem);
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ═══ Left panel ═══ */
@@ -959,21 +974,83 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+/* ═══ Logbook Dialog — Custom Header ═══ */
+.logbook-header-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.1rem 0;
+}
+
+.logbook-header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.logbook-header-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--secondary);
+  line-height: 1.3;
+}
+
+.logbook-header-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* ═══ Logbook Dialog — Sections ═══ */
+.logbook-section {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  margin-bottom: 0.65rem;
+}
+
+.logbook-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.logbook-section-title .pi {
+  font-size: 0.82rem;
+}
+
 /* ═══ Logbook preset chips ═══ */
 .logbook-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.7rem;
 }
 
 .preset-chip {
-  padding: 0.25rem 0.65rem;
-  font-size: 0.78rem;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.76rem;
   font-weight: 600;
   border: 1px solid var(--border, #d1d5db);
   border-radius: 999px;
-  background: var(--bg, #fff);
+  background: var(--bg-card, #fff);
   color: var(--text-secondary, #6b7280);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -989,5 +1066,63 @@ onMounted(async () => {
   border-color: var(--primary, #3b82f6);
   background: var(--primary, #3b82f6);
   color: #fff;
+}
+
+/* ═══ Logbook VP rows ═══ */
+.logbook-vp-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+}
+
+.logbook-vp-row .form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.vp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.45rem;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.vp-badge.vp-gui {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+}
+
+.vp-badge.vp-nhan {
+  background: linear-gradient(135deg, #10b981, #065f46);
+  color: #fff;
+}
+
+.logbook-vp-arrow {
+  display: flex;
+  justify-content: center;
+  padding: 0.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+
+
+/* ═══ Logbook footer ═══ */
+.logbook-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.logbook-footer-actions {
+  display: flex;
+  gap: 0.4rem;
 }
 </style>

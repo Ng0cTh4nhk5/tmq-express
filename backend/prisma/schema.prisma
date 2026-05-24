@@ -1,5 +1,4 @@
 // TMQ Express — Prisma Schema
-// 10 bảng cho Phase 1 ERP
 
 generator client {
   provider = "prisma-client-js"
@@ -17,7 +16,6 @@ datasource db {
 enum Role {
   admin
   staff
-  accountant
 }
 
 enum TrangThai {
@@ -25,8 +23,11 @@ enum TrangThai {
   dang_vc
   da_den_kho
   da_bao_khach
+  dang_giao      // Shipper đang giao tận nơi (chỉ áp dụng hinh_thuc_giao = tan_noi)
+  da_giao_chanh  // Đã bàn giao cho Chành bên thứ 3 (Terminal — kết thúc trách nhiệm TMQ)
   khach_da_nhan
 }
+
 
 enum TrangThaiThu {
   da_thu
@@ -52,11 +53,26 @@ enum TrangThaiCongNo {
 }
 
 enum TrangThaiCOD {
-  khong_co       // thu_ho = 0 hoặc null — không áp dụng COD
-  cho_thu        // Chưa thu COD từ người nhận
-  da_thu         // VP nhận đã thu COD từ người nhận
-  da_chuyen      // VP nhận đã chuyển COD về VP gửi
-  da_tra         // VP gửi đã trả COD cho người gửi (hoàn tất)
+  khong_co           // thu_ho = 0 hoặc null — không áp dụng COD
+  cho_thu            // Chưa thu COD từ người nhận
+  da_thu_chanh       // Chành đã thu, chờ nộp về VP Nhận
+  da_thu             // VP nhận đã thu COD từ người nhận
+  cho_chuyen_pending // [MỚI] BN đã gom vào PhieuChuyenCOD, bị khóa chờ chuyển
+  da_chuyen          // VP nhận đã chuyển COD về VP gửi (qua PhieuChuyenCOD)
+  da_tra             // VP gửi đã trả COD cho người gửi (hoàn tất)
+}
+
+enum TrangThaiPhieuChuyen {
+  cho_chuyen   // Đã lập, chưa gửi tiền
+  da_chuyen    // Đã gửi (xe / chuyển khoản)
+  da_nhan      // VP Gửi đã xác nhận nhận đủ tiền
+}
+
+enum TrangThaiCuocNhan {
+  cho_thu      // BN chua_thu vừa tạo — chờ thu từ người nhận
+  da_thu       // VP Nhận đã thu cước từ người nhận — tiền đang ở VP Nhận
+  cho_chuyen   // Đã gom vào PhieuChuyenCuoc, bị khóa chờ chuyển
+  da_nhan      // VP Gửi đã xác nhận nhận tiền — hoàn tất
 }
 
 enum PhuongThucCapNhat {
@@ -76,18 +92,25 @@ enum LoaiKH {
 
 /// Văn phòng / Chi nhánh (NV-2)
 model VanPhong {
-  id        Int      @id @default(autoincrement())
-  ma_vp     String   @unique @db.VarChar(10)
-  ten       String   @db.VarChar(200)
-  dia_chi   String?  @db.VarChar(500)
-  dien_thoai String? @db.VarChar(20)
-  active    Boolean  @default(true)
+  id         Int      @id @default(autoincrement())
+  ma_vp      String   @unique @db.VarChar(10)
+  ten        String   @db.VarChar(200)
+  dia_chi    String?  @db.VarChar(500)
+  dien_thoai String?  @db.VarChar(20)
+  active     Boolean  @default(true)
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  nhan_vien       NhanVien[]
-  bien_nhan_gui   BienNhan[] @relation("VP_Gui")
-  bien_nhan_nhan  BienNhan[] @relation("VP_Nhan")
-  chanh           Chanh[]
+  nhan_vien              NhanVien[]
+  bien_nhan_gui          BienNhan[]          @relation("VP_Gui")
+  bien_nhan_nhan         BienNhan[]          @relation("VP_Nhan")
+  phieu_thu              PhieuThu[]
+  phieu_chi              PhieuChi[]
+  bien_nhan_thu_ho       BienNhanThuHo[]
+  phieu_chuyen_cod_nhan  PhieuChuyenCOD[]    @relation("PCCOD_VPNhan")
+  phieu_chuyen_cod_gui   PhieuChuyenCOD[]    @relation("PCCOD_VPGui")
+  phieu_chuyen_cuoc_nhan PhieuChuyenCuoc[]   @relation("PCCuoc_VPNhan")
+  phieu_chuyen_cuoc_gui  PhieuChuyenCuoc[]   @relation("PCCuoc_VPGui")
 
   @@map("van_phong")
 }
@@ -107,13 +130,21 @@ model NhanVien {
   locked_until        DateTime?
   token_version       Int       @default(0)
   created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  van_phong          VanPhong           @relation(fields: [van_phong_id], references: [id])
-  bien_nhan_nhap     BienNhan[]         @relation("NV_Nhap")
-  lich_su_trang_thai LichSuTrangThai[]
-  phieu_thu          PhieuThu[]
-  phieu_chi          PhieuChi[]
+  van_phong              VanPhong           @relation(fields: [van_phong_id], references: [id])
+  bien_nhan_nhap         BienNhan[]         @relation("NV_Nhap")
+  lich_su_trang_thai     LichSuTrangThai[]
+  phieu_thu              PhieuThu[]
+  phieu_chi              PhieuChi[]
+  bien_nhan_thu_ho       BienNhanThuHo[]
+  phieu_chuyen_cod_lap   PhieuChuyenCOD[]   @relation("PCCOD_Lap")
+  phieu_chuyen_cod_nhan  PhieuChuyenCOD[]   @relation("PCCOD_Nhan")
+  phieu_chuyen_cuoc_lap  PhieuChuyenCuoc[]  @relation("PCCuoc_Lap")
+  phieu_chuyen_cuoc_nhan PhieuChuyenCuoc[]  @relation("PCCuoc_Nhan")
 
+  @@index([van_phong_id])
+  @@index([active])
   @@map("nhan_vien")
 }
 
@@ -140,9 +171,9 @@ model KhachHang {
 /// Biên nhận hàng hóa (NV-4, NV-5)
 model BienNhan {
   id                Int             @id @default(autoincrement())
-  ma_so             String          @unique @db.VarChar(30)
-  ngay_bien_nhan    DateTime        @default(now())  // Ngày nghiệp vụ (cho phép back-dating, dùng để đếm mã + filter danh sách)
-  gio_tao           String?         @db.VarChar(5)   // "HH:mm" — giờ tạo đơn, riêng biệt với ngày
+  ma_so             String          @db.VarChar(30)
+  ngay_bien_nhan    DateTime        @default(now())
+  gio_tao           String?         @db.VarChar(5)
   van_phong_gui_id  Int
   van_phong_nhan_id Int
   nhan_vien_nhap_id Int
@@ -158,48 +189,199 @@ model BienNhan {
   nguoi_nhan        String?         @db.VarChar(200)
   dien_thoai_nhan   String?         @db.VarChar(20)
   dia_chi_nhan      String?         @db.VarChar(500)
-  so_cccd_gui       String?         @db.VarChar(20)              // CCCD người gửi
-  so_cccd_nhan      String?         @db.VarChar(20)              // CCCD người nhận
+  so_cccd_gui       String?         @db.VarChar(20)
+  so_cccd_nhan      String?         @db.VarChar(20)
 
-  ten_hang_hoa      String?         @db.VarChar(500)             // Auto-generated từ hang_hoa_json
-  hang_hoa_json     Json?                                        // [{don_vi:"Kiện", so_luong:2, ghi_chu:""}, ...]
-  so_luong          Int?                                         // Legacy / tổng số lượng
-  don_vi_tinh       String?         @db.VarChar(20)              // Legacy
+  ten_hang_hoa      String?         @db.VarChar(500)
+  hang_hoa_json     Json?
+  so_luong          Int?
+  don_vi_tinh       String?         @db.VarChar(20)
   gia_tri_hang      Decimal?        @db.Decimal(15, 0)
   trong_luong       Decimal?        @db.Decimal(10, 2)
   thu_ho            Decimal?        @default(0) @db.Decimal(15, 0)
-  trang_thai_cod    TrangThaiCOD    @default(khong_co)               // Trạng thái quy trình COD
+  trang_thai_cod    TrangThaiCOD    @default(khong_co)
   gia_cuoc          Decimal         @default(0) @db.Decimal(15, 0)
 
-  trang_thai        TrangThai       @default(cho_vc)
-  trang_thai_thu    TrangThaiThu    @default(da_thu)
-  hang_hu_khong_den Boolean         @default(false)
-  can_xuat_hddt     Boolean         @default(false)
-  da_vao_bang_ke    Boolean         @default(false)
-  hinh_thuc_giao    HinhThucGiao    @default(tan_noi)
-  chanh_id          Int?                                         // Chành nhận hàng (điểm phát cuối)
-  dia_chi_giao      String?         @db.VarChar(500)             // Địa chỉ giao hàng
+  trang_thai           TrangThai          @default(cho_vc)
+  trang_thai_thu       TrangThaiThu       @default(da_thu)
+  trang_thai_cuoc_nhan TrangThaiCuocNhan? // null khi da_thu hoặc cong_no; cho_thu..da_nhan khi chua_thu
+  hang_hu_khong_den    Boolean            @default(false)
+  can_xuat_hddt        Boolean            @default(false)
+  da_vao_bang_ke       Boolean            @default(false)
+  hinh_thuc_giao       HinhThucGiao       @default(tan_noi)
+  chanh_id             Int?
+  dia_chi_giao         String?            @db.VarChar(500)
 
   created_at        DateTime        @default(now())
   updated_at        DateTime        @updatedAt
 
-  van_phong_gui     VanPhong        @relation("VP_Gui", fields: [van_phong_gui_id], references: [id])
-  van_phong_nhan    VanPhong        @relation("VP_Nhan", fields: [van_phong_nhan_id], references: [id])
-  nhan_vien_nhap    NhanVien        @relation("NV_Nhap", fields: [nhan_vien_nhap_id], references: [id])
-  chanh             Chanh?          @relation(fields: [chanh_id], references: [id])
-  lich_su_trang_thai LichSuTrangThai[]
-  bang_ke_chi_tiet  BangKeChiTiet[]
-  cong_no           CongNo[]
-  phieu_thu         PhieuThu[]
+  van_phong_gui              VanPhong                   @relation("VP_Gui", fields: [van_phong_gui_id], references: [id])
+  van_phong_nhan             VanPhong                   @relation("VP_Nhan", fields: [van_phong_nhan_id], references: [id])
+  nhan_vien_nhap             NhanVien                   @relation("NV_Nhap", fields: [nhan_vien_nhap_id], references: [id])
+  chanh                      Chanh?                     @relation(fields: [chanh_id], references: [id])
+  lich_su_trang_thai         LichSuTrangThai[]
+  bang_ke_chi_tiet           BangKeChiTiet[]
+  cong_no                    CongNo[]
+  phieu_thu                  PhieuThu[]
+  phieu_chi                  PhieuChi[]
+  bien_nhan_thu_ho           BienNhanThuHo?
+  phieu_chuyen_chi_tiet      PhieuChuyenCODChiTiet[]
+  phieu_chuyen_cuoc_chi_tiet PhieuChuyenCuocChiTiet[]
 
+  @@unique([ma_so, ngay_bien_nhan])
+  @@index([ma_so])
   @@index([van_phong_gui_id])
   @@index([van_phong_nhan_id])
+  @@index([van_phong_nhan_id, trang_thai])
+  @@index([van_phong_gui_id, trang_thai])
+  @@index([van_phong_gui_id, ngay_bien_nhan])
+  @@index([van_phong_nhan_id, ngay_bien_nhan])
   @@index([trang_thai])
   @@index([ngay_bien_nhan])
   @@index([can_xuat_hddt, da_vao_bang_ke])
   @@index([chanh_id])
   @@index([trang_thai_cod])
+  @@index([van_phong_nhan_id, trang_thai_cod])
+  @@index([van_phong_gui_id, trang_thai_cod])
+  @@index([trang_thai_cuoc_nhan])
+  @@index([van_phong_nhan_id, trang_thai_cuoc_nhan])
+  @@index([van_phong_gui_id, trang_thai_cuoc_nhan])
   @@map("bien_nhan")
+}
+
+/// Biên nhận thu hộ — chứng từ giao cho người nhận hàng khi thu COD
+model BienNhanThuHo {
+  id           Int               @id @default(autoincrement())
+  ma_bnth      String            @unique @db.VarChar(20)  // VD: BNTH-0001
+  ngay_thu     DateTime          @default(now())
+
+  bien_nhan_id Int               @unique  // 1 BN → 1 BNTH
+  so_tien      Decimal           @db.Decimal(15, 0)
+  nguoi_nop    String            @db.VarChar(200)  // Tên người nộp tiền
+  hinh_thuc    HinhThucThanhToan @default(tien_mat)
+  ghi_chu      String?           @db.Text
+
+  van_phong_id  Int  // VP Nhận hàng (hoặc VP quản lý Chành)
+  nhan_vien_id  Int  // NV ghi nhận
+  la_qua_chanh  Boolean @default(false)  // true = Chành thu hộ
+
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @default(now()) @updatedAt
+
+  bien_nhan    BienNhan          @relation(fields: [bien_nhan_id], references: [id])
+  van_phong    VanPhong          @relation(fields: [van_phong_id], references: [id])
+  nhan_vien    NhanVien          @relation(fields: [nhan_vien_id], references: [id])
+
+  @@index([ngay_thu])
+  @@index([van_phong_id])
+  @@map("bien_nhan_thu_ho")
+}
+
+/// Phiếu chuyển COD — VP Nhận gom lô → chuyển tiền về VP Gửi
+model PhieuChuyenCOD {
+  id                Int                   @id @default(autoincrement())
+  ma_phieu          String                @unique @db.VarChar(20)  // VD: PC-COD-0001
+  ngay_lap          DateTime              @default(now())
+  ngay_chuyen       DateTime?
+  ngay_nhan         DateTime?
+
+  van_phong_nhan_id Int   // VP đang giữ tiền (VP Nhận hàng — bên lập)
+  van_phong_gui_id  Int   // VP sẽ nhận tiền về (VP Gửi hàng)
+
+  so_tien_tong      Decimal               @db.Decimal(15, 0)
+  hinh_thuc         HinhThucThanhToan     @default(tien_mat)
+  trang_thai        TrangThaiPhieuChuyen  @default(cho_chuyen)
+  ghi_chu           String?               @db.Text
+
+  nhan_vien_lap_id  Int   // NV lập (VP Nhận)
+  nhan_vien_nhan_id Int?  // NV xác nhận (VP Gửi)
+
+  // FK sang PhieuChi/PhieuThu — Option B: FK trên PhieuChuyenCOD
+  phieu_chi_id      Int?  @unique  // PhieuChi @ VP Nhận (chi ra khi lập)
+  phieu_thu_id      Int?  @unique  // PhieuThu @ VP Gửi (thu vào khi xác nhận nhận)
+
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
+
+  van_phong_nhan    VanPhong              @relation("PCCOD_VPNhan", fields: [van_phong_nhan_id], references: [id])
+  van_phong_gui     VanPhong              @relation("PCCOD_VPGui", fields: [van_phong_gui_id], references: [id])
+  nhan_vien_lap     NhanVien              @relation("PCCOD_Lap", fields: [nhan_vien_lap_id], references: [id])
+  nhan_vien_nhan    NhanVien?             @relation("PCCOD_Nhan", fields: [nhan_vien_nhan_id], references: [id])
+  phieu_chi         PhieuChi?             @relation(fields: [phieu_chi_id], references: [id])
+  phieu_thu         PhieuThu?             @relation(fields: [phieu_thu_id], references: [id])
+  chi_tiet          PhieuChuyenCODChiTiet[]
+
+  @@index([van_phong_nhan_id, trang_thai])
+  @@index([van_phong_gui_id, trang_thai])
+  @@map("phieu_chuyen_cod")
+}
+
+/// Chi tiết PhieuChuyenCOD — từng BN được gom vào phiếu
+model PhieuChuyenCODChiTiet {
+  id           Int             @id @default(autoincrement())
+  phieu_id     Int
+  bien_nhan_id Int
+  so_tien      Decimal         @db.Decimal(15, 0)  // Snapshot thu_ho lúc lập
+
+  phieu        PhieuChuyenCOD  @relation(fields: [phieu_id], references: [id], onDelete: Cascade)
+  bien_nhan    BienNhan        @relation(fields: [bien_nhan_id], references: [id])
+
+  @@unique([phieu_id, bien_nhan_id])
+  @@index([bien_nhan_id])
+  @@map("phieu_chuyen_cod_chi_tiet")
+}
+
+/// Phiếu chuyển cước nhận — VP Nhận gom lô BN chua_thu đã thu → chuyển cước về VP Gửi
+model PhieuChuyenCuoc {
+  id                Int                   @id @default(autoincrement())
+  ma_phieu          String                @unique @db.VarChar(20)  // VD: PC-CUOC-0001
+  ngay_lap          DateTime              @default(now())
+  ngay_chuyen       DateTime?
+  ngay_nhan         DateTime?
+
+  van_phong_nhan_id Int   // VP đang giữ tiền cước (VP Nhận hàng — bên lập)
+  van_phong_gui_id  Int   // VP sẽ nhận tiền cước về (VP Gửi hàng)
+
+  so_tien_tong      Decimal               @db.Decimal(15, 0)
+  hinh_thuc         HinhThucThanhToan     @default(tien_mat)
+  trang_thai        TrangThaiPhieuChuyen  @default(cho_chuyen)
+  ghi_chu           String?               @db.Text
+
+  nhan_vien_lap_id  Int   // NV lập (VP Nhận)
+  nhan_vien_nhan_id Int?  // NV xác nhận (VP Gửi)
+
+  phieu_chi_id      Int?  @unique  // PhieuChi @ VP Nhận (chi ra khi lập)
+  phieu_thu_id      Int?  @unique  // PhieuThu @ VP Gửi (thu vào khi xác nhận nhận)
+
+  created_at        DateTime              @default(now())
+  updated_at        DateTime              @updatedAt
+
+  van_phong_nhan    VanPhong              @relation("PCCuoc_VPNhan", fields: [van_phong_nhan_id], references: [id])
+  van_phong_gui     VanPhong              @relation("PCCuoc_VPGui", fields: [van_phong_gui_id], references: [id])
+  nhan_vien_lap     NhanVien              @relation("PCCuoc_Lap", fields: [nhan_vien_lap_id], references: [id])
+  nhan_vien_nhan    NhanVien?             @relation("PCCuoc_Nhan", fields: [nhan_vien_nhan_id], references: [id])
+  phieu_chi         PhieuChi?             @relation(fields: [phieu_chi_id], references: [id])
+  phieu_thu         PhieuThu?             @relation(fields: [phieu_thu_id], references: [id])
+  chi_tiet          PhieuChuyenCuocChiTiet[]
+
+  @@index([van_phong_nhan_id, trang_thai])
+  @@index([van_phong_gui_id, trang_thai])
+  @@map("phieu_chuyen_cuoc")
+}
+
+/// Chi tiết PhieuChuyenCuoc — từng BN được gom vào phiếu
+model PhieuChuyenCuocChiTiet {
+  id           Int              @id @default(autoincrement())
+  phieu_id     Int
+  bien_nhan_id Int
+  so_tien      Decimal          @db.Decimal(15, 0)  // Snapshot gia_cuoc lúc lập
+
+  phieu        PhieuChuyenCuoc  @relation(fields: [phieu_id], references: [id], onDelete: Cascade)
+  bien_nhan    BienNhan         @relation(fields: [bien_nhan_id], references: [id])
+
+  @@unique([phieu_id, bien_nhan_id])
+  @@index([bien_nhan_id])
+  @@map("phieu_chuyen_cuoc_chi_tiet")
 }
 
 /// Lịch sử trạng thái vận chuyển (NV-7)
@@ -217,6 +399,7 @@ model LichSuTrangThai {
   nhan_vien       NhanVien           @relation(fields: [nhan_vien_id], references: [id])
 
   @@index([bien_nhan_id])
+  @@index([nhan_vien_id])
   @@map("lich_su_trang_thai")
 }
 
@@ -237,20 +420,18 @@ model BangKe {
 }
 
 /// Chi tiết bảng kê — lưu snapshot tại thời điểm xuất (NV-9)
-/// bien_nhan_id nullable: NULL = dòng tự kê thủ công
 model BangKeChiTiet {
   id             Int      @id @default(autoincrement())
   bang_ke_id     Int
-  bien_nhan_id   Int?     // NULL = dòng tự kê
+  bien_nhan_id   Int?
   stt            Int      @default(0)
 
-  // Snapshot data — đủ để tạo lại Excel không cần join BN
   ngay           DateTime
   tuyen          String?  @db.VarChar(30)
   nguoi_gui      String?  @db.VarChar(300)
   dia_chi_gui    String?  @db.VarChar(500)
   hang_hoa       String?  @db.VarChar(300)
-  gia_cuoc       Decimal  @default(0) @db.Decimal(15, 0)  // Sau thuế
+  gia_cuoc       Decimal  @default(0) @db.Decimal(15, 0)
 
   bang_ke        BangKe    @relation(fields: [bang_ke_id], references: [id], onDelete: Cascade)
   bien_nhan      BienNhan? @relation(fields: [bien_nhan_id], references: [id])
@@ -259,7 +440,7 @@ model BangKeChiTiet {
   @@map("bang_ke_chi_tiet")
 }
 
-/// Doanh nghiệp nhận HĐĐT — cấu hình sẵn để autocomplete khi tự kê
+/// Doanh nghiệp nhận HĐĐT
 model DoanhNghiepHDDT {
   id            Int      @id @default(autoincrement())
   ten           String   @db.VarChar(300)
@@ -287,9 +468,12 @@ model PhieuThu {
   da_huy          Boolean             @default(false)
   created_at      DateTime            @default(now())
 
-  nhan_vien       NhanVien            @relation(fields: [nhan_vien_id], references: [id])
-  bien_nhan       BienNhan?           @relation(fields: [bien_nhan_id], references: [id])
-  cong_no         CongNo[]
+  van_phong        VanPhong            @relation(fields: [van_phong_id], references: [id])
+  nhan_vien        NhanVien            @relation(fields: [nhan_vien_id], references: [id])
+  bien_nhan         BienNhan?           @relation(fields: [bien_nhan_id], references: [id])
+  cong_no           CongNo[]
+  phieu_chuyen_cod  PhieuChuyenCOD?    // back-reference (FK trên PhieuChuyenCOD)
+  phieu_chuyen_cuoc PhieuChuyenCuoc?   // back-reference (FK trên PhieuChuyenCuoc)
 
   @@index([ngay_thu])
   @@index([van_phong_id])
@@ -307,13 +491,19 @@ model PhieuChi {
   hinh_thuc       HinhThucThanhToan   @default(tien_mat)
   van_phong_id    Int
   nhan_vien_id    Int
+  bien_nhan_id    Int?                // [MỚI] Trace PhieuChi "trả người gửi" về BN
   da_huy          Boolean             @default(false)
   created_at      DateTime            @default(now())
 
-  nhan_vien       NhanVien            @relation(fields: [nhan_vien_id], references: [id])
+  van_phong         VanPhong            @relation(fields: [van_phong_id], references: [id])
+  nhan_vien         NhanVien            @relation(fields: [nhan_vien_id], references: [id])
+  bien_nhan         BienNhan?           @relation(fields: [bien_nhan_id], references: [id])
+  phieu_chuyen_cod  PhieuChuyenCOD?    // back-reference (FK trên PhieuChuyenCOD)
+  phieu_chuyen_cuoc PhieuChuyenCuoc?   // back-reference (FK trên PhieuChuyenCuoc)
 
   @@index([ngay_chi])
   @@index([van_phong_id])
+  @@index([bien_nhan_id])
   @@map("phieu_chi")
 }
 
@@ -340,20 +530,18 @@ model CongNo {
 /// Chành — Trạm trung chuyển hàng hóa
 model Chanh {
   id            Int      @id @default(autoincrement())
-  ten           String   @db.VarChar(200)              // Tên chành (VD: "Chành Miền Tây - Q.Bình Thạnh")
+  ten           String   @db.VarChar(200)
   dia_chi       String?  @db.VarChar(500)
   dien_thoai    String?  @db.VarChar(20)
-  nguoi_lien_he String?  @db.VarChar(200)              // Người liên hệ tại chành
-  van_phong_id  Int                                     // Thuộc văn phòng nào
+  nguoi_lien_he String?  @db.VarChar(200)
   ghi_chu       String?  @db.Text
   active        Boolean  @default(true)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  van_phong     VanPhong @relation(fields: [van_phong_id], references: [id])
   bien_nhan     BienNhan[]
 
-  @@index([van_phong_id])
+  @@unique([ten])
   @@map("chanh")
 }
 
@@ -362,7 +550,7 @@ model LoginLog {
   id            Int      @id @default(autoincrement())
   nhan_vien_id  Int?
   username      String   @db.VarChar(100)
-  action        String   @db.VarChar(20)     // login_success | login_failed | logout
+  action        String   @db.VarChar(20)
   ip_address    String?  @db.VarChar(45)
   user_agent    String?  @db.VarChar(500)
   timestamp     DateTime @default(now())
@@ -372,13 +560,13 @@ model LoginLog {
   @@map("login_log")
 }
 
-/// Audit Log — ghi lại MỌI thao tác thay đổi dữ liệu (S-01)
+/// Audit Log (S-01)
 model AuditLog {
   id            Int      @id @default(autoincrement())
   timestamp     DateTime @default(now())
   nhan_vien_id  Int
-  action        String   @db.VarChar(20)    // CREATE | UPDATE | DELETE | EXPORT
-  entity        String   @db.VarChar(50)    // bien_nhan | phieu_thu | ...
+  action        String   @db.VarChar(20)
+  entity        String   @db.VarChar(50)
   entity_id     Int?
   old_data      Json?
   new_data      Json?

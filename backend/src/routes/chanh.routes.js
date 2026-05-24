@@ -1,12 +1,18 @@
 import { getAllChanh, getChanhById, createChanh, updateChanh, toggleChanhActive } from '../services/chanh.service.js';
 
+// Schema dùng chung cho params :id
+const paramsIdSchema = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'integer', minimum: 1 } },
+};
+
 export default async function chanhRoutes(fastify) {
-  // GET /api/chanh — Danh sách chành (lọc theo ?van_phong_id=&active=true)
+  // GET /api/chanh — Danh sách chành (lọc theo ?active=true)
   fastify.get('/', {
     preHandler: [fastify.authenticate],
     handler: async (request) => {
       const opts = {};
-      if (request.query.van_phong_id) opts.van_phong_id = request.query.van_phong_id;
       if (request.query.active === 'true') opts.active = true;
       if (request.query.active === 'false') opts.active = false;
       const data = await getAllChanh(opts);
@@ -29,15 +35,16 @@ export default async function chanhRoutes(fastify) {
     schema: {
       body: {
         type: 'object',
-        required: ['ten', 'van_phong_id'],
+        required: ['ten'],
         properties: {
           ten: { type: 'string', minLength: 1 },
           dia_chi: { type: 'string' },
-          dien_thoai: { type: 'string' },
+          // [M1] Chỉ cho phép ký tự số, +, -, space, (), dấu chấm — độ dài 6-20
+          dien_thoai: { type: 'string', pattern: '^[0-9+\\-\\s().]{6,20}$' },
           nguoi_lien_he: { type: 'string' },
-          van_phong_id: { type: 'integer' },
           ghi_chu: { type: 'string' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request, reply) => {
@@ -50,14 +57,15 @@ export default async function chanhRoutes(fastify) {
   fastify.put('/:id', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     schema: {
+      params: paramsIdSchema,
       body: {
         type: 'object',
         properties: {
           ten: { type: 'string', minLength: 1 },
           dia_chi: { type: 'string' },
-          dien_thoai: { type: 'string' },
+          // [M1] Chỉ cho phép ký tự số, +, -, space, (), dấu chấm — độ dài 6-20
+          dien_thoai: { type: 'string', pattern: '^[0-9+\\-\\s().]{6,20}$' },
           nguoi_lien_he: { type: 'string' },
-          van_phong_id: { type: 'integer' },
           ghi_chu: { type: 'string' },
         },
         additionalProperties: false,
@@ -73,6 +81,7 @@ export default async function chanhRoutes(fastify) {
   fastify.patch('/:id/active', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     schema: {
+      params: paramsIdSchema,
       body: {
         type: 'object',
         required: ['active'],

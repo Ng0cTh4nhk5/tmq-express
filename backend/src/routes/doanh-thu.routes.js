@@ -2,7 +2,7 @@ import { baoCaoDoanhThu } from '../services/doanh-thu.service.js';
 
 export default async function doanhThuRoutes(fastify) {
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'accountant'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       querystring: {
         type: 'object',

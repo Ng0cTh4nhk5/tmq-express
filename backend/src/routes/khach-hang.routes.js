@@ -5,10 +5,11 @@ export default async function khachHangRoutes(fastify) {
   fastify.get('/', {
     preHandler: [fastify.authenticate],
     handler: async (request) => {
-      const { search, active, page, limit } = request.query;
+      const { search, active, loai_kh, page, limit } = request.query;
       const result = await listKhachHang({
         search,
         active: active === 'true' ? true : active === 'false' ? false : undefined,
+        loai_kh,
         page: Number(page) || 1,
         limit: Number(limit) || 20,
       });

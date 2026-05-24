@@ -6,16 +6,45 @@ export async function getAllVanPhong(activeOnly = false) {
 }
 
 export async function createVanPhong(data) {
-  return prisma.vanPhong.create({ data });
+  try {
+    return await prisma.vanPhong.create({ data });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      throw Object.assign(
+        new Error(`Mã văn phòng "${data.ma_vp}" đã tồn tại. Vui lòng chọn mã khác.`),
+        { statusCode: 409 },
+      );
+    }
+    throw err;
+  }
 }
 
 export async function updateVanPhong(id, data) {
   // Không cho sửa ma_vp
   const { ma_vp, ...updateData } = data;
-  return prisma.vanPhong.update({ where: { id }, data: updateData });
+  try {
+    return await prisma.vanPhong.update({ where: { id }, data: updateData });
+  } catch (err) {
+    if (err.code === 'P2025') {
+      throw Object.assign(
+        new Error(`Không tìm thấy văn phòng với ID ${id}.`),
+        { statusCode: 404 },
+      );
+    }
+    throw err;
+  }
 }
 
 export async function toggleVanPhongActive(id, active) {
+  // Kiểm tra tồn tại trước
+  const existing = await prisma.vanPhong.findUnique({ where: { id } });
+  if (!existing) {
+    throw Object.assign(
+      new Error(`Không tìm thấy văn phòng với ID ${id}.`),
+      { statusCode: 404 },
+    );
+  }
+
   // Khi deactivate: kiểm tra ràng buộc
   if (!active) {
     const [bnDangXuLy, nvActive] = await Promise.all([
@@ -44,4 +73,3 @@ export async function toggleVanPhongActive(id, active) {
 
   return prisma.vanPhong.update({ where: { id }, data: { active } });
 }
-

@@ -14,6 +14,8 @@ import AutoComplete from 'primevue/autocomplete';
 import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
+import { formatDate, formatNumber, truocThue, toISODate } from '../utils/format';
+import { downloadBase64File } from '../utils/file';
 
 const toast = useToast();
 
@@ -62,21 +64,42 @@ function removeBNItem(bnId, idx) {
   }
 }
 
+// ── Văn phòng (dùng cho dropdown tuyến tự kê) ────────────────
+const vanPhongs = ref([]);
+async function loadVanPhongs() {
+  try {
+    const res = await api.get('/van-phong?active=true');
+    vanPhongs.value = res.data.data.map(v => ({ label: `${v.ma_vp} — ${v.ten}`, value: v.id, ma: v.ma_vp }));
+  } catch { vanPhongs.value = []; }
+}
+
 // ── Case B: Dòng tự kê ───────────────────────────────────────
 const manualRows = ref([]);
 const manualDialogVisible = ref(false);
 const manualEditing = ref(null); // null = thêm mới, { idx, data } = sửa
 const manualForm = ref(createEmptyManual());
 
+
+
 function createEmptyManual() {
   return {
-    nguoi_gui: '',
+    ngay: selectedDate.value || new Date(),
+    vp_gui_id: null,
+    vp_nhan_id: null,
+    // Người gửi
+    don_vi_gui: '',
     dia_chi_gui: '',
-    tuyen: '',
+    // Hàng hoá (text tự do)
     hang_hoa: '',
     gia_cuoc: 0,
-    ngay: selectedDate.value || new Date(),
   };
+}
+
+// Label tuyến tính từ vp_gui_id / vp_nhan_id
+function getTuyenLabel(row) {
+  const gui = vanPhongs.value.find(v => v.value === row.vp_gui_id)?.ma || '?';
+  const nhan = vanPhongs.value.find(v => v.value === row.vp_nhan_id)?.ma || '?';
+  return `${gui}→${nhan}`;
 }
 
 function openManualDialog(row = null, idx = null) {
@@ -91,18 +114,19 @@ function openManualDialog(row = null, idx = null) {
 }
 
 function saveManualRow() {
-  if (!manualForm.value.nguoi_gui?.trim()) {
-    toast.add({ severity: 'warn', summary: 'Thiếu người gửi', life: 2000 });
+  if (!manualForm.value.don_vi_gui?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Thiếu thông tin người gửi', detail: 'Nhập tên đơn vị gửi', life: 2500 });
     return;
   }
   if (!manualForm.value.gia_cuoc || manualForm.value.gia_cuoc <= 0) {
     toast.add({ severity: 'warn', summary: 'Cần nhập giá cước', life: 2000 });
     return;
   }
+  const saved = { ...manualForm.value };
   if (manualEditing.value !== null) {
-    manualRows.value[manualEditing.value.idx] = { ...manualForm.value };
+    manualRows.value[manualEditing.value.idx] = saved;
   } else {
-    manualRows.value.push({ ...manualForm.value });
+    manualRows.value.push(saved);
   }
   manualDialogVisible.value = false;
 }
@@ -111,25 +135,28 @@ function removeManualRow(idx) {
   manualRows.value.splice(idx, 1);
 }
 
-// ── Autocomplete doanh nghiệp (Case B) ───────────────────────
-const dnSuggestions = ref([]);
+// ── Autocomplete Khách hàng ────────────────────────────────────
+const guiSuggestions = ref([]);
 
-async function searchDN(event) {
-  if (!event.query || event.query.length < 1) { dnSuggestions.value = []; return; }
+async function searchKH(event) {
+  const q = event.query;
+  if (!q || q.length < 2) return;
   try {
-    const res = await api.get('/doanh-nghiep-hddt', { params: { search: event.query, active: true } });
-    dnSuggestions.value = res.data.data;
-  } catch { dnSuggestions.value = []; }
+    const { data: res } = await api.get('/khach-hang/autocomplete', { params: { q } });
+    guiSuggestions.value = res.data;
+  } catch {
+    guiSuggestions.value = [];
+  }
 }
 
-function onSelectDN(event) {
-  const dn = event.value;
-  // AutoComplete v-model gán object → dùng nextTick để gán lại string
+function onSelectGui(event) {
+  const kh = event.value;
   nextTick(() => {
-    manualForm.value.nguoi_gui = dn.ten || '';
+    manualForm.value.don_vi_gui = kh.ten_don_vi || '';
   });
-  manualForm.value.dia_chi_gui = dn.dia_chi || '';
+  manualForm.value.dia_chi_gui = kh.dia_chi || '';
 }
+
 
 // ── Computed: tổng cộng ───────────────────────────────────────
 const tongSauThue = computed(() => {
@@ -151,7 +178,7 @@ async function loadPending() {
   loading.value = true;
   selectedBNs.value = [];
   try {
-    const ngay = fmtISO(selectedDate.value);
+    const ngay = toISODate(selectedDate.value);
     const res = await api.get('/bang-ke/bien-nhan-cho', { params: { ngay } });
     pendingList.value = res.data.data;
     initBNEdits(pendingList.value);
@@ -198,16 +225,20 @@ async function exportBangKe() {
 
     // Case B
     for (const row of manualRows.value) {
+      const vpGui = vanPhongs.value.find(v => v.value === row.vp_gui_id);
+      const vpNhan = vanPhongs.value.find(v => v.value === row.vp_nhan_id);
+      const tuyen = (vpGui && vpNhan) ? `${vpGui.ma}→${vpNhan.ma}` : '';
       items.push({
         bien_nhan_id: null,
-        ngay: fmtISO(row.ngay || selectedDate.value),
-        tuyen: row.tuyen || '',
-        nguoi_gui: row.nguoi_gui || '',
+        ngay: toISODate(row.ngay || selectedDate.value),
+        tuyen,
+        nguoi_gui: row.don_vi_gui || '',
         dia_chi_gui: row.dia_chi_gui || '',
         hang_hoa: row.hang_hoa || '',
         gia_cuoc: Number(row.gia_cuoc || 0),
       });
     }
+
 
     const payload = { items };
     if (bienSoXe.value?.trim()) payload.bien_so_xe = bienSoXe.value.trim();
@@ -304,34 +335,21 @@ async function toggleDN(dn) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-function fmtISO(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// ── Helpers — alias ngắn gọn từ utils ─────────────────────────
+// downloadBase64File → từ utils/file (đã import ở đầu file)
+// toISODate          → từ utils/format (đã import ở đầu file)
+const fmt     = (n) => formatNumber(n);           // dùng trong template
+const fmtDate = formatDate;                        // dùng trong template
+function fmtTruocThue(n) {
+  return truocThue(n).toLocaleString('vi-VN');     // tính trước thuế rồi format
 }
 
-function fmtDate(dt) {
-  if (!dt) return '—';
-  return new Date(dt).toLocaleDateString('vi-VN');
-}
-
-function fmt(n) { return Number(n).toLocaleString('vi-VN'); }
-function fmtTruocThue(n) { return Math.round(Number(n) / 1.08).toLocaleString('vi-VN'); }
-
-function downloadBase64File(base64, filename) {
-  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 5000);
-}
-
-onMounted(() => {
-  loadPending();
-  fetchHistory();
-  loadDN();
+onMounted(async () => {
+  // Chạy độc lập — lỗi riêng không làm treo trang
+  loadPending().catch(() => {});
+  fetchHistory().catch(() => {});
+  loadDN().catch(() => {});
+  loadVanPhongs().catch(() => {});
 });
 </script>
 
@@ -403,7 +421,7 @@ onMounted(() => {
         <Column header="STT" style="width: 42px; text-align:center;">
           <template #body="{ index }">{{ index + 1 }}</template>
         </Column>
-        <Column field="ma_so" header="Mã BN" style="width: 110px; font-weight:700; font-family: monospace;" />
+        <Column field="ma_so" header="Mã BN" style="width: 110px; font-weight:700;" />
         <Column header="Ngày" style="width: 78px;">
           <template #body="{ data }">{{ fmtDate(data.ngay_bien_nhan) }}</template>
         </Column>
@@ -478,10 +496,24 @@ onMounted(() => {
         <Column header="Ngày" style="width: 78px;">
           <template #body="{ data }">{{ fmtDate(data.ngay) }}</template>
         </Column>
-        <Column field="tuyen" header="Tuyến" style="width: 74px;" />
-        <Column field="nguoi_gui" header="Người gửi" />
-        <Column field="dia_chi_gui" header="Địa chỉ gửi" />
-        <Column field="hang_hoa" header="Hàng hoá" style="width: 130px;" />
+        <Column header="Tuyến" style="width: 80px;">
+          <template #body="{ data }">
+            <span class="tuyen-badge">{{ getTuyenLabel(data) }}</span>
+          </template>
+        </Column>
+        <Column header="Người gửi" style="min-width: 120px;">
+          <template #body="{ data }">
+            <div class="cell-main">{{ data.don_vi_gui || data.nguoi_gui || '—' }}</div>
+            <div class="cell-sub" v-if="data.don_vi_gui && data.nguoi_gui">{{ data.nguoi_gui }}</div>
+          </template>
+        </Column>
+        <Column header="Người nhận" style="min-width: 120px;">
+          <template #body="{ data }">
+            <div class="cell-main">{{ data.don_vi_nhan || data.nguoi_nhan || '—' }}</div>
+            <div class="cell-sub" v-if="data.don_vi_nhan && data.nguoi_nhan">{{ data.nguoi_nhan }}</div>
+          </template>
+        </Column>
+        <Column field="hang_hoa" header="Hàng hoá" style="min-width: 110px;" />
         <Column header="Trước thuế" style="width: 90px; text-align:right;">
           <template #body="{ data }">
             <span class="cuoc-before">{{ fmtTruocThue(data.gia_cuoc) }}</span>
@@ -534,43 +566,93 @@ onMounted(() => {
 
     <!-- ══ DIALOG: Thêm/Sửa dòng tự kê ══ -->
     <Dialog v-model:visible="manualDialogVisible"
-      :header="manualEditing !== null ? 'Sửa dòng tự kê' : 'Thêm dòng tự kê'"
-      :modal="true" :style="{ width: '480px' }">
+      :modal="true" :style="{ width: '500px' }" :draggable="false">
 
-      <div class="form-group">
-        <label class="form-label">Người gửi <span style="color:var(--danger)">*</span></label>
-        <AutoComplete v-model="manualForm.nguoi_gui"
-          :suggestions="dnSuggestions" optionLabel="ten"
-          @complete="searchDN" @item-select="onSelectDN"
-          placeholder="Gõ tên hoặc chọn từ danh sách DN..." fluid />
+      <template #header>
+        <div class="manual-dlg-header">
+          <div class="manual-dlg-icon">
+            <i :class="manualEditing !== null ? 'pi pi-pencil' : 'pi pi-plus'"></i>
+          </div>
+          <div>
+            <div class="manual-dlg-title">{{ manualEditing !== null ? 'Sửa dòng tự kê' : 'Thêm dòng tự kê' }}</div>
+            <div class="manual-dlg-sub">Nhập thông tin tương tự biên nhận hàng gửi</div>
+          </div>
+        </div>
+      </template>
+
+      <!-- ── Section: Ngày & Tuyến ── -->
+      <div class="form-section">
+        <div class="form-section-title"><i class="pi pi-map-marker"></i> Ngày & Tuyến</div>
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label class="form-label">Ngày</label>
+            <DatePicker v-model="manualForm.ngay" dateFormat="dd/mm/yy" showIcon fluid />
+          </div>
+          <div class="form-group">
+            <label class="form-label"><span class="vp-badge vp-gui">Gửi</span> Văn phòng gửi</label>
+            <Select v-model="manualForm.vp_gui_id"
+              :options="vanPhongs" optionLabel="label" optionValue="value"
+              placeholder="Chọn VP gửi..." fluid filter />
+          </div>
+          <div class="form-group">
+            <label class="form-label"><span class="vp-badge vp-nhan">Nhận</span> Văn phòng nhận</label>
+            <Select v-model="manualForm.vp_nhan_id"
+              :options="vanPhongs" optionLabel="label" optionValue="value"
+              placeholder="Chọn VP nhận..." fluid filter />
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Địa chỉ gửi</label>
-        <InputText v-model="manualForm.dia_chi_gui" placeholder="Địa chỉ người gửi..." fluid />
-      </div>
-      <div class="form-grid">
+
+      <!-- ── Người gửi ── -->
+      <div class="form-section form-section-green">
+        <div class="form-section-title"><i class="pi pi-send"></i> Người gửi</div>
         <div class="form-group">
-          <label class="form-label">Tuyến</label>
-          <InputText v-model="manualForm.tuyen" placeholder="VD: SG→CT" fluid />
+          <label class="form-label">Đơn vị gửi <span class="req">*</span></label>
+          <AutoComplete
+            v-model="manualForm.don_vi_gui"
+            :suggestions="guiSuggestions"
+            field="ten_don_vi"
+            @complete="searchKH"
+            @item-select="onSelectGui"
+            placeholder="Gõ tên đơn vị hoặc số điện thoại..."
+            fluid
+          >
+            <template #option="{ option }">
+              <div class="ac-option">
+                <span class="ac-name">{{ option.ten_don_vi }}</span>
+                <span class="ac-sub">{{ option.dien_thoai }}{{ option.nguoi_lien_he ? ' — ' + option.nguoi_lien_he : '' }}</span>
+              </div>
+            </template>
+          </AutoComplete>
         </div>
         <div class="form-group">
-          <label class="form-label">Ngày</label>
-          <DatePicker v-model="manualForm.ngay" dateFormat="dd/mm/yy" showIcon fluid />
+          <label class="form-label">Địa chỉ gửi</label>
+          <InputText v-model="manualForm.dia_chi_gui" placeholder="Địa chỉ gửi..." fluid />
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Hàng hoá</label>
-        <InputText v-model="manualForm.hang_hoa" placeholder="VD: 3 Thùng" fluid />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cước (sau thuế, đơn vị: đồng) <span style="color:var(--danger)">*</span></label>
-        <InputNumber v-model="manualForm.gia_cuoc" :min="0" :step="1000" fluid
-          suffix="đ" :useGrouping="true" placeholder="0" />
+
+      <!-- ── Hàng hoá & Cước ── -->
+      <div class="form-section">
+        <div class="form-section-title"><i class="pi pi-box"></i> Hàng hoá & Cước</div>
+        <div class="form-group">
+          <label class="form-label">Hàng hoá <span class="req">*</span></label>
+          <InputText v-model="manualForm.hang_hoa" placeholder="VD: 3 Kiện, 2 Bao, 1 Thùng..." fluid />
+          <small class="form-hint">Nhập tự do, cách nhau bằng dấu phẩy</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cước (sau thuế) <span class="req">*</span></label>
+          <InputNumber v-model="manualForm.gia_cuoc" :min="0" :step="1000" fluid
+            suffix="đ" :useGrouping="true" placeholder="0" />
+        </div>
       </div>
 
       <template #footer>
-        <Button label="Huỷ" severity="secondary" text size="small" @click="manualDialogVisible = false" />
-        <Button label="Lưu dòng" icon="pi pi-check" size="small" @click="saveManualRow" />
+        <div class="manual-dlg-footer">
+          <Button label="Huỷ" severity="secondary" text size="small" @click="manualDialogVisible = false" />
+          <Button :label="manualEditing !== null ? 'Cập nhật' : 'Thêm dòng'"
+            :icon="manualEditing !== null ? 'pi pi-check' : 'pi pi-plus'"
+            size="small" @click="saveManualRow" />
+        </div>
       </template>
     </Dialog>
 
@@ -772,4 +854,165 @@ onMounted(() => {
   padding: 0.65rem 0.85rem;
   margin-bottom: 0.75rem;
 }
+
+/* ══ Manual dialog ══ */
+.manual-dlg-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.manual-dlg-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-100, #e0e7ff);
+  color: var(--primary, #4f46e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.manual-dlg-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.manual-dlg-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.manual-dlg-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Sections trong dialog */
+.form-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.85rem 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.form-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.form-section-green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.form-section-green .form-section-title {
+  color: #15803d;
+}
+
+.form-section-gold {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.form-section-gold .form-section-title {
+  color: #92400e;
+}
+
+/* Layout 3-cột cho Ngày & Tuyến */
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.6rem;
+}
+
+/* Layout 2-cột — đã bỏ */
+
+
+/* VP badge inline label */
+.vp-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  margin-right: 0.2rem;
+  vertical-align: middle;
+}
+.vp-gui { background: #dcfce7; color: #15803d; }
+.vp-nhan { background: #fef9c3; color: #a16207; }
+
+
+/* Required star */
+.req {
+  color: var(--danger, #dc2626);
+  margin-left: 0.1rem;
+}
+
+/* Tuyến badge trong table */
+.tuyen-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary, #4f46e5);
+  background: var(--primary-50, #eef2ff);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Cell 2 dòng (đơn vị / tên) */
+.cell-main {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cell-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ── Hint text trong form ── */
+.form-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+/* ── Autocomplete option template ── */
+.ac-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.15rem 0;
+}
+
+.ac-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ac-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+
 </style>

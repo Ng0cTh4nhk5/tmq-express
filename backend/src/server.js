@@ -22,6 +22,9 @@ import doanhThuRoutes from './routes/doanh-thu.routes.js';
 import chanhRoutes from './routes/chanh.routes.js';
 import doanhNghiepHDDTRoutes from './routes/doanh-nghiep-hddt.routes.js';
 import thuHoRoutes from './routes/thu-ho.routes.js';
+import phieuChuyenCodRoutes from './routes/phieu-chuyen-cod.routes.js';
+import bienNhanThuHoRoutes from './routes/bien-nhan-thu-ho.routes.js';
+import cuocNhanRoutes from './routes/cuoc-nhan.routes.js';
 
 const fastify = Fastify({
   logger: {
@@ -72,6 +75,9 @@ await fastify.register(doanhThuRoutes, { prefix: '/api/doanh-thu' });
 await fastify.register(chanhRoutes, { prefix: '/api/chanh' });
 await fastify.register(doanhNghiepHDDTRoutes, { prefix: '/api/doanh-nghiep-hddt' });
 await fastify.register(thuHoRoutes, { prefix: '/api/thu-ho' });
+await fastify.register(phieuChuyenCodRoutes, { prefix: '/api/phieu-chuyen-cod' });
+await fastify.register(bienNhanThuHoRoutes, { prefix: '/api/bien-nhan-thu-ho' });
+await fastify.register(cuocNhanRoutes, { prefix: '/api/cuoc-nhan' });
 
 // ---- Graceful Shutdown ----
 const shutdown = async (signal) => {

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import api from '../api/client';
 import StatusBadge from '../components/bien-nhan/StatusBadge.vue';
 import StatusStepper from '../components/bien-nhan/StatusStepper.vue';
+import { formatDate, formatCurrency } from '../utils/format';
 
 const route = useRoute();
 const ma_so = route.params.ma_so;
@@ -16,18 +17,15 @@ const TRANG_THAI_LABELS = {
   dang_vc: 'Đang vận chuyển',
   da_den_kho: 'Đã đến kho',
   da_bao_khach: 'Đã báo khách',
+  dang_giao: 'Đang giao hàng',
+  da_giao_chanh: 'Đã giao Chành',
   khach_da_nhan: 'Khách đã nhận',
 };
 
-function formatDate(dt) {
-  if (!dt) return '';
-  return new Date(dt).toLocaleString('vi-VN');
-}
 
-function formatCurrency(val) {
-  if (!val) return '—';
-  return Number(val).toLocaleString('vi-VN') + 'đ';
-}
+// formatDate, formatCurrency — đã import từ utils/format
+// formatDate: hiển thị ngày theo vi-VN
+// formatCurrency: hiển thị số + đ
 
 async function load() {
   loading.value = true;
@@ -75,13 +73,26 @@ onMounted(load);
 
       <!-- Status Stepper -->
       <div class="scan-section">
-        <StatusStepper :current="bn.trang_thai" />
+        <StatusStepper
+          :current="bn.trang_thai"
+          :hinhThucGiao="bn.hinh_thuc_giao"
+          :hasChanh="!!bn.chanh"
+        />
       </div>
 
       <!-- Status -->
       <div class="scan-status">
         <StatusBadge :value="bn.trang_thai" type="trang_thai" />
         <span class="scan-date">{{ formatDate(bn.ngay_bien_nhan) }}</span>
+      </div>
+
+      <!-- Chanh Info (chỉ hiển khi da_giao_chanh) -->
+      <div v-if="bn.trang_thai === 'da_giao_chanh' && bn.chanh" class="scan-section scan-chanh">
+        <div class="chanh-label"><i class="pi pi-send"></i> Đã bàn giao cho đơn vị vận chuyển tiếp theo</div>
+        <div class="chanh-name">{{ bn.chanh.ten }}</div>
+        <div v-if="bn.chanh.dien_thoai" class="chanh-detail"><i class="pi pi-phone"></i> {{ bn.chanh.dien_thoai }}</div>
+        <div v-if="bn.chanh.dia_chi" class="chanh-detail"><i class="pi pi-map-marker"></i> {{ bn.chanh.dia_chi }}</div>
+        <div v-if="bn.chanh.nguoi_lien_he" class="chanh-detail"><i class="pi pi-user"></i> NLH: {{ bn.chanh.nguoi_lien_he }}</div>
       </div>
 
       <!-- Route -->
@@ -338,5 +349,25 @@ onMounted(load);
 
 .timeline-note {
   font-style: italic;
+}
+
+/* ── Chanh panel (da_giao_chanh) ──────────────────────────────── */
+.scan-chanh {
+  background: linear-gradient(135deg, #ede9fe, #f3e8ff);
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+}
+.chanh-label {
+  font-size: 0.72rem; font-weight: 700; color: #7c3aed;
+  display: flex; align-items: center; gap: 0.35rem;
+  margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.chanh-name {
+  font-size: 1rem; font-weight: 800; color: #4c1d95; margin-bottom: 0.4rem;
+}
+.chanh-detail {
+  font-size: 0.82rem; color: #5b21b6;
+  display: flex; align-items: center; gap: 0.35rem;
+  margin-top: 0.25rem;
 }
 </style>

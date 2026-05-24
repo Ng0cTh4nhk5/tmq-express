@@ -1,20 +1,34 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
+import DatePicker from 'primevue/datepicker';
+import { use }            from 'echarts/core';
+import { CanvasRenderer }  from 'echarts/renderers';
+import { BarChart }        from 'echarts/charts';
+import {
+  TooltipComponent,
+  LegendComponent,
+  GridComponent,
+} from 'echarts/components';
+import VChart from 'vue-echarts';
+
+// Đăng ký các ECharts components cần thiết (bắt buộc với vue-echarts v6+)
+use([CanvasRenderer, BarChart, TooltipComponent, LegendComponent, GridComponent]);
 import PageHeader from '../components/shared/PageHeader.vue';
 import StatCard from '../components/shared/StatCard.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
+import { formatNumber, toISODate } from '../utils/format';
 
 const toast = useToast();
 
 // ── Filter state ─────────────────────────────
 const now = new Date();
-const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-const today        = now.toISOString().slice(0, 10);
+const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+const today        = now;
 
 const from   = ref(firstOfMonth);
 const to     = ref(today);
@@ -32,6 +46,14 @@ function fmt(n) {
   return Number(n || 0).toLocaleString('vi-VN');
 }
 
+function toLocalDateStr(d) {
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // ── Fetch VP list ─────────────────────────────
 async function fetchVanPhong() {
   try {
@@ -47,8 +69,8 @@ async function fetchReport() {
   loading.value = true;
   try {
     const params = { nhom: nhom.value };
-    if (from.value)  params.from = from.value;
-    if (to.value)    params.to   = to.value;
+    if (from.value)  params.from = toISODate(from.value);
+    if (to.value)    params.to   = toISODate(to.value);
     if (vpId.value)  params.van_phong_id = vpId.value;
 
     const res = await api.get('/doanh-thu', { params });
@@ -61,6 +83,54 @@ async function fetchReport() {
   }
 }
 
+function setNhom(value) {
+  nhom.value = value;
+  const now = new Date();
+  switch (value) {
+    case 'ngay':
+      from.value = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      to.value   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'tuan': {
+      const day = now.getDay() || 7;
+      const mon = new Date(now); mon.setDate(now.getDate() - day + 1);
+      from.value = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate());
+      to.value   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    }
+    case 'thang':
+      from.value = new Date(now.getFullYear(), now.getMonth(), 1);
+      to.value   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'nam':
+      from.value = new Date(now.getFullYear(), 0, 1);
+      to.value   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+  }
+}
+
+// ── Chart config ─────────────────────────────
+const chartOption = computed(() => {
+  if (!chiTiet.value.length) return null;
+  return {
+    tooltip: { trigger: 'axis', formatter: (params) => {
+      let html = `<b>${params[0].name}</b><br/>`;
+      for (const p of params) {
+        html += `${p.marker} ${p.seriesName}: <b>${Number(p.value || 0).toLocaleString('vi-VN')}đ</b><br/>`;
+      }
+      return html;
+    }},
+    legend: { data: ['Tổng cước', 'Đã thu'], bottom: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 60, right: 20, top: 16, bottom: 40 },
+    xAxis: { type: 'category', data: chiTiet.value.map(d => d.key), axisLabel: { fontSize: 10, rotate: chiTiet.value.length > 10 ? 30 : 0 } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 10, formatter: (v) => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v } },
+    series: [
+      { name: 'Tổng cước', type: 'bar', data: chiTiet.value.map(d => d.tong_cuoc), itemStyle: { color: '#2a4f8a', borderRadius: [3,3,0,0] }, barMaxWidth: 28 },
+      { name: 'Đã thu', type: 'bar', data: chiTiet.value.map(d => d.da_thu), itemStyle: { color: '#16a34a', borderRadius: [3,3,0,0] }, barMaxWidth: 28 },
+    ],
+  };
+});
+
 onMounted(async () => {
   await fetchVanPhong();
   await fetchReport();
@@ -72,37 +142,42 @@ onMounted(async () => {
     <PageHeader title="Báo cáo doanh thu" icon="pi pi-chart-line" />
 
     <div class="card">
-      <!-- Filter row — native HTML to avoid PrimeVue InputGroup CSS merging -->
-      <div class="dt-filter-row">
-        <label class="dt-label">Từ ngày</label>
-        <input type="date" v-model="from" class="dt-input" />
+      <!-- Filter row -->
+      <div class="filter-section">
+        <label>Từ ngày</label>
+        <DatePicker v-model="from" dateFormat="dd/mm/yy" showIcon style="width: 140px;" />
 
-        <label class="dt-label">Đến ngày</label>
-        <input type="date" v-model="to" class="dt-input" />
+        <label class="filter-spacer">Đến ngày</label>
+        <DatePicker v-model="to" dateFormat="dd/mm/yy" showIcon style="width: 140px;" />
 
-        <label class="dt-label">VP gửi</label>
-        <select v-model="vpId" class="dt-select">
+        <label class="filter-spacer">VP gửi</label>
+        <select v-model="vpId" style="width: 160px;">
           <option value="">Tất cả</option>
           <option v-for="vp in vanPhongs" :key="vp.id" :value="vp.id">{{ vp.ma_vp }} — {{ vp.ten }}</option>
         </select>
 
-        <label class="dt-label">Nhóm theo</label>
-        <div class="dt-radio-group">
-          <button :class="['dt-radio-btn', { active: nhom === 'ngay' }]"  @click="nhom = 'ngay'">Ngày</button>
-          <button :class="['dt-radio-btn', { active: nhom === 'tuan' }]"  @click="nhom = 'tuan'">Tuần</button>
-          <button :class="['dt-radio-btn', { active: nhom === 'thang' }]" @click="nhom = 'thang'">Tháng</button>
-          <button :class="['dt-radio-btn', { active: nhom === 'nam' }]"   @click="nhom = 'nam'">Năm</button>
+        <label class="filter-spacer">Nhóm theo</label>
+        <div class="seg-group">
+          <button :class="['seg-btn', { active: nhom === 'ngay' }]"  @click="setNhom('ngay')">Ngày</button>
+          <button :class="['seg-btn', { active: nhom === 'tuan' }]"  @click="setNhom('tuan')">Tuần</button>
+          <button :class="['seg-btn', { active: nhom === 'thang' }]" @click="setNhom('thang')">Tháng</button>
+          <button :class="['seg-btn', { active: nhom === 'nam' }]"   @click="setNhom('nam')">Năm</button>
         </div>
 
-        <Button label="Xem" icon="pi pi-search" style="margin-left: 1.5rem;" :loading="loading" @click="fetchReport" />
+        <Button label="Xem" icon="pi pi-search" style="margin-left: auto;" :loading="loading" @click="fetchReport" />
       </div>
 
       <!-- Stat cards -->
       <div v-if="tongHop" class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
-        <StatCard icon="pi pi-inbox"               label="Số biên nhận"     :value="fmt(tongHop.so_bn) + ' BN'"     gradient="blue" />
-        <StatCard icon="pi pi-wallet"              label="Tổng doanh thu"   :value="fmt(tongHop.tong_cuoc) + 'đ'"   gradient="purple" />
-        <StatCard icon="pi pi-check-circle"        label="Đã thu"           :value="fmt(tongHop.da_thu) + 'đ'"      gradient="green" />
-        <StatCard icon="pi pi-exclamation-triangle" label="Chưa thu + Nợ" :value="fmt(tongHop.chua_thu + tongHop.cong_no) + 'đ'" gradient="orange" />
+        <StatCard icon="pi pi-inbox"               label="Số biên nhận"   :value="fmt(tongHop.so_bn) + ' BN'"                              variant="info" />
+        <StatCard icon="pi pi-wallet"              label="Tổng doanh thu" :value="fmt(tongHop.tong_cuoc) + 'đ'"                             variant="gold" />
+        <StatCard icon="pi pi-check-circle"        label="Đã thu"         :value="fmt(tongHop.da_thu) + 'đ'"                                variant="success" />
+        <StatCard icon="pi pi-exclamation-triangle" label="Chưa thu + Nợ" :value="fmt(tongHop.chua_thu + tongHop.cong_no) + 'đ'"            variant="danger" />
+      </div>
+
+      <!-- Chart -->
+      <div v-if="chartOption" class="chart-wrap">
+        <VChart :option="chartOption" autoresize style="height: 220px;" />
       </div>
 
       <!-- Data table -->
@@ -121,35 +196,35 @@ onMounted(async () => {
           </div>
         </template>
 
-        <Column field="key" header="Kỳ" style="font-weight:600; font-family: monospace; white-space: nowrap;" />
+        <Column field="key" header="Kỳ" style="font-weight:600; white-space: nowrap;" />
 
         <Column header="Số BN" style="width:80px; text-align:right;">
           <template #body="{ data }">
-            <span style="font-weight:600;">{{ data.so_bn }}</span>
+            <span class="fw-600">{{ data.so_bn }}</span>
           </template>
         </Column>
 
         <Column header="Tổng cước" style="width:130px; text-align:right;">
           <template #body="{ data }">
-            <span style="font-weight:700; color:#1e293b;">{{ fmt(data.tong_cuoc) }}đ</span>
+            <span class="fw-700 text-heading">{{ fmt(data.tong_cuoc) }}đ</span>
           </template>
         </Column>
 
         <Column header="Đã thu" style="width:120px; text-align:right;">
           <template #body="{ data }">
-            <span style="color:#16a34a; font-weight:600;">{{ fmt(data.da_thu) }}đ</span>
+            <span class="text-success fw-600">{{ fmt(data.da_thu) }}đ</span>
           </template>
         </Column>
 
         <Column header="Chưa thu" style="width:110px; text-align:right;">
           <template #body="{ data }">
-            <span :style="{ color: data.chua_thu > 0 ? '#d97706' : '#94a3b8' }">{{ fmt(data.chua_thu) }}đ</span>
+            <span :class="data.chua_thu > 0 ? 'text-warning' : 'text-muted'">{{ fmt(data.chua_thu) }}đ</span>
           </template>
         </Column>
 
         <Column header="Công nợ" style="width:110px; text-align:right;">
           <template #body="{ data }">
-            <span :style="{ color: data.cong_no > 0 ? '#dc2626' : '#94a3b8', fontWeight: data.cong_no > 0 ? 700 : 400 }">
+            <span :class="[data.cong_no > 0 ? 'text-danger fw-700' : 'text-muted']">
               {{ fmt(data.cong_no) }}đ
             </span>
           </template>
@@ -157,107 +232,75 @@ onMounted(async () => {
 
         <Column header="Thu hộ" style="width:110px; text-align:right;">
           <template #body="{ data }">
-            <span style="color:#6366f1;">{{ fmt(data.thu_ho) }}đ</span>
+            <span class="text-navy">{{ fmt(data.thu_ho) }}đ</span>
           </template>
         </Column>
       </DataTable>
 
       <!-- Footer tổng cộng -->
-      <div v-if="tongHop && chiTiet.length"
-        style="display:flex; gap:2rem; justify-content:flex-end; margin-top:0.5rem;
-               padding:0.6rem 0.75rem; background:#f1f5f9; border-radius:6px;
-               font-size:0.82rem; font-weight:700; border:1px solid #e2e8f0;">
+      <div v-if="tongHop && chiTiet.length" class="summary-footer">
         <span>{{ fmt(tongHop.so_bn) }} biên nhận</span>
-        <span>Tổng: <span style="color:#1e293b;">{{ fmt(tongHop.tong_cuoc) }}đ</span></span>
-        <span style="color:#16a34a;">Đã thu: {{ fmt(tongHop.da_thu) }}đ</span>
-        <span style="color:#d97706;">Chưa thu: {{ fmt(tongHop.chua_thu) }}đ</span>
-        <span style="color:#dc2626;">Công nợ: {{ fmt(tongHop.cong_no) }}đ</span>
+        <span>Tổng: <span class="text-heading">{{ fmt(tongHop.tong_cuoc) }}đ</span></span>
+        <span class="text-success">Đã thu: {{ fmt(tongHop.da_thu) }}đ</span>
+        <span class="text-warning">Chưa thu: {{ fmt(tongHop.chua_thu) }}đ</span>
+        <span class="text-danger">Công nợ: {{ fmt(tongHop.cong_no) }}đ</span>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Filter row — native HTML, no PrimeVue to avoid InputGroup border-merge bug */
-.dt-filter-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  gap: 0;
-}
-
-.dt-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #475569;
-  margin-right: 0.4rem;
-  white-space: nowrap;
-}
-
-.dt-input,
-.dt-select {
-  padding: 0.38rem 0.6rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-family: inherit;
-  color: #1e293b;
-  background: #fff;
-  margin-right: 1.5rem;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.dt-input:focus,
-.dt-select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-
-.dt-input[type="date"] { width: 130px; }
-.dt-select             { width: 160px; }
-
-/* Nhóm theo buttons — segmented control style */
-.dt-radio-group {
+/* Segmented control buttons */
+.seg-group {
   display: flex;
 }
 
-.dt-radio-btn {
+.seg-btn {
   padding: 0.38rem 0.85rem;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
   font-size: 0.8rem;
   font-family: inherit;
-  color: #475569;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
   outline: none;
 }
 
-.dt-radio-btn:first-child {
-  border-radius: 6px 0 0 6px;
-}
+.seg-btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.seg-btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.seg-btn:not(:first-child) { border-left: none; }
 
-.dt-radio-btn:last-child {
-  border-radius: 0 6px 6px 0;
-}
-
-.dt-radio-btn:not(:first-child) {
-  border-left: none;
-}
-
-.dt-radio-btn.active {
-  background: #2563eb;
+.seg-btn.active {
+  background: var(--navy-500);
   color: #fff;
-  border-color: #2563eb;
+  border-color: var(--navy-500);
 }
 
-.dt-radio-btn:not(.active):hover {
-  background: #f1f5f9;
+.seg-btn:not(.active):hover {
+  background: var(--bg-sunken);
+}
+
+/* Chart container */
+.chart-wrap {
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 0.5rem;
+  background: var(--bg-base);
+}
+
+/* Summary footer */
+.summary-footer {
+  display: flex;
+  gap: 2rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
 }
 </style>

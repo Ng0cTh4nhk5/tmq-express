@@ -1,5 +1,4 @@
 <script setup>
-import { computed } from 'vue';
 import AppSidebar from './AppSidebar.vue';
 import AppHeader from './AppHeader.vue';
 import Toast from 'primevue/toast';
@@ -16,7 +15,11 @@ const ui = useUiStore();
     <Toast position="top-right" />
     <ConfirmDialog />
     <main class="app-main">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <Transition name="page-fade" mode="out-in">
+          <component :is="Component" />
+        </Transition>
+      </router-view>
     </main>
 
     <!-- Backdrop khi sidebar expanded -->

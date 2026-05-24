@@ -1,5 +1,12 @@
 import * as nhanVienService from '../services/nhan-vien.service.js';
 
+// Schema dùng chung cho params :id
+const paramsIdSchema = {
+  type: 'object',
+  required: ['id'],
+  properties: { id: { type: 'integer', minimum: 1 } },
+};
+
 export default async function nhanVienRoutes(fastify) {
   // GET /api/nhan-vien
   fastify.get('/', {
@@ -20,11 +27,14 @@ export default async function nhanVienRoutes(fastify) {
         properties: {
           ma_nv: { type: 'string', minLength: 1 },
           ten: { type: 'string', minLength: 1 },
-          username: { type: 'string', minLength: 3 },
+          // [FE-04] username: chỉ cho phép chữ thường, số, gạch dưới/ngang/chấm
+          username: { type: 'string', minLength: 3, pattern: '^[a-z0-9_.\\-]+$' },
           password: { type: 'string', minLength: 6 },
-          role: { type: 'string', enum: ['admin', 'staff', 'accountant'] },
+          role: { type: 'string', enum: ['admin', 'staff'] },
           van_phong_id: { type: 'integer' },
+          require_password_change: { type: 'boolean' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {
@@ -37,11 +47,13 @@ export default async function nhanVienRoutes(fastify) {
   fastify.put('/:id', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     schema: {
+      // [ROUTE-02] Validate params :id là integer
+      params: paramsIdSchema,
       body: {
         type: 'object',
         properties: {
           ten: { type: 'string', minLength: 1 },
-          role: { type: 'string', enum: ['admin', 'staff', 'accountant'] },
+          role: { type: 'string', enum: ['admin', 'staff'] },
           van_phong_id: { type: 'integer' },
         },
         additionalProperties: false,
@@ -57,6 +69,8 @@ export default async function nhanVienRoutes(fastify) {
   fastify.patch('/:id/active', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
     schema: {
+      // [ROUTE-02] Validate params :id là integer
+      params: paramsIdSchema,
       body: {
         type: 'object',
         required: ['active'],
@@ -81,6 +95,12 @@ export default async function nhanVienRoutes(fastify) {
   // POST /api/nhan-vien/:id/reset-password
   fastify.post('/:id/reset-password', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    // [ROUTE-04] Per-route rate limit chặt hơn cho thao tác nhạy cảm
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+    schema: {
+      // [ROUTE-02] Validate params :id là integer
+      params: paramsIdSchema,
+    },
     handler: async (request) => {
       const result = await nhanVienService.resetPassword(Number(request.params.id));
       return {
