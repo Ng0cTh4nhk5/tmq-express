@@ -6,14 +6,28 @@ import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 /**
  * Danh sách BN có COD (thu_ho > 0)
  */
-export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, page = 1, limit = 20, search }) {
+export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, page = 1, limit = 20, search }, user) {
   const p = parseInt(page, 10) || 1;
   const l = Math.min(parseInt(limit, 10) || 20, 100);
   const where = { thu_ho: { gt: 0 } };
 
+  // Phân quyền: staff xem BN thuộc VP nhận của mình,
+  // CỘNG THÊM BN da_chuyen/da_tra thuộc VP gửi của mình
+  // (chành gửi cần thấy để "Trả người gửi" và xem lịch sử)
+  if (user.role !== 'admin') {
+    const vpId = user.van_phong_id;
+    where.OR = [
+      // BN mà VP mình là bên nhận hàng (mọi trạng thái)
+      { van_phong_nhan_id: vpId },
+      // BN mà VP mình là bên gửi hàng + đã chuyển/đã trả tiền COD về
+      { van_phong_gui_id: vpId, trang_thai_cod: { in: ['da_chuyen', 'da_tra'] } },
+    ];
+  } else {
+    if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
+  }
+
   if (trang_thai_cod) where.trang_thai_cod = trang_thai_cod;
   if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
-  if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
 
   if (from || to) {
     where.ngay_bien_nhan = {};
@@ -22,12 +36,18 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
   }
 
   if (search) {
-    where.OR = [
-      { ma_so: { contains: search, mode: 'insensitive' } },
-      { don_vi_gui: { contains: search, mode: 'insensitive' } },
-      { don_vi_nhan: { contains: search, mode: 'insensitive' } },
-      { nguoi_gui: { contains: search, mode: 'insensitive' } },
-      { nguoi_nhan: { contains: search, mode: 'insensitive' } },
+    // Dùng AND để không ghi đè OR của phân quyền VP
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { ma_so: { contains: search, mode: 'insensitive' } },
+          { don_vi_gui: { contains: search, mode: 'insensitive' } },
+          { don_vi_nhan: { contains: search, mode: 'insensitive' } },
+          { nguoi_gui: { contains: search, mode: 'insensitive' } },
+          { nguoi_nhan: { contains: search, mode: 'insensitive' } },
+        ],
+      },
     ];
   }
 
@@ -59,10 +79,21 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
 /**
  * Tổng hợp COD theo 6 trạng thái
  */
-export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}) {
+export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}, user) {
   const baseWhere = { thu_ho: { gt: 0 } };
+
+  // Phân quyền: staff xem BN thuộc VP nhận của mình,
+  // CỘNG THÊM BN da_chuyen/da_tra thuộc VP gửi của mình
+  if (user.role !== 'admin') {
+    const vpId = user.van_phong_id;
+    baseWhere.OR = [
+      { van_phong_nhan_id: vpId },
+      { van_phong_gui_id: vpId, trang_thai_cod: { in: ['da_chuyen', 'da_tra'] } },
+    ];
+  } else {
+    if (vp_nhan) baseWhere.van_phong_nhan_id = Number(vp_nhan);
+  }
   if (vp_gui) baseWhere.van_phong_gui_id = Number(vp_gui);
-  if (vp_nhan) baseWhere.van_phong_nhan_id = Number(vp_nhan);
   if (from || to) {
     baseWhere.ngay_bien_nhan = {};
     if (from) baseWhere.ngay_bien_nhan.gte = parseStartOfDayVN(from);
@@ -112,6 +143,11 @@ export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop 
   }
   if (!bn.thu_ho || Number(bn.thu_ho) <= 0) {
     throw Object.assign(new Error('Biên nhận không có tiền COD để thu'), { statusCode: 400 });
+  }
+
+  // [FIX-VP] Staff chỉ được thu COD của BN thuộc VP nhận của mình
+  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+    throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được thu COD của biên nhận này'), { statusCode: 403 });
   }
 
   const tenNguoiNop = nguoi_nop || bn.don_vi_nhan || bn.nguoi_nhan || 'Không xác định';
@@ -193,6 +229,11 @@ export async function xacNhanThuChanh(bienNhanId, { ghi_chu } = {}, user) {
     throw Object.assign(new Error('Biên nhận này chưa được gán chành'), { statusCode: 400 });
   }
 
+  // [FIX-VP] Staff chỉ được ghi nhận chành thu tại VP nhận của mình
+  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+    throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được ghi nhận chành thu'), { statusCode: 403 });
+  }
+
   const updatedBN = await prisma.bienNhan.update({
     where: { id: bienNhanId },
     data: { trang_thai_cod: 'da_thu_chanh' },
@@ -204,8 +245,12 @@ export async function xacNhanThuChanh(bienNhanId, { ghi_chu } = {}, user) {
 
 /**
  * VP Nhận xác nhận đã nhận tiền từ Chành
- * State: da_thu_chanh → da_thu
- * Side effect: PhieuThu @ VP Nhận + BienNhanThuHo (la_qua_chanh = true)
+ * State COD: da_thu_chanh → da_thu
+ * Side effect: PhieuThu COD @ VP Nhận + BienNhanThuHo (la_qua_chanh = true)
+ *
+ * [CHANH-CUOC] Nếu BN đồng thời có cước chưa thu (trang_thai_cuoc_nhan = 'cho_thu'),
+ * tự động thu cước trong cùng transaction — vì khi chành giao hàng và VP nhận lại tiền
+ * COD từ chành, cước cũng đã được thu (qua chành) cùng lúc.
  */
 export async function xacNhanNhanTuChanh(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop } = {}, user) {
   const bn = await prisma.bienNhan.findUnique({
@@ -218,17 +263,34 @@ export async function xacNhanNhanTuChanh(bienNhanId, { hinh_thuc, ghi_chu, nguoi
     throw Object.assign(new Error('BN chưa ở trạng thái "Chành đã thu"'), { statusCode: 400 });
   }
 
-  const tenNguoiNop = nguoi_nop || (bn.chanh ? `Chành ${bn.chanh.ten}` : 'Chành') ;
+  // [FIX-VP] Staff chỉ được xác nhận nhận từ chành tại VP nhận của mình
+  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+    throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được xác nhận nhận tiền từ chành'), { statusCode: 403 });
+  }
+
+  const tenNguoiNop = nguoi_nop || (bn.chanh ? `Chành ${bn.chanh.ten}` : 'Chành');
   const ht = hinh_thuc || 'tien_mat';
 
+  // [CHANH-CUOC] Kiểm tra có cước chưa thu không để xử lý trong cùng transaction
+  const canAutoThuCuoc = bn.trang_thai_cuoc_nhan === 'cho_thu'
+    && bn.trang_thai_thu === 'chua_thu'
+    && bn.gia_cuoc && Number(bn.gia_cuoc) > 0;
+
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Update trạng thái
+    // 1. Update trạng thái COD (+ tự động thu cước nếu đủ điều kiện)
+    const bnUpdateData = { trang_thai_cod: 'da_thu' };
+    if (canAutoThuCuoc) {
+      // Đánh dấu đã thu cước — trang_thai_thu vẫn giữ 'chua_thu' cho đến
+      // khi VP Gửi nhận đủ tiền (nếu cần chuyển cước), nhưng trang_thai_cuoc_nhan
+      // chuyển sang 'da_thu' để phản ánh cước đã được thu tại VP Nhận.
+      bnUpdateData.trang_thai_cuoc_nhan = 'da_thu';
+    }
     const updatedBN = await tx.bienNhan.update({
       where: { id: bienNhanId },
-      data: { trang_thai_cod: 'da_thu' },
+      data: bnUpdateData,
     });
 
-    // 2. PhieuThu @ VP Nhận
+    // 2. PhieuThu COD @ VP Nhận
     const phieuThu = await createWithCode(
       async (ma_phieu) => tx.phieuThu.create({
         data: {
@@ -263,10 +325,36 @@ export async function xacNhanNhanTuChanh(bienNhanId, { hinh_thuc, ghi_chu, nguoi
       'bienNhanThuHo', 'ma_bnth', 'BNTH', 4, tx,
     );
 
-    return { bn: updatedBN, phieu_thu: phieuThu, bien_nhan_thu_ho: bnth };
+    // [CHANH-CUOC] 4. Nếu BN có cước chưa thu → tạo PhieuThu cước riêng
+    let phieuThuCuoc = null;
+    if (canAutoThuCuoc) {
+      phieuThuCuoc = await createWithCode(
+        async (ma_phieu) => tx.phieuThu.create({
+          data: {
+            ma_phieu,
+            doi_tuong: tenNguoiNop,
+            ly_do: `Thu cước BN ${bn.ma_so} qua chành`,
+            so_tien: bn.gia_cuoc,
+            hinh_thuc: ht,
+            van_phong_id: bn.van_phong_nhan_id,
+            nhan_vien_id: user.id,
+            bien_nhan_id: bn.id,
+          },
+        }),
+        'phieuThu', 'ma_phieu', 'PT', 4, tx,
+      );
+    }
+
+    return { bn: updatedBN, phieu_thu: phieuThu, bien_nhan_thu_ho: bnth, phieu_thu_cuoc: phieuThuCuoc };
   });
 
-  writeAuditLog({ action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId, newData: { trang_thai_cod: 'da_thu' } });
+  writeAuditLog({
+    action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId,
+    newData: {
+      trang_thai_cod: 'da_thu',
+      ...(canAutoThuCuoc ? { trang_thai_cuoc_nhan: 'da_thu', note: 'Auto-thu cước qua chành' } : {}),
+    },
+  });
   return result;
 }
 

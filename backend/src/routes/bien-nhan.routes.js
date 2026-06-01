@@ -240,36 +240,44 @@ export default async function bienNhanRoutes(fastify) {
       if (request.user.role === 'staff') {
         vpNhanId = request.user.van_phong_id;
       } else {
+        // [FIX-ADMIN] Admin: optional VP filter — null = xem tất cả VP
         vpNhanId = request.query.vp_nhan_id ? Number(request.query.vp_nhan_id) : null;
       }
 
-      const EMPTY = { success: true, data: [], stats: { total: 0, tong_cuoc: 0, so_co_cod: 0 }, tab_counts: { dang_vc: 0, da_den_kho: 0, da_bao_khach: 0, dang_giao: 0 } };
-      if (!vpNhanId) return EMPTY;
+      const EMPTY = { success: true, data: [], stats: { total: 0, tong_cuoc: 0, so_co_cod: 0 }, tab_counts: { dang_vc: 0, da_den_kho: 0, da_bao_khach: 0, dang_giao: 0, da_giao_chanh: 0 } };
+      // [FIX-ADMIN] Chỉ chặn staff không có VP, admin được phép null (= tất cả)
+      if (!vpNhanId && request.user.role === 'staff') return EMPTY;
 
-      const ALLOWED_TABS = ['dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao'];
+      const ALLOWED_TABS = ['dang_vc', 'da_den_kho', 'da_bao_khach', 'dang_giao', 'da_giao_chanh'];
       const trangThai = ALLOWED_TABS.includes(request.query.trang_thai)
         ? request.query.trang_thai
         : 'dang_vc';
 
+      // [FIX-ADMIN] Build where: chỉ thêm VP filter khi có giá trị cụ thể
+      const vpFilter = vpNhanId ? { van_phong_nhan_id: vpNhanId } : {};
 
       // count_all=true: chỉ đếm tổng cho badge sidebar
       if (request.query.count_all === 'true') {
         const counts = await Promise.all(
-          ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { van_phong_nhan_id: vpNhanId, trang_thai: tt } }))
+          ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { ...vpFilter, trang_thai: tt } }))
         );
         const tab_counts = Object.fromEntries(ALLOWED_TABS.map((tt, i) => [tt, counts[i]]));
         return { success: true, tab_counts, total: counts.reduce((s, c) => s + c, 0) };
       }
 
-      const where = { van_phong_nhan_id: vpNhanId, trang_thai: trangThai };
+      const page  = Number(request.query.page)  || 1;
+      const limit = Number(request.query.limit) || 50;
+      const skip  = (page - 1) * limit;
+
+      const where = { ...vpFilter, trang_thai: trangThai };
 
       // [HD-01] Query data tab hiện tại + count chính xác + counts tất cả tab song song
-      // total lấy từ DB count — chính xác ngay cả khi > 500 BN (không dùng data.length)
       const [data, totalCount, ...tabCountResults] = await Promise.all([
         prisma.bienNhan.findMany({
           where,
           orderBy: [{ ngay_bien_nhan: 'asc' }, { id: 'asc' }],
-          take: 500,
+          skip,
+          take: limit,
           include: {
             van_phong_gui:  { select: { ma_vp: true, ten: true } },
             van_phong_nhan: { select: { ma_vp: true, ten: true } },
@@ -278,18 +286,20 @@ export default async function bienNhanRoutes(fastify) {
           },
         }),
 
-        prisma.bienNhan.count({ where }),                         // [HD-01] DB count cho stats.total chính xác
-        ...ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { van_phong_nhan_id: vpNhanId, trang_thai: tt } })),
+        prisma.bienNhan.count({ where }),
+        ...ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { ...vpFilter, trang_thai: tt } })),
       ]);
 
       const tab_counts = Object.fromEntries(ALLOWED_TABS.map((tt, i) => [tt, tabCountResults[i]]));
       const stats = {
-        total:     totalCount,                                    // [HD-01] từ DB, không phải data.length
+        total:     totalCount,
         tong_cuoc: data.reduce((s, b) => s + Number(b.gia_cuoc || 0), 0),
         so_co_cod: data.filter(b => Number(b.thu_ho) > 0).length,
       };
 
-      return { success: true, data, stats, tab_counts, has_more: totalCount > data.length };
+      const pagination = { page, limit, total: totalCount, totalPages: Math.ceil(totalCount / limit) };
+
+      return { success: true, data, stats, tab_counts, pagination };
     },
   });
 
@@ -304,31 +314,41 @@ export default async function bienNhanRoutes(fastify) {
       if (request.user.role === 'staff') {
         vpGuiId = request.user.van_phong_id;
       } else {
+        // [FIX-ADMIN] Admin: optional VP filter — null = xem tất cả VP
         vpGuiId = request.query.vp_gui_id ? Number(request.query.vp_gui_id) : null;
       }
 
       const EMPTY = {
         success: true, data: [],
         stats: { total: 0, tong_cuoc: 0, so_co_cod: 0 },
-        count: 0,
+        pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
       };
-      if (!vpGuiId) return EMPTY;
+      // [FIX-ADMIN] Chỉ chặn staff không có VP, admin được phép null (= tất cả)
+      if (!vpGuiId && request.user.role === 'staff') return EMPTY;
+
+      const page  = Number(request.query.page)  || 1;
+      const limit = Number(request.query.limit) || 50;
+      const skip  = (page - 1) * limit;
+
+      // [FIX-ADMIN] Build where: chỉ thêm VP filter khi có giá trị cụ thể
+      const vpFilter = vpGuiId ? { van_phong_gui_id: vpGuiId } : {};
 
       // count_all=true: chỉ đếm cho badge sidebar, không cần trả data
       if (request.query.count_all === 'true') {
         const count = await prisma.bienNhan.count({
-          where: { van_phong_gui_id: vpGuiId, trang_thai: 'cho_vc' },
+          where: { ...vpFilter, trang_thai: 'cho_vc' },
         });
         return { success: true, count };
       }
 
-      // [BE-W1] Query đầy đủ — count song song để stats luôn chính xác dù take: 500
-      const where = { van_phong_gui_id: vpGuiId, trang_thai: 'cho_vc' };
+      // [BE-W1] Query đầy đủ — count song song để stats luôn chính xác
+      const where = { ...vpFilter, trang_thai: 'cho_vc' };
       const [data, totalCount] = await Promise.all([
         prisma.bienNhan.findMany({
           where,
           orderBy: { ngay_bien_nhan: 'asc' },
-          take: 500, // [RT-02] Giới hạn tải về — đủ cho một ca làm việc bình thường
+          skip,
+          take: limit,
           include: {
             van_phong_gui:  { select: { ma_vp: true, ten: true } },
             van_phong_nhan: { select: { ma_vp: true, ten: true } },
@@ -339,15 +359,15 @@ export default async function bienNhanRoutes(fastify) {
         prisma.bienNhan.count({ where }),
       ]);
 
-      // [BE-W1] total lấy từ DB count, tong_cuoc/so_co_cod tính từ data đã load
-      // (acceptable trade-off: tong_cuoc chỉ tính trên 500 BN đầu nếu vượt ngưỡng)
       const stats = {
         total:     totalCount,
         tong_cuoc: data.reduce((s, b) => s + Number(b.gia_cuoc || 0), 0),
         so_co_cod: data.filter(b => Number(b.thu_ho) > 0).length,
       };
 
-      return { success: true, data, stats, has_more: totalCount > data.length };
+      const pagination = { page, limit, total: totalCount, totalPages: Math.ceil(totalCount / limit) };
+
+      return { success: true, data, stats, pagination };
     },
   });
 

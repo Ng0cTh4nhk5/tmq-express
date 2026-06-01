@@ -574,11 +574,7 @@ button, input, select, textarea, .p-component {
   border-radius: var(--radius-sm);
 }
 
-/* Page transitions (used with <Transition name="page-fade">) */
-.page-fade-enter-active { transition: opacity 0.15s ease, transform 0.15s ease; }
-.page-fade-leave-active { transition: opacity 0.1s ease; }
-.page-fade-enter-from { opacity: 0; transform: translateY(6px); }
-.page-fade-leave-to { opacity: 0; }
+/* Page transitions — removed: animate-fade-in on each view provides entry animation */
 
 /* ─── Text Color Utilities ─── */
 .text-success { color: var(--success); }
@@ -651,3 +647,674 @@ button, input, select, textarea, .p-component {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED VIEW LAYOUT — dùng chung cho tất cả các View chính
+   (ChoVanChuyen, HangDen, ThuHo, CuocNhan)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Page Shell (Full-height flex container) ──────────────────── */
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--header-height) - var(--content-padding) * 2);
+  gap: 0.5rem;
+}
+
+/* ─── Page Header (overrides generic .page-header above) ───────── */
+.page-shell .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  margin-bottom: 0; /* reset base margin — gap handles spacing */
+}
+
+.page-shell .page-header h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.page-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-icon {
+  font-size: 1rem;
+  color: var(--navy-400);
+}
+
+/* ─── VP Badge (hiển thị tên VP của nhân viên) ─────────────────── */
+.vp-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── VP Select Wrap (Admin: chọn VP từ dropdown) ──────────────── */
+.vp-select-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.vp-select {
+  min-width: 200px;
+  font-size: 0.82rem;
+}
+
+/* ─── Refresh Info (đếm ngược auto-refresh) ────────────────────── */
+.refresh-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 48px;
+  transition: color var(--transition);
+}
+
+.refresh-info.almost {
+  color: #f97316;
+  font-weight: 600;
+}
+
+/* ─── Stats Row (flex row thay vì grid — co giãn linh hoạt) ──── */
+.stats-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.stats-row .stat-card {
+  flex: 1 1 130px;
+  min-width: 130px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius);
+  border-left-width: 3px;
+  border-left-style: solid;
+  overflow: hidden;
+}
+
+.stats-row .stat-card .stat-icon {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.stats-row .stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.stats-row .stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--secondary);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-row .stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Stats Row semantic variants */
+.stats-row .stat-card.stat-total        { border-left-color: #f59e0b; }
+.stats-row .stat-card.stat-total        .stat-icon { background: #fef3c7; color: #d97706; }
+.stats-row .stat-card.stat-money        { border-left-color: #22c55e; }
+.stats-row .stat-card.stat-money        .stat-icon { background: #f0fdf4; color: #16a34a; }
+.stats-row .stat-card.stat-cod          { border-left-color: #f97316; }
+.stats-row .stat-card.stat-cod          .stat-icon { background: #fff7ed; color: #ea580c; }
+.stats-row .stat-card.stat-cod-active   { border-left-color: #ef4444; background: #fff8f8; }
+.stats-row .stat-card.stat-cod-active   .stat-icon { background: #fef2f2; color: #dc2626; }
+.stats-row .stat-card.stat-warning      { border-left-color: var(--warning); }
+.stats-row .stat-card.stat-warning      .stat-icon { background: var(--warning-light); color: var(--warning); }
+.stats-row .stat-card.stat-info         { border-left-color: var(--info); }
+.stats-row .stat-card.stat-info         .stat-icon { background: var(--info-light); color: var(--info); }
+.stats-row .stat-card.stat-success      { border-left-color: var(--success); }
+.stats-row .stat-card.stat-success      .stat-icon { background: var(--success-light); color: var(--success); }
+.stats-row .stat-card.stat-gold         { border-left-color: var(--gold-400); }
+.stats-row .stat-card.stat-gold         .stat-icon { background: var(--gold-50); color: var(--gold-500); }
+.stats-row .stat-card.stat-send         { border-left-color: #8b5cf6; }
+.stats-row .stat-card.stat-send         .stat-icon { background: #f5f3ff; color: #7c3aed; }
+.stats-row .stat-card.stat-neutral      { border-left-color: var(--border); }
+.stats-row .stat-card.stat-neutral      .stat-icon { background: var(--bg-sunken); color: var(--text-muted); }
+
+/* COD warn badge (absolute position inside stat-card) */
+.stat-cod-warn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: #ef4444;
+  color: white;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+/* ─── Tab Bar ───────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 0.15rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+  font-family: var(--font-family);
+}
+
+.tab-btn:hover {
+  background: var(--bg-sunken);
+  color: var(--secondary);
+}
+
+.tab-btn.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ─── Page Toolbar ──────────────────────────────────────────────── */
+.page-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.search-wrap {
+  flex: 1 1 200px;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  font-size: 0.83rem;
+  height: 100%;
+}
+
+.filter-select {
+  flex: 0 0 180px;
+  font-size: 0.82rem;
+}
+
+.filter-date {
+  flex: 0 0 140px;
+  font-size: 0.82rem;
+}
+
+.filter-chanh {
+  flex: 0 0 160px;
+}
+
+.filter-active-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #bfdbfe;
+  flex-wrap: wrap;
+}
+
+.clear-filter {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.25rem;
+  font-weight: 600;
+  font-family: var(--font-family);
+}
+
+.clear-filter:hover {
+  text-decoration: underline;
+}
+
+/* ─── Batch Action Bar ──────────────────────────────────────────── */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  flex-shrink: 0;
+  font-size: 0.82rem;
+}
+
+.batch-bar--active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.batch-bar--hint {
+  border-color: var(--border);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+}
+
+.batch-bar .batch-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* COD-specific batch bar (warn tone) */
+.batch-bar-cod {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-light);
+  flex-shrink: 0;
+  font-size: 0.82rem;
+}
+
+/* ─── Has-more Warning Banner ───────────────────────────────────── */
+.has-more-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  background: var(--warning-light);
+  border: 1px solid var(--warning-border);
+  color: #92400e;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.has-more-warn i {
+  color: var(--warning);
+  font-size: 0.85rem;
+}
+
+/* ─── Table Shared Utilities ────────────────────────────────────── */
+.page-table {
+  flex: 1;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  color: var(--text-muted);
+}
+
+.ma-so-cell {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 0.82rem;
+}
+
+/* VP Tags */
+.vp-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.vp-tag.vp-gui  { background: #dbeafe; color: #1d4ed8; }
+.vp-tag.vp-nhan { background: #dcfce7; color: #166534; }
+
+/* Chanh Tag */
+.chanh-tag {
+  display: inline-block;
+  background: #f3e8ff;
+  color: #7c3aed;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* COD Badge */
+.cod-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--danger-border);
+}
+
+/* Cuoc Badge */
+.cuoc-badge {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+/* Cuoc Nhan Badge */
+.cuoc-nhan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--info-light);
+  color: var(--info);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--info-border);
+}
+
+/* No value placeholder */
+.no-val {
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+/* Action cell in table */
+.action-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.confirm-btn {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Waiting / passive label */
+.waiting-label,
+.waiting-cod-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Row highlight for COD rows */
+:deep(.row-has-cod) { background: #fffbeb !important; border-left: 2px solid #f59e0b; }
+:deep(.row-has-cod:hover td) { background: #fef3c7 !important; }
+
+/* Row not selectable */
+:deep(.row-not-selectable) { opacity: 0.6; }
+
+/* Person cell (name + sub + phone) */
+.person-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.person-cell .name  { font-size: 0.82rem; font-weight: 600; color: var(--secondary); }
+.person-cell .sub   { font-size: 0.72rem; color: var(--text-muted); }
+.person-cell .phone { font-size: 0.72rem; color: #2563eb; }
+
+/* Cuoc value */
+.cuoc-val { font-size: 0.82rem; font-weight: 600; }
+
+/* ─── Confirm Dialog Shared Styles ──────────────────────────────── */
+.confirm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.confirm-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.confirm-lbl {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.confirm-val {
+  color: var(--secondary);
+  font-size: 0.85rem;
+}
+
+.confirm-cod-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  background: var(--danger-light);
+  color: var(--danger);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger-border);
+}
+
+.confirm-cuoc-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  background: var(--info-light);
+  color: var(--info);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--info-border);
+}
+
+.confirm-ghi-chu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+/* Batch list inside dialog */
+.batch-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.5rem;
+}
+
+.batch-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.78rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-muted);
+}
+
+.batch-item strong {
+  color: var(--secondary);
+  min-width: 100px;
+}
+
+/* ─── Pagination controls ───────────────────────────────────────── */
+.page-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.25rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.pagi-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ─── Info Banner ───────────────────────────────────────────────── */
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  background: var(--info-light);
+  border: 1px solid var(--info-border);
+  color: var(--info);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* Quick filter chip */
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
+  font-family: var(--font-family);
+}
+
+.quick-chip:hover { background: var(--bg-hover); border-color: var(--primary); color: var(--primary); }
+.quick-chip--active { background: var(--warning-light); border-color: var(--warning-border); color: var(--warning); font-weight: 600; }
+
+/* form-label alias used in dialogs */
+.bk-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ─── Summary Footer (ThuHo / CuocNhan) ────────────────────────── */
+.summary-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.cod-total {
+  font-weight: 700;
+  color: var(--danger);
+}
+

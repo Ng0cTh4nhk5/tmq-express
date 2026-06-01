@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
@@ -12,6 +15,9 @@ const router = useRouter();
 const toast = useToast();
 const auth = useAuthStore();
 
+// ============================================================================
+// MARK: - STATE & VALIDATION
+// ============================================================================
 // Nếu đến do require_password_change thì ẩn nút "Bỏ qua"
 const isMandatory = computed(() => auth.user?.require_password_change === true);
 
@@ -40,6 +46,9 @@ function validate() {
   return Object.keys(errors.value).length === 0;
 }
 
+// ============================================================================
+// MARK: - ACTIONS
+// ============================================================================
 async function save() {
   if (!validate()) return;
   saving.value = true;
@@ -66,6 +75,9 @@ function cancel() {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & BANNERS                                              -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Đổi mật khẩu" icon="pi pi-key">
       <template #actions>
@@ -90,6 +102,9 @@ function cancel() {
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - PASSWORD FORM CARD                                            -->
+    <!-- ===================================================================== -->
     <div class="card change-pw-card">
       <div class="form-section-title">
         <i class="pi pi-lock"></i>
@@ -158,6 +173,9 @@ function cancel() {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .mandatory-banner {
   display: flex;
   align-items: flex-start;

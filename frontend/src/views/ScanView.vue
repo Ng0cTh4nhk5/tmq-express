@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../api/client';
@@ -6,6 +9,9 @@ import StatusBadge from '../components/bien-nhan/StatusBadge.vue';
 import StatusStepper from '../components/bien-nhan/StatusStepper.vue';
 import { formatDate, formatCurrency } from '../utils/format';
 
+// ============================================================================
+// MARK: - STATE & CONSTANTS
+// ============================================================================
 const route = useRoute();
 const ma_so = route.params.ma_so;
 const bn = ref(null);
@@ -27,6 +33,9 @@ const TRANG_THAI_LABELS = {
 // formatDate: hiển thị ngày theo vi-VN
 // formatCurrency: hiển thị số + đ
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 async function load() {
   loading.value = true;
   error.value = '';
@@ -44,6 +53,9 @@ onMounted(load);
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - LOADING & ERROR LAYOUTS                                       -->
+  <!-- ===================================================================== -->
   <div class="scan-page">
     <div class="scan-card" v-if="loading">
       <div class="scan-loading">
@@ -61,6 +73,9 @@ onMounted(load);
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - RESULT DETAILS DISPLAY                                        -->
+    <!-- ===================================================================== -->
     <div class="scan-result" v-else>
       <!-- Header -->
       <div class="scan-header">
@@ -71,6 +86,9 @@ onMounted(load);
         <div class="scan-ma-so">{{ bn.ma_so }}</div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - STEPPER PROGRESS                                              -->
+      <!-- ===================================================================== -->
       <!-- Status Stepper -->
       <div class="scan-section">
         <StatusStepper
@@ -95,6 +113,9 @@ onMounted(load);
         <div v-if="bn.chanh.nguoi_lien_he" class="chanh-detail"><i class="pi pi-user"></i> NLH: {{ bn.chanh.nguoi_lien_he }}</div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - ROUTE MAP                                                     -->
+      <!-- ===================================================================== -->
       <!-- Route -->
       <div class="scan-section">
         <div class="scan-route">
@@ -123,6 +144,9 @@ onMounted(load);
         </div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - TIMELINE HISTORY                                              -->
+      <!-- ===================================================================== -->
       <!-- Timeline -->
       <div class="scan-section" v-if="bn.lich_su?.length">
         <h3 class="section-title">Lịch sử</h3>
@@ -142,6 +166,9 @@ onMounted(load);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .scan-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);

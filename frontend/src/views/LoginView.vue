@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth.store';
@@ -9,11 +12,17 @@ import Button from 'primevue/button';
 const router = useRouter();
 const auth = useAuthStore();
 
+// ============================================================================
+// MARK: - STATE VARIABLES
+// ============================================================================
 const username = ref('');
 const password = ref('');
 const loading = ref(false);
 const error = ref('');
 
+// ============================================================================
+// MARK: - API: HANDLE LOGIN
+// ============================================================================
 async function handleLogin() {
   error.value = '';
   if (!username.value || !password.value) {
@@ -49,6 +58,9 @@ async function handleLogin() {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - BRANDING & BACKGROUND                                         -->
+  <!-- ===================================================================== -->
   <div class="login-page">
     <!-- Animated background shapes -->
     <div class="bg-shapes">
@@ -74,6 +86,9 @@ async function handleLogin() {
         </div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - LOGIN FORM CARD                                               -->
+      <!-- ===================================================================== -->
       <!-- Right login form -->
       <div class="login-card">
         <div class="login-header">
@@ -137,6 +152,9 @@ async function handleLogin() {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .login-page {
   min-height: 100vh;
   display: flex;

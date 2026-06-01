@@ -1,47 +1,28 @@
-node_modules/
-.env
-.DS_Store
-dist/
-dist-ssr/
-*.local
-node_modules
-/node_modules/
-dist
-/dist/
-coverage/
+# Ignore everything in the root directory by default
+/*
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
+# Allow tracking these root files and folders
+!/.gitignore
+!/frontend/
+!/backend/
 
-# OS
-.DS_Store
-*.pem
+# --- Frontend Ignores ---
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/.env
+frontend/.env.*
+frontend/.vite-cache*/
+frontend/.vscode/
 
-# Prisma
+# --- Backend Ignores ---
+backend/node_modules/
+backend/dist/
+backend/*.local
+backend/.env
+backend/.env.*
 backend/prisma/dev.db
 backend/prisma/dev.db-journal
-
-# Environment variables
-.env
-.env.test
-.env.production
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-thuc-dia/
-frontend/.vite-cache/
-frontend/.vite-cache-2/
-frontend/.vite-cache-3/
-*.mp4
-*.m4a
-
-current-system/
-logo.jpg
-temp/
+backend/logs/
+backend/*.log

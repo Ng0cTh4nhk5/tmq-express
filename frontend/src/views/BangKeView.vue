@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
@@ -19,6 +22,9 @@ import { downloadBase64File } from '../utils/file';
 
 const toast = useToast();
 
+// ============================================================================
+// MARK: - STATE & CONSTANTS
+// ============================================================================
 // ── Đơn vị hàng hoá ──────────────────────────────────────────
 const UNITS = ['Kiện', 'Bao', 'Thùng', 'Cuộn', 'Pallet', 'Cái', 'Bộ', 'Khác'];
 
@@ -29,6 +35,9 @@ const bienSoXe = ref('');
 const loading = ref(false);
 const exporting = ref(false);
 
+// ============================================================================
+// MARK: - STATE: BN EDITS (PENDING TAB)
+// ============================================================================
 // ── Case A: BN chờ từ DB ──────────────────────────────────────
 const pendingList = ref([]);   // Danh sách BN chờ từ API
 const selectedBNs = ref([]);   // BN được checkbox
@@ -64,6 +73,9 @@ function removeBNItem(bnId, idx) {
   }
 }
 
+// ============================================================================
+// MARK: - STATE & API: OFFICES ( tuyến tự kê )
+// ============================================================================
 // ── Văn phòng (dùng cho dropdown tuyến tự kê) ────────────────
 const vanPhongs = ref([]);
 async function loadVanPhongs() {
@@ -73,6 +85,9 @@ async function loadVanPhongs() {
   } catch { vanPhongs.value = []; }
 }
 
+// ============================================================================
+// MARK: - STATE: MANUAL INPUT ROWS
+// ============================================================================
 // ── Case B: Dòng tự kê ───────────────────────────────────────
 const manualRows = ref([]);
 const manualDialogVisible = ref(false);
@@ -135,6 +150,9 @@ function removeManualRow(idx) {
   manualRows.value.splice(idx, 1);
 }
 
+// ============================================================================
+// MARK: - CUSTOMER AUTOCOMPLETE SUGGESTIONS
+// ============================================================================
 // ── Autocomplete Khách hàng ────────────────────────────────────
 const guiSuggestions = ref([]);
 
@@ -158,6 +176,9 @@ function onSelectGui(event) {
 }
 
 
+// ============================================================================
+// MARK: - COMPUTED STATE
+// ============================================================================
 // ── Computed: tổng cộng ───────────────────────────────────────
 const tongSauThue = computed(() => {
   let total = 0;
@@ -173,6 +194,9 @@ const tongTruocThue = computed(() => {
 });
 const totalItems = computed(() => selectedBNs.value.length + manualRows.value.length);
 
+// ============================================================================
+// MARK: - API: LOADS & PENDING ITEMS
+// ============================================================================
 // ── Lấy BN chờ HĐĐT theo ngày ─────────────────────────────────
 async function loadPending() {
   loading.value = true;
@@ -200,6 +224,9 @@ async function fetchHistory() {
   }
 }
 
+// ============================================================================
+// MARK: - API: EXPORT BANG KE TO EXCEL
+// ============================================================================
 // ── Xuất Excel ───────────────────────────────────────────────
 async function exportBangKe() {
   if (totalItems.value === 0) {
@@ -276,6 +303,9 @@ async function redownload(bk) {
   }
 }
 
+// ============================================================================
+// MARK: - E-INVOICE BUSINESS MANAGEMENT (HDDT)
+// ============================================================================
 // ── Quản lý Doanh nghiệp HĐĐT ────────────────────────────────
 const dnDialogVisible = ref(false);
 const doanhNghieps = ref([]);
@@ -335,6 +365,9 @@ async function toggleDN(dn) {
   }
 }
 
+// ============================================================================
+// MARK: - LIFECYCLE & SHORTENED HELPERS
+// ============================================================================
 // ── Helpers — alias ngắn gọn từ utils ─────────────────────────
 // downloadBase64File → từ utils/file (đã import ở đầu file)
 // toISODate          → từ utils/format (đã import ở đầu file)
@@ -354,6 +387,9 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & EXCEL ACTIONS                                        -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Bảng kê hóa đơn điện tử" icon="pi pi-file-excel">
       <template #actions>
@@ -366,6 +402,9 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - FILTERS TOOLBAR                                               -->
+    <!-- ===================================================================== -->
     <!-- ── Toolbar ── -->
     <div class="bk-toolbar card" style="margin-bottom: 0.75rem;">
       <div class="toolbar-row">
@@ -391,6 +430,9 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TABS SWITCHER                                                 -->
+    <!-- ===================================================================== -->
     <!-- ── Tabs ── -->
     <div class="tab-bar" style="margin-bottom: 0.75rem;">
       <Button :label="`Biên nhận chờ (${pendingList.length})`" size="small"
@@ -404,6 +446,9 @@ onMounted(async () => {
         :outlined="tab !== 'history'" @click="tab = 'history'" />
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB: PENDING ITEMS                                            -->
+    <!-- ===================================================================== -->
     <!-- ══ TAB: BN Chờ (Case A) ══ -->
     <div class="card" v-if="tab === 'pending'">
       <DataTable :value="pendingList" :loading="loading"
@@ -483,6 +528,9 @@ onMounted(async () => {
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB: MANUAL ENTRIES                                           -->
+    <!-- ===================================================================== -->
     <!-- ══ TAB: Dòng tự kê (Case B) ══ -->
     <div class="card" v-if="tab === 'manual'">
       <div v-if="!manualRows.length" class="empty-msg">
@@ -539,6 +587,9 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB: HISTORY LOGS                                             -->
+    <!-- ===================================================================== -->
     <!-- ══ TAB: Lịch sử ══ -->
     <div class="card" v-if="tab === 'history'">
       <DataTable :value="historyList" stripedRows size="small" responsiveLayout="scroll" dataKey="id">
@@ -564,6 +615,9 @@ onMounted(async () => {
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: MANUAL ROW CREATOR/EDITOR                             -->
+    <!-- ===================================================================== -->
     <!-- ══ DIALOG: Thêm/Sửa dòng tự kê ══ -->
     <Dialog v-model:visible="manualDialogVisible"
       :modal="true" :style="{ width: '500px' }" :draggable="false">
@@ -656,6 +710,9 @@ onMounted(async () => {
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: BUSINESSES MANAGER (HDDT)                             -->
+    <!-- ===================================================================== -->
     <!-- ══ DIALOG: Quản lý Doanh nghiệp HĐĐT ══ -->
     <Dialog v-model:visible="dnDialogVisible"
       header="Quản lý Doanh nghiệp HĐĐT"
@@ -717,6 +774,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .bk-toolbar {
   padding: 0.65rem 0.85rem;
 }

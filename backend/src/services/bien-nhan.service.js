@@ -35,16 +35,26 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
 
   // Staff: chỉ thấy BN liên quan đến VP mình — scope được enforce qua OR condition
   if (role === 'staff' && van_phong_id) {
-    where.OR = [
+    const staffScope = { OR: [
       { van_phong_gui_id: van_phong_id },
       { van_phong_nhan_id: van_phong_id },
-    ];
-    // [N-H01] KHÔNG áp dụng vp_gui/vp_nhan từ query khi là staff —
-    // filter đó sẽ ghi đè trực tiếp vào where và phá vỡ OR scope,
-    // cho phép bypass xem BN của VP khác.
+    ] };
+
+    // [N-H01 FIX] Kết hợp staff scope với filter vp_gui/vp_nhan (nếu user chọn)
+    // bằng AND — đảm bảo staff không thể xem BN ngoài phạm vi VP mình,
+    // đồng thời filter VP gửi/VP nhận vẫn có hiệu lực.
+    const extraFilters = [];
+    if (vp_gui)  extraFilters.push({ van_phong_gui_id:  Number(vp_gui) });
+    if (vp_nhan) extraFilters.push({ van_phong_nhan_id: Number(vp_nhan) });
+
+    if (extraFilters.length > 0) {
+      where.AND = [staffScope, ...extraFilters];
+    } else {
+      where.OR = staffScope.OR;
+    }
   } else {
-    // Admin / staff (không bị scope VP): áp dụng filter từ query
-    if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
+    // Admin / accountant: áp dụng filter từ query trực tiếp
+    if (vp_gui)  where.van_phong_gui_id  = Number(vp_gui);
     if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
   }
 
@@ -71,7 +81,12 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
       { ten_hang_hoa: { contains: search, mode: 'insensitive' } },
     ];
 
-    if (where.OR) {
+    if (where.AND) {
+      // Staff với VP filter: where.AND đã có [staffScope, ...extraFilters]
+      // Thêm search condition vào AND
+      where.AND.push({ OR: searchOr });
+    } else if (where.OR) {
+      // Staff không có VP filter: where.OR là staffScope
       const staffFilter = where.OR;
       delete where.OR;
       where.AND = [
@@ -79,6 +94,7 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
         { OR: searchOr },
       ];
     } else {
+      // Admin/accountant: set OR trực tiếp
       where.OR = searchOr;
     }
   }
@@ -88,7 +104,11 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
       where,
       skip: (p - 1) * l,
       take: l,
-      orderBy: { [safeSortBy]: safeSortOrder },
+      // [S-01] Array orderBy: primary sort theo user chọn, tiebreaker là created_at DESC
+      // → đảm bảo BN tạo sau luôn nằm trên khi cùng ngày/cùng giá trị sort field
+      orderBy: safeSortBy === 'created_at'
+        ? [{ created_at: safeSortOrder }]
+        : [{ [safeSortBy]: safeSortOrder }, { created_at: 'desc' }],
       include: {
         van_phong_gui: { select: { ma_vp: true, ten: true } },
         van_phong_nhan: { select: { ma_vp: true, ten: true } },

@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
@@ -17,6 +20,9 @@ import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 
+// ============================================================================
+// MARK: - STATE & OPTIONS
+// ============================================================================
 const toast = useToast();
 const confirm = useConfirm();
 const list = ref([]);
@@ -37,6 +43,9 @@ const emptyForm = () => ({
 const form = ref(emptyForm());
 const pwError = ref('');
 
+// ============================================================================
+// MARK: - WATCHERS
+// ============================================================================
 // ── [FE-01] Tự sinh mã NV khi chọn VP (chỉ khi tạo mới) ───────────────────
 // Derive số thứ tự từ index trong vanPhongs (thứ tự load từ API), không hardcode
 watch(() => form.value.van_phong_id, (vpId) => {
@@ -53,6 +62,9 @@ watch(() => form.value.van_phong_id, (vpId) => {
   form.value.ma_nv = `NV${vpNum}${stt}`;
 });
 
+// ============================================================================
+// MARK: - COMPUTED SEARCH FILTERS
+// ============================================================================
 // ── [FE-03] Computed filtered list ──────────────────────────────────────────
 const filteredList = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
@@ -80,6 +92,9 @@ function roleLabel(role) {
   return 'Nhân viên';
 }
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 async function fetchData() {
   loading.value = true;
   try {
@@ -100,6 +115,9 @@ async function fetchData() {
   loading.value = false;
 }
 
+// ============================================================================
+// MARK: - ACTIONS
+// ============================================================================
 function openNew() {
   form.value = emptyForm();
   pwError.value = '';
@@ -157,6 +175,9 @@ function validateForm() {
   return true;
 }
 
+// ============================================================================
+// MARK: - API: SAVE & STATUS TOGGLES
+// ============================================================================
 async function save() {
   if (!validateForm()) return;
   try {
@@ -195,6 +216,9 @@ async function toggleActive(row) {
   } catch (err) { handleApiError(err, toast, 'Không thể thay đổi trạng thái'); }
 }
 
+// ============================================================================
+// MARK: - API: RESET PASSWORD
+// ============================================================================
 async function resetPw(row) {
   confirm.require({
     message: `Reset mật khẩu cho ${row.ten}?`,
@@ -223,6 +247,9 @@ onMounted(fetchData);
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & TOOLBAR                                              -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Nhân viên" icon="pi pi-id-card">
       <template #actions>
@@ -247,7 +274,10 @@ onMounted(fetchData);
         </span>
       </div>
 
-      <DataTable
+    <!-- ===================================================================== -->
+    <!-- MARK: - DATA TABLE                                                    -->
+    <!-- ===================================================================== -->
+    <DataTable
         :value="filteredList"
         :loading="loading"
         stripedRows
@@ -287,6 +317,9 @@ onMounted(fetchData);
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CREATE/EDIT EMPLOYEE                                  -->
+    <!-- ===================================================================== -->
     <!-- Dialog tạo / sửa -->
     <Dialog
       v-model:visible="dialogVisible"
@@ -418,6 +451,9 @@ onMounted(fetchData);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .table-toolbar {
   display: flex;
   align-items: center;

@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
@@ -11,6 +14,9 @@ import { handleApiError } from '../utils/error-handler';
 import { applyPhoneFormat, stripPhone } from '../utils/phone';
 import { usePhoneInput } from '../composables/usePhoneInput';
 
+// ============================================================================
+// MARK: - STATE & OPTIONS
+// ============================================================================
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
@@ -31,6 +37,9 @@ const form = ref({
 });
 const maKh = ref('');
 
+// ============================================================================
+// MARK: - INPUT HELPERS & PHONE COMPOSTABLE
+// ============================================================================
 // ── Phone input composable ───────────────────────────────────────
 const { handlePhoneInput } = usePhoneInput();
 
@@ -53,6 +62,9 @@ const tenDonViLabel = computed(() =>
 const isCaNhan = computed(() => form.value.loai_kh === 'ca_nhan');
 const isDoanh  = computed(() => form.value.loai_kh === 'doanh_nghiep');
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 async function loadKH() {
   if (!isEdit.value) return;
   loading.value = true;
@@ -91,6 +103,9 @@ function validate() {
   return true;
 }
 
+// ============================================================================
+// MARK: - API: SAVE DATA & VALIDATE
+// ============================================================================
 async function save() {
   if (!validate()) return;
   saving.value = true;
@@ -135,6 +150,9 @@ onMounted(loadKH);
 
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER                                                        -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader :title="isEdit ? 'Sửa khách hàng' : 'Thêm khách hàng mới'" icon="pi pi-users">
       <template #actions>
@@ -142,6 +160,9 @@ onMounted(loadKH);
       </template>
     </PageHeader>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TYPE SELECTOR                                                 -->
+    <!-- ===================================================================== -->
     <div class="card kh-form-card" v-if="!loading">
 
       <div v-if="isEdit" class="form-group" style="margin-bottom: 1rem;">
@@ -161,6 +182,9 @@ onMounted(loadKH);
         </div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - FORM: INDIVIDUAL CUSTOMER                                     -->
+      <!-- ===================================================================== -->
       <template v-if="isCaNhan">
         <div class="section-title" style="margin-top: 0.75rem;"><i class="pi pi-id-card"></i> Thông tin cá nhân</div>
         <div class="form-grid-2-1">
@@ -190,6 +214,9 @@ onMounted(loadKH);
         </div>
       </template>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - FORM: BUSINESS CUSTOMER                                       -->
+      <!-- ===================================================================== -->
       <template v-if="isDoanh">
         <div class="section-title" style="margin-top: 0.75rem;"><i class="pi pi-building"></i> Thông tin doanh nghiệp</div>
         <div class="form-grid-2-1">
@@ -231,6 +258,9 @@ onMounted(loadKH);
         </div>
       </template>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - FORM: NOTES & ACTIONS                                         -->
+      <!-- ===================================================================== -->
       <template v-if="form.loai_kh">
         <div class="section-title" style="margin-top: 0.25rem;"><i class="pi pi-comment"></i> Ghi chú</div>
         <div class="form-group">
@@ -246,6 +276,9 @@ onMounted(loadKH);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .kh-form-card { max-width: 680px; }
 
 .section-title {

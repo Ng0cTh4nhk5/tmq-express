@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
@@ -22,10 +25,14 @@ const choVcStore = useChoVanChuyenStore();
 const route = useRoute();
 const router = useRouter();
 
+// ============================================================================
+// MARK: - STATE: CORE DATA
+// ============================================================================
 // ── Data ──────────────────────────────────────────────────────────
 const items = ref([]);
 const stats = ref({ total: 0, tong_cuoc: 0, so_co_cod: 0 });
-const hasMore = ref(false); // [NEW-L1] Backend flag: có hơn 500 BN chưa hiển thị
+const pagination = ref({ page: 1, limit: 50, total: 0, totalPages: 1 }); // [B9] Backend pagination
+const page = ref(1);
 const loading = ref(false);
 const vanPhongs = ref([]);
 const selectedVpGui = ref(null);
@@ -33,6 +40,9 @@ const searchText = ref('');
 const filterVpNhan = ref(null);
 const filterChanh = ref(null);
 
+// ============================================================================
+// MARK: - STATE: BATCH & SINGLE DIALOGS
+// ============================================================================
 // ── Batch ─────────────────────────────────────────────────────────
 const batchSelected = ref([]);
 const batchConfirmVisible = ref(false);
@@ -50,6 +60,9 @@ const refreshCountdown = ref(60);
 let refreshTimer = null;
 let countdownTimer = null;
 
+// ============================================================================
+// MARK: - COMPUTED STATE
+// ============================================================================
 // ── Computed ───────────────────────────────────────────────────────
 const isAdminOrAccountant = computed(() => auth.isAdmin || auth.isAccountant);
 
@@ -108,32 +121,32 @@ const displayStats = computed(() => {
   };
 });
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 // ── Load VPs (Admin) ───────────────────────────────────────────────
 async function loadVanPhongs() {
   if (!isAdminOrAccountant.value) return;
   try {
     const { data: res } = await api.get('/van-phong?active=true');
-    vanPhongs.value = res.data.map(v => ({ label: `${v.ma_vp} — ${v.ten}`, value: v.id }));
+    vanPhongs.value = [
+      { label: 'Tất cả VP', value: null },  // [FIX-ADMIN] Admin xem tất cả khi không chọn VP
+      ...res.data.map(v => ({ label: `${v.ma_vp} — ${v.ten}`, value: v.id })),
+    ];
   } catch { vanPhongs.value = []; }
 }
 
 // ── Load data ──────────────────────────────────────────────────────
 async function loadData() {
-  if (isAdminOrAccountant.value && !selectedVpGui.value) {
-    items.value = [];
-    stats.value = { total: 0, tong_cuoc: 0, so_co_cod: 0 };
-    hasMore.value = false; // [V3-W2] Reset banner khi admin bỏ chọn VP
-    return;
-  }
   loading.value = true;
   try {
-    const params = {};
-    if (isAdminOrAccountant.value) params.vp_gui_id = selectedVpGui.value;
+    const params = { page: page.value, limit: 50 };
+    if (isAdminOrAccountant.value && selectedVpGui.value) params.vp_gui_id = selectedVpGui.value;
     const { data: res } = await api.get('/bien-nhan/cho-van-chuyen', { params });
     items.value = res.data;
     stats.value = res.stats;
-    hasMore.value = res.has_more ?? false;    // [NEW-L1] Track nếu > 500 BN
-    choVcStore.count = res.stats.total;       // [NEW-W2] Cập nhật badge trực tiếp, bỏ request thừa
+    pagination.value = res.pagination ?? { page: 1, limit: 50, total: res.stats?.total ?? 0, totalPages: 1 }; // [B9]
+    choVcStore.count = res.stats.total; // Cập nhật badge trực tiếp
   } catch (err) {
     handleApiError(err, toast, 'Không thể tải danh sách');
   } finally {
@@ -141,6 +154,9 @@ async function loadData() {
   }
 }
 
+// ============================================================================
+// MARK: - ACTIONS & REFRESH TIMERS
+// ============================================================================
 // ── Timers ─────────────────────────────────────────────────────────
 function resetCountdown() { refreshCountdown.value = 60; }
 function startTimers() {
@@ -155,6 +171,9 @@ async function manualRefresh() {
   startTimers();
 }
 
+// ============================================================================
+// MARK: - ACTIONS: SINGLE & BATCH CONFIRMATIONS
+// ============================================================================
 // ── Confirm đơn lẻ ────────────────────────────────────────────────
 function openConfirm(bn) {
   confirmTarget.value = bn;
@@ -245,6 +264,9 @@ watch(selectedVpGui, async () => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - LIFECYCLE
+// ============================================================================
 onMounted(async () => {
   // Restore filters từ URL
   if (route.query.vp_nhan) filterVpNhan.value = route.query.vp_nhan;
@@ -260,6 +282,9 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & OFFICE SWITCHER                                      -->
+  <!-- ===================================================================== -->
   <div class="cvc-page animate-fade-in">
 
     <!-- ═══ HEADER ═══ -->
@@ -278,7 +303,8 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="cvc-header-right">
-        <span class="refresh-info" :class="{ 'almost': refreshCountdown <= 10 }">
+        <span class="refresh-info" :class="{ 'almost': refreshCountdown <= 10 }"
+          v-tooltip.bottom="'Tự động làm mới dữ liệu sau ' + refreshCountdown + ' giây'">
           <i class="pi pi-clock"></i> {{ refreshCountdown }}s
         </span>
         <Button icon="pi pi-refresh" v-tooltip.bottom="'Làm mới ngay'" severity="secondary"
@@ -286,6 +312,9 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - STATISTICS CARDS                                              -->
+    <!-- ===================================================================== -->
     <!-- ═══ STATS CARDS ═══ -->
     <div class="stats-row">
       <div class="stat-card stat-total">
@@ -319,13 +348,10 @@ onUnmounted(() => {
       Đang hiển thị <strong>500</strong> / <strong>{{ stats.total }}</strong> biên nhận — giao xe các lô đầu để xem phần còn lại.
     </div>
 
-    <!-- ═══ EMPTY (admin chưa chọn VP) ═══ -->
-    <div v-if="isAdminOrAccountant && !selectedVpGui" class="empty-state">
-      <i class="pi pi-building empty-icon"></i>
-      <p>Chọn văn phòng gửi để xem danh sách</p>
-    </div>
-
-    <template v-else>
+    <!-- [FIX-ADMIN] Bỏ guard v-if/v-else — admin thấy dữ liệu ngay -->
+      <!-- ===================================================================== -->
+      <!-- MARK: - TOOLBAR & FILTERS                                             -->
+      <!-- ===================================================================== -->
       <!-- ═══ TOOLBAR ═══ -->
       <div class="cvc-toolbar">
         <div class="toolbar-row">
@@ -352,6 +378,9 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- MARK: - DATA TABLE                                                    -->
+      <!-- ===================================================================== -->
       <!-- ═══ TABLE ═══ -->
       <DataTable :value="filteredItems" v-model:selection="batchSelected" dataKey="id"
         :loading="loading" stripedRows size="small" scrollable scrollHeight="flex"
@@ -429,8 +458,26 @@ onUnmounted(() => {
           </div>
         </template>
       </DataTable>
-    </template>
 
+      <!-- ─── Pagination Bar [B9] ─────────────────────────────────────── -->
+      <div v-if="pagination.totalPages > 1" class="page-pagination">
+        <span>Trang {{ pagination.page }}/{{ pagination.totalPages }} · {{ pagination.total }} biên nhận</span>
+        <div class="pagi-controls">
+          <Button icon="pi pi-angle-double-left" text size="small" rounded
+            :disabled="pagination.page <= 1" @click="page = 1; loadData()" />
+          <Button icon="pi pi-angle-left" text size="small" rounded
+            :disabled="pagination.page <= 1" @click="page--; loadData()" />
+          <span style="font-size:0.8rem; padding: 0 0.25rem;">{{ pagination.page }}</span>
+          <Button icon="pi pi-angle-right" text size="small" rounded
+            :disabled="pagination.page >= pagination.totalPages" @click="page++; loadData()" />
+          <Button icon="pi pi-angle-double-right" text size="small" rounded
+            :disabled="pagination.page >= pagination.totalPages" @click="page = pagination.totalPages; loadData()" />
+        </div>
+      </div>
+
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CONFIRM SINGLE ITEM                                   -->
+    <!-- ===================================================================== -->
     <!-- ═══ CONFIRM ĐƠN LẺ ═══ -->
     <Dialog v-model:visible="confirmDialogVisible" header="Xác nhận Giao xe" :modal="true" :style="{ width: '420px' }">
       <div v-if="confirmTarget" class="confirm-info">
@@ -458,10 +505,13 @@ onUnmounted(() => {
       </div>
       <template #footer>
         <Button label="Hủy" severity="secondary" text size="small" @click="confirmDialogVisible = false" />
-        <Button label="✓ Giao xe" severity="warn" size="small" :loading="confirming" @click="confirmSingle" />
+        <Button label="Giao xe" icon="pi pi-send" severity="warn" size="small" :loading="confirming" @click="confirmSingle" />
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: BATCH CONFIRM ITEMS                                   -->
+    <!-- ===================================================================== -->
     <!-- ═══ BATCH CONFIRM ═══ -->
     <Dialog v-model:visible="batchConfirmVisible" header="Giao xe hàng loạt" :modal="true" :style="{ width: '460px' }">
       <p style="font-size:0.87rem;margin-bottom:0.6rem;">
@@ -481,8 +531,8 @@ onUnmounted(() => {
       </div>
       <template #footer>
         <Button label="Hủy" severity="secondary" text size="small" @click="batchConfirmVisible = false; batchGhiChu = ''" /> <!-- [V3-W3] Reset ghi chú khi hủy -->
-        <Button :label="`✓ Giao xe ${batchSelected.length} BN`"
-          severity="warn" size="small" :loading="batchConfirming" @click="confirmBatch" />
+        <Button :label="`Giao xe ${batchSelected.length} BN`"
+          icon="pi pi-send" severity="warn" size="small" :loading="batchConfirming" @click="confirmBatch" />
       </template>
     </Dialog>
 
@@ -490,84 +540,48 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ─── Page ──────────────────────────────────────────────────────── */
+/* ─── Page Layout ──────────────────────────────────────────────── */
 .cvc-page { display: flex; flex-direction: column; height: calc(100vh - var(--header-height) - var(--content-padding) * 2); gap: 0.5rem; }
 
 /* ─── Header ────────────────────────────────────────────────────── */
-.cvc-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 0.5rem; padding: 0.25rem 0; }
-.cvc-header-left { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.cvc-header-left h1 { font-size: 1.1rem; font-weight: 700; color: var(--secondary); margin: 0; }
-.header-icon { color: #d97706; font-size: 1rem; }
-.cvc-header-right { display: flex; align-items: center; gap: 0.5rem; }
-.vp-select { min-width: 200px; font-size: 0.82rem; }
-.vp-badge { display: flex; align-items: center; gap: 0.3rem; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); background: var(--bg-hover); padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); }
-.refresh-info { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem; min-width: 48px; transition: color 0.3s; }
-.refresh-info.almost { color: #f97316; font-weight: 600; }
+.cvc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
 
-/* ─── Stats ─────────────────────────────────────────────────────── */
-.stats-row { display: flex; gap: 0.6rem; flex-shrink: 0; }
-.stat-card { flex: 1 1 0%; min-width: 0; position: relative; display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem 0.9rem; border-radius: var(--radius); background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid transparent; transition: box-shadow 0.2s; overflow: hidden; }
-.stat-card:hover { box-shadow: var(--shadow-sm); }
-.stat-total { border-left-color: #f59e0b; }
-.stat-money { border-left-color: #22c55e; }
-.stat-cod   { border-left-color: #f97316; }
-.stat-cod-active { border-left-color: #ef4444; background: #fff8f8; }
-.stat-icon { width: 34px; height: 34px; min-width: 34px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0; }
-.stat-total .stat-icon { background: #fef3c7; color: #d97706; }
-.stat-money .stat-icon { background: #f0fdf4; color: #16a34a; }
-.stat-cod   .stat-icon { background: #fff7ed; color: #ea580c; }
-.stat-cod-active .stat-icon { background: #fef2f2; color: #dc2626; }
-.stat-body { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; flex: 1; }
-.stat-value { font-size: 1.05rem; font-weight: 700; color: var(--secondary); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stat-label { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
-.stat-cod-warn { position: absolute; top: 8px; right: 8px; font-size: 0.6rem; font-weight: 700; background: #ef4444; color: white; padding: 0.1rem 0.35rem; border-radius: 4px; text-transform: uppercase; }
+.cvc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
 
-/* ─── Empty ─────────────────────────────────────────────────────── */
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--text-muted); }
-.empty-icon { font-size: 3rem; opacity: 0.3; }
+.cvc-header-left h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin: 0;
+  white-space: nowrap;
+}
 
-/* ─── Has-more warning ──────────────────────────────────────────── */
-.has-more-warn { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); flex-shrink: 0; }
-.has-more-warn i { color: #d97706; font-size: 0.85rem; }
+.cvc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
 
-/* ─── Toolbar ───────────────────────────────────────────────────── */
+/* ─── Table & Toolbar ───────────────────────────────────────────── */
+.cvc-table   { flex: 1; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); }
 .cvc-toolbar { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
-.toolbar-row { display: flex; align-items: stretch; gap: 0.5rem; flex-wrap: wrap; }
-.search-wrap { flex: 1 1 200px; max-width: 300px; display: flex; align-items: center; }
-.search-input { width: 100%; font-size: 0.83rem; height: 100%; }
-.filter-select { flex: 0 0 180px; font-size: 0.82rem; }
-.filter-chanh { flex: 0 0 160px; }
-.filter-active-hint { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: #d97706; background: #fef3c7; padding: 0.25rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid #fde68a; flex-wrap: wrap; }
-.clear-filter { background: none; border: none; color: #dc2626; font-size: 0.75rem; cursor: pointer; padding: 0; margin-left: 0.25rem; font-weight: 600; }
-.clear-filter:hover { text-decoration: underline; }
 
-/* ─── Table ─────────────────────────────────────────────────────── */
-.cvc-table { flex: 1; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); }
-.ma-so-cell { font-weight: 700; color: #d97706; font-size: 0.82rem; }
-.vp-tag { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px; letter-spacing: 0.03em; }
-.vp-nhan { background: #dcfce7; color: #166534; }
-.chanh-tag { display: inline-block; background: #f3e8ff; color: #7c3aed; font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 4px; }
-.person-cell { display: flex; flex-direction: column; gap: 0.05rem; }
-.person-cell .name { font-size: 0.82rem; font-weight: 600; color: var(--secondary); }
-.person-cell .sub  { font-size: 0.72rem; color: var(--text-muted); }
-.person-cell .phone { font-size: 0.72rem; color: #2563eb; }
-.cuoc-val { font-size: 0.82rem; font-weight: 600; }
-.cod-badge { display: inline-flex; align-items: center; gap: 0.2rem; background: #fef2f2; color: #dc2626; font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #fecaca; }
-.no-val { color: var(--text-light); font-size: 0.8rem; }
+/* ─── NV nhập cell: chỉ riêng ChoVanChuyen mới có cột này ──────── */
 .nv-nhap-cell { font-size: 0.78rem; color: var(--text-muted); }
-.confirm-btn { font-size: 0.78rem; white-space: nowrap; }
-:deep(.row-has-cod) { background: #fffbeb !important; border-left: 2px solid #f59e0b; }
-:deep(.row-has-cod:hover td) { background: #fef3c7 !important; }
-.table-empty { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem; color: var(--text-muted); }
-
-/* ─── Confirm dialog ────────────────────────────────────────────── */
-.confirm-info { display: flex; flex-direction: column; gap: 0.5rem; }
-.confirm-row { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.85rem; }
-.confirm-lbl { color: var(--text-muted); font-size: 0.78rem; min-width: 80px; flex-shrink: 0; }
-.confirm-val { color: var(--secondary); font-size: 0.85rem; }
-.confirm-cod-warn { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; background: #fef2f2; color: #dc2626; padding: 0.4rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid #fecaca; }
-.confirm-ghi-chu { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.25rem; }
-.batch-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.3rem 0.5rem; }
-.batch-item { display: flex; gap: 0.5rem; align-items: center; font-size: 0.78rem; padding: 0.2rem 0; border-bottom: 1px solid var(--border-light); color: var(--text-muted); }
-.batch-item strong { color: var(--secondary); min-width: 100px; }
 </style>
+

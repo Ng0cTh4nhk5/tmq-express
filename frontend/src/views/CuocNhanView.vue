@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth.store.js';
 import { useToast } from 'primevue/usetoast';
@@ -9,9 +12,9 @@ import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
 import DatePicker from 'primevue/datepicker';
-import PageHeader from '../components/shared/PageHeader.vue';
-import StatCard from '../components/shared/StatCard.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 import { formatDate, formatNumber, toISODate } from '../utils/format';
@@ -21,13 +24,18 @@ import {
   PHIEU_CHUYEN_CUOC_STATUS_OPTIONS,
   HINH_THUC_OPTIONS,
 } from '../constants/cuoc-nhan.js';
+import { useCuocNhanStore } from '../stores/cuoc-nhan.store.js';
 
 const toast = useToast();
 const fmt = formatNumber;
 const fmtDate = formatDate;
 
+// ============================================================================
+// MARK: - USER CONTEXT & PERMISSIONS
+// ============================================================================
 // ─── User context ─────────────────────────────────────────────────
 const authStore  = useAuthStore();
+const cuocNhanStore = useCuocNhanStore();
 const currentUser = computed(() => authStore.user);
 const userVpId    = computed(() => currentUser.value?.van_phong?.id || null);
 const isAdmin     = computed(() => currentUser.value?.role === 'admin');
@@ -41,6 +49,9 @@ function canActOnPhieu(phieu, action) {
   return false;
 }
 
+// ============================================================================
+// MARK: - COMPONENT STATE
+// ============================================================================
 // ─── State ────────────────────────────────────────────────────────
 const activeView   = ref('bn');
 const data         = ref([]);
@@ -89,6 +100,9 @@ const phieuAction        = ref('');
 const hinhThucPhieu      = ref('tien_mat');
 const confirmingPhieu    = ref(false);
 
+// ============================================================================
+// MARK: - COMPUTED STATE
+// ============================================================================
 // Computed: tổng tiền selected
 const tongTienSelected = computed(() =>
   selectedRows.value.reduce((s, r) => s + Number(r.gia_cuoc || 0), 0)
@@ -103,6 +117,9 @@ const pendingForMe = computed(() => {
   ).length;
 });
 
+// ============================================================================
+// MARK: - API: BIÊN NHẬN
+// ============================================================================
 // ─── API BN ───────────────────────────────────────────────────────
 async function fetchBN() {
   loading.value = true;
@@ -116,6 +133,8 @@ async function fetchBN() {
     data.value       = res.data.data;
     pagination.value = res.data.pagination;
     selectedRows.value = [];
+    // [Store-B7] Đồng bộ badge sidebar
+    cuocNhanStore.setCount(res.data.pagination?.total);
   } catch (err) { handleApiError(err, toast, 'Không thể tải danh sách'); }
   loading.value = false;
 }
@@ -129,6 +148,14 @@ async function fetchTongHop() {
 
 function onSearch() { page.value = 1; fetchBN(); }
 
+async function manualRefresh() {
+  selectedRows.value = [];
+  await Promise.all([fetchBN(), fetchTongHop()]);
+}
+
+// ============================================================================
+// MARK: - API: PHIẾU CHUYỂN CƯỚC
+// ============================================================================
 // ─── API Phiếu ────────────────────────────────────────────────────
 async function fetchPhieu() {
   loadingP.value = true;
@@ -156,6 +183,9 @@ async function xemChiTietPhieu(phieu) {
   loadingChiTiet.value = false;
 }
 
+// ============================================================================
+// MARK: - ACTIONS: LẬP PHIẾU CHUYỂN
+// ============================================================================
 // ─── Lập PhieuChuyenCuoc ──────────────────────────────────────────
 async function loadVanPhongs() {
   try {
@@ -243,6 +273,9 @@ async function xacNhanLapPhieu() {
   confirmingLap.value = false;
 }
 
+// ============================================================================
+// MARK: - ACTIONS: XÁC NHẬN & THU CƯỚC
+// ============================================================================
 // ─── Xác nhận phiếu ───────────────────────────────────────────────
 function openPhieuAction(phieu, action) {
   selectedPhieu.value      = phieu;
@@ -275,65 +308,119 @@ async function thuCuocThuCong(row) {
   } catch (err) { handleApiError(err, toast, 'Lỗi thu cước'); }
 }
 
+// ============================================================================
+// MARK: - LIFECYCLE
+// ============================================================================
 onMounted(async () => {
   await Promise.all([fetchBN(), fetchTongHop(), loadVanPhongs(), fetchPhieu()]);
 });
 </script>
 
 <template>
-  <div class="animate-fade-in">
-    <PageHeader title="Cước nhận" icon="pi pi-wallet" />
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & STATISTICS                                           -->
+  <!-- ===================================================================== -->
+  <div class="cn-page animate-fade-in">
 
-    <!-- Stats -->
-    <div class="cuoc-stats-grid">
-      <StatCard icon="pi pi-clock"        label="Chưa thu cước" :value="fmt(tongHop?.cho_thu?.total||0)+'đ'"    :subtitle="(tongHop?.cho_thu?.count||0)+' BN'"     variant="warning" />
-      <StatCard icon="pi pi-check"        label="Đã thu"        :value="fmt(tongHop?.da_thu?.total||0)+'đ'"     :subtitle="(tongHop?.da_thu?.count||0)+' BN'"      variant="info" />
-      <StatCard icon="pi pi-hourglass"    label="Chờ chuyển"   :value="fmt(tongHop?.cho_chuyen?.total||0)+'đ'" :subtitle="(tongHop?.cho_chuyen?.count||0)+' BN'"  variant="gold" />
-      <StatCard icon="pi pi-check-circle" label="Hoàn tất"     :value="fmt(tongHop?.da_nhan?.total||0)+'đ'"    :subtitle="(tongHop?.da_nhan?.count||0)+' BN'"     variant="success" />
+    <!-- ═══ HEADER ═══ -->
+    <div class="cn-header">
+      <div class="cn-header-left">
+        <i class="pi pi-wallet header-icon"></i>
+        <h1>Cước nhận</h1>
+        <div class="vp-badge">
+          <i class="pi pi-building"></i>
+          {{ authStore.userVanPhong?.ten || authStore.userVanPhong?.ma_vp || 'VP' }}
+        </div>
+      </div>
+      <div class="cn-header-right">
+        <Button icon="pi pi-refresh" v-tooltip.bottom="'Làm mới'" severity="secondary"
+          text rounded size="small" :loading="loading" @click="manualRefresh" />
+      </div>
     </div>
 
-    <!-- Info banner -->
+    <!-- ═══ STATS CARDS ═══ -->
+    <div class="stats-row">
+      <div class="stat-card stat-warning">
+        <div class="stat-icon"><i class="pi pi-clock"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.cho_thu?.total||0) }}đ</span>
+          <span class="stat-label">Chưa thu · {{ tongHop?.cho_thu?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-info">
+        <div class="stat-icon"><i class="pi pi-check"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_thu?.total||0) }}đ</span>
+          <span class="stat-label">Đã thu · {{ tongHop?.da_thu?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-gold">
+        <div class="stat-icon"><i class="pi pi-hourglass"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.cho_chuyen?.total||0) }}đ</span>
+          <span class="stat-label">Chờ chuyển · {{ tongHop?.cho_chuyen?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="pi pi-check-circle"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_nhan?.total||0) }}đ</span>
+          <span class="stat-label">Hoàn tất · {{ tongHop?.da_nhan?.count||0 }} BN</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ INFO BANNER ═══ -->
     <div class="info-banner">
       <i class="pi pi-info-circle"></i>
       <span>Cước nhận được <b>tự động thu</b> khi nhân viên xác nhận giao hàng thành công (trạng thái "Khách đã nhận").</span>
     </div>
 
-    <!-- View switcher -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="filter-section">
-        <Button label="Biên nhận cước" icon="pi pi-list"
-          :outlined="activeView!=='bn'" @click="activeView='bn'; fetchBN()" />
-        <!-- [UX-3] Badge đếm phiếu cần mình xử lý -->
-        <div style="position:relative;display:inline-block;margin-left:.4rem;">
-          <Button label="Phiếu chuyển cước" icon="pi pi-send"
-            :outlined="activeView!=='phieu'"
-            @click="activeView='phieu'; fetchPhieu()" />
-          <span v-if="pendingForMe > 0" class="phieu-badge">{{ pendingForMe }}</span>
-        </div>
-      </div>
+    <!-- ═══ TAB BAR ═══ -->
+    <div class="tab-bar">
+      <button class="tab-btn" :class="{ active: activeView === 'bn' }"
+        @click="activeView='bn'; fetchBN()">
+        <i class="pi pi-list"></i>
+        <span>Biên nhận cước</span>
+      </button>
+      <button class="tab-btn" :class="{ active: activeView === 'phieu' }"
+        @click="activeView='phieu'; fetchPhieu()">
+        <i class="pi pi-send"></i>
+        <span>Phiếu chuyển cước</span>
+        <span v-if="pendingForMe > 0" class="tab-badge">{{ pendingForMe }}</span>
+      </button>
     </div>
 
-    <!-- BN View -->
-    <div v-if="activeView==='bn'" class="card">
-      <!-- Filters -->
-      <div class="filter-section" style="margin-bottom:.75rem;">
-        <label>Trạng thái</label>
-        <Select v-model="filterState" :options="CUOC_NHAN_STATUS_OPTIONS" optionLabel="label" optionValue="value" style="width:160px;" @change="onSearch" />
-        <label class="filter-spacer">Từ ngày</label>
-        <DatePicker v-model="filterFrom" dateFormat="dd/mm/yy" showIcon style="width:140px;" />
-        <label class="filter-spacer">Đến ngày</label>
-        <DatePicker v-model="filterTo" dateFormat="dd/mm/yy" showIcon style="width:140px;" />
-        <InputText v-model="search" placeholder="Mã BN, tên..." style="width:180px;" @keyup.enter="onSearch" />
-        <Button label="Xem" icon="pi pi-search" @click="onSearch" :loading="loading" style="margin-left:auto;" />
-        <Button label="Xóa lọc" icon="pi pi-times" severity="secondary" text
-          @click="filterState='';filterFrom=null;filterTo=null;search='';onSearch()" />
-      </div>
-      <!-- Quick filter chip: Cần xử lý -->
-      <div style="margin-bottom:.5rem;">
-        <button
-          :class="['quick-chip', filterState==='cho_thu' ? 'quick-chip--active' : '']"
-          @click="filterState='cho_thu';onSearch()"
-        >⚠️ Cần xử lý (chưa thu)</button>
+    <!-- ===================================================================== -->
+    <!-- MARK: - BIÊN NHẬN LIST SECTION                                        -->
+    <!-- ===================================================================== -->
+    <template v-if="activeView==='bn'">
+      <!-- ═══ TOOLBAR ═══ -->
+      <div class="cn-toolbar">
+        <div class="toolbar-row">
+          <IconField class="search-wrap">
+            <InputIcon class="pi pi-search" />
+            <InputText v-model="search" placeholder="Tìm mã BN, tên..." class="search-input" @keyup.enter="onSearch" />
+          </IconField>
+          <Select v-model="filterState" :options="CUOC_NHAN_STATUS_OPTIONS" optionLabel="label" optionValue="value"
+            class="filter-select" placeholder="Trạng thái..." @change="onSearch" />
+          <DatePicker v-model="filterFrom" dateFormat="dd/mm/yy" showIcon placeholder="Từ ngày" class="filter-date" />
+          <DatePicker v-model="filterTo" dateFormat="dd/mm/yy" showIcon placeholder="Đến ngày" class="filter-date" />
+          <Button icon="pi pi-search" label="Xem" size="small" @click="onSearch" :loading="loading" />
+          <Button icon="pi pi-times" label="Xóa lọc" severity="secondary" text size="small"
+            @click="filterState='';filterFrom=null;filterTo=null;search='';onSearch()" />
+          <button
+            :class="['quick-chip', filterState==='cho_thu' ? 'quick-chip--active' : '']"
+            @click="filterState='cho_thu';onSearch()"
+          >⚠️ Cần xử lý</button>
+        </div>
+        <div v-if="filterState || filterFrom || filterTo || search" class="filter-active-hint">
+          <i class="pi pi-filter-fill"></i>
+          <span v-if="filterState">{{ CUOC_NHAN_STATUS_OPTIONS.find(o=>o.value===filterState)?.label }}</span>
+          <span v-if="search"> · Tìm: <strong>{{ search }}</strong></span>
+          — {{ pagination?.total || 0 }} kết quả
+          <button class="clear-filter" @click="filterState='';filterFrom=null;filterTo=null;search='';onSearch()">✕ Bỏ lọc</button>
+        </div>
       </div>
 
       <!-- Batch action bar -->
@@ -367,70 +454,85 @@ onMounted(async () => {
         <Button v-if="selectedRows.length > 0" label="Bỏ chọn" icon="pi pi-times" severity="secondary" text size="small" @click="selectedRows=[]" />
       </div>
 
+      <!-- ═══ TABLE ═══ -->
       <DataTable
         v-model:selection="selectedRows"
         :value="data"
         :loading="loading"
         stripedRows size="small"
+        scrollable scrollHeight="flex"
         dataKey="id"
         :isDataSelectable="isDataSelectable"
         :rowClass="row => row.trang_thai_cuoc_nhan !== 'da_thu' ? 'row-not-selectable' : ''"
+        class="cn-table"
       >
         <template #empty>
-          <div style="text-align:center;padding:2rem;color:var(--text-muted);">
-            <i class="pi pi-wallet" style="font-size:1.5rem;opacity:.3;"></i>
-            <p style="font-size:.85rem;margin-top:.5rem;">Không có biên nhận cước nhận nào</p>
+          <div class="table-empty">
+            <i class="pi pi-wallet" style="font-size:2rem;color:#94a3b8;"></i>
+            <p>Không có biên nhận cước nhận nào</p>
           </div>
         </template>
 
-        <!-- Checkbox col: PrimeVue nàtive selection -->
         <Column selectionMode="multiple" style="width:44px;" :exportable="false" />
 
-        <Column header="Mã BN" style="width:130px;font-weight:600;">
-          <template #body="{ data: row }">{{ row.ma_so }}</template>
+        <Column header="Mã BN" field="ma_so" frozen style="min-width:130px;">
+          <template #body="{ data: row }"><span class="ma-so-cell">{{ row.ma_so }}</span></template>
         </Column>
-        <Column header="Ngày" style="width:90px;">
+        <Column header="Ngày" style="min-width:85px;">
           <template #body="{ data: row }">{{ fmtDate(row.ngay_bien_nhan) }}</template>
         </Column>
-        <Column header="Tuyến" style="width:110px;">
+        <Column header="Tuyến" style="min-width:110px;">
           <template #body="{ data: row }">
-            <span style="font-size:.8rem;font-weight:600;">{{ row.van_phong_gui?.ma_vp }} → {{ row.van_phong_nhan?.ma_vp }}</span>
+            <span class="vp-tag vp-gui">{{ row.van_phong_gui?.ma_vp }}</span>
+            <span style="margin:0 2px;color:var(--text-light);">→</span>
+            <span class="vp-tag vp-nhan">{{ row.van_phong_nhan?.ma_vp }}</span>
           </template>
         </Column>
-        <Column header="Người gửi">
-          <template #body="{ data: row }"><span style="font-size:.82rem;">{{ row.don_vi_gui||row.nguoi_gui||'—' }}</span></template>
-        </Column>
-        <Column header="Người nhận">
-          <template #body="{ data: row }"><span style="font-size:.82rem;">{{ row.don_vi_nhan||row.nguoi_nhan||'—' }}</span></template>
-        </Column>
-        <Column header="Cước" style="width:110px;text-align:right;">
-          <template #body="{ data: row }"><span class="cuoc-amount">{{ fmt(row.gia_cuoc) }}đ</span></template>
-        </Column>
-        <Column header="Trạng thái" style="width:160px;text-align:center;">
+        <Column header="Người gửi" style="min-width:140px;">
           <template #body="{ data: row }">
-            <!-- [B3] Phân biệt 2 sub-state của cho_thu:
-                 - đã giao hàng nhưng chưa thu cước (auto-thu fail) → warn
-                 - chưa giao hàng nên chưa thu cước → secondary -->
-            <Tag v-if="row.trang_thai_cuoc_nhan === 'cho_thu' && row.trang_thai === 'khach_da_nhan'"
+            <div class="person-cell">
+              <span class="name">{{ row.don_vi_gui || row.nguoi_gui || '—' }}</span>
+              <span v-if="row.don_vi_gui && row.nguoi_gui" class="sub">{{ row.nguoi_gui }}</span>
+            </div>
+          </template>
+        </Column>
+        <Column header="Người nhận" style="min-width:140px;">
+          <template #body="{ data: row }">
+            <div class="person-cell">
+              <span class="name">{{ row.don_vi_nhan || row.nguoi_nhan || '—' }}</span>
+              <span v-if="row.don_vi_nhan && row.nguoi_nhan" class="sub">{{ row.nguoi_nhan }}</span>
+            </div>
+          </template>
+        </Column>
+        <Column header="Cước" style="min-width:110px;text-align:right;">
+          <template #body="{ data: row }">
+            <span class="cuoc-badge">{{ fmt(row.gia_cuoc) }}đ</span>
+          </template>
+        </Column>
+        <Column header="Trạng thái" style="min-width:160px;text-align:center;">
+          <template #body="{ data: row }">
+            <Tag v-if="row.trang_thai_cuoc_nhan === 'cho_thu' && ['khach_da_nhan','da_giao_chanh'].includes(row.trang_thai)"
               value="Cần thu thủ công" severity="warn" />
             <Tag v-else-if="row.trang_thai_cuoc_nhan === 'cho_thu'"
               value="Chưa thu cước" severity="secondary" />
             <Tag v-else-if="row.trang_thai_cuoc_nhan && CUOC_NHAN_STATUS[row.trang_thai_cuoc_nhan]"
               :value="CUOC_NHAN_STATUS[row.trang_thai_cuoc_nhan].label"
               :severity="CUOC_NHAN_STATUS[row.trang_thai_cuoc_nhan].severity" />
-            <span v-else class="text-muted" style="font-size:.75rem;">—</span>
+            <span v-else class="no-val">—</span>
           </template>
         </Column>
-        <Column header="Thao tác" style="width:220px;">
+        <Column frozen alignFrozen="right" style="min-width:180px;text-align:center;">
+          <template #header><span style="font-size:0.75rem;">Thao tác</span></template>
           <template #body="{ data: row }">
-            <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+            <div class="action-cell">
               <template v-if="row.trang_thai_cuoc_nhan === 'cho_thu'">
-                <!-- [B3] Đã giao hàng nhưng cước chưa thu (auto-thu fail) → hiện nút thu -->
-                <template v-if="row.trang_thai === 'khach_da_nhan'">
+                <template v-if="['khach_da_nhan','da_giao_chanh'].includes(row.trang_thai)">
                   <Button label="Thu cước" icon="pi pi-dollar" size="small" severity="warn"
                     @click="thuCuocThuCong(row)" />
                 </template>
-                <!-- Chưa giao hàng → chờ -->
+                <template v-else-if="row.trang_thai === 'da_giao_chanh'">
+                  <span class="waiting-label"><i class="pi pi-send"></i> Chờ giao chành</span>
+                </template>
                 <template v-else>
                   <span class="waiting-label"><i class="pi pi-clock"></i> Chưa thu cước</span>
                 </template>
@@ -439,19 +541,17 @@ onMounted(async () => {
                 <Button label="Lập phiếu" icon="pi pi-send" size="small" severity="help" @click="openLapPhieu(row)" />
               </template>
               <template v-else-if="row.trang_thai_cuoc_nhan === 'cho_chuyen'">
-                <span style="display:flex;flex-direction:column;gap:.2rem;">
+                <div style="display:flex;flex-direction:column;gap:0.2rem;">
                   <Tag value="Trong phiếu" severity="help" />
                   <button
                     v-if="row.phieu_chuyen_cuoc_id"
                     class="phieu-link-btn"
                     @click="xemChiTietPhieu({ id: row.phieu_chuyen_cuoc_id })"
                   ><i class="pi pi-external-link"></i> Xem phiếu</button>
-                </span>
+                </div>
               </template>
               <template v-else-if="row.trang_thai_cuoc_nhan === 'da_nhan'">
-                <span style="display:flex;flex-direction:column;gap:.2rem;">
-                  <Tag value="Hoàn tất" severity="success" />
-                </span>
+                <Tag value="Hoàn tất" severity="success" />
               </template>
             </div>
           </template>
@@ -459,17 +559,18 @@ onMounted(async () => {
       </DataTable>
 
       <!-- Pagination -->
-      <div v-if="pagination"
-        style="display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;font-size:.82rem;color:#64748b;">
+      <div v-if="pagination" class="cn-pagination">
         <span>Tổng {{ pagination.total }} biên nhận</span>
-        <div style="display:flex;gap:.5rem;">
+        <div class="pagi-controls">
           <Button icon="pi pi-chevron-left" text rounded size="small" :disabled="page<=1" @click="page--;fetchBN()" />
-          <span style="line-height:2rem;">Trang {{ page }}/{{ Math.max(1, pagination.totalPages) }}</span>
+          <span>{{ page }}/{{ Math.max(1, pagination.totalPages) }}</span>
           <Button icon="pi pi-chevron-right" text rounded size="small" :disabled="page>=pagination.totalPages" @click="page++;fetchBN()" />
         </div>
       </div>
-    </div>
-
+    </template>
+    <!-- ===================================================================== -->
+    <!-- MARK: - PHIẾU CHUYỂN CƯỚC LIST SECTION                                -->
+    <!-- ===================================================================== -->
     <!-- Phiếu View -->
     <div v-if="activeView==='phieu'" class="card">
       <div class="filter-section" style="margin-bottom:.75rem;">
@@ -552,8 +653,21 @@ onMounted(async () => {
           </template>
         </Column>
       </DataTable>
+
+      <!-- Phiếu Pagination -->
+      <div v-if="phieuPagi && phieuPagi.total > 20" class="cn-pagination">
+        <span>Tổng {{ phieuPagi.total }} phiếu</span>
+        <div class="pagi-controls">
+          <Button icon="pi pi-chevron-left" text rounded size="small" :disabled="phieuPage<=1" @click="phieuPage--;fetchPhieu()" />
+          <span>{{ phieuPage }}/{{ phieuPagi.totalPages }}</span>
+          <Button icon="pi pi-chevron-right" text rounded size="small" :disabled="phieuPage>=phieuPagi.totalPages" @click="phieuPage++;fetchPhieu()" />
+        </div>
+      </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: LẬP PHIẾU CHUYỂN                                      -->
+    <!-- ===================================================================== -->
     <!-- Dialog lập phiếu chuyển -->
     <Dialog v-model:visible="lapPhieuVisible" header="Lập phiếu chuyển cước" :style="{width:'600px'}" modal>
       <div style="margin-bottom:1rem;">
@@ -620,6 +734,9 @@ onMounted(async () => {
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: XÁC NHẬN GỬI/NHẬN                                     -->
+    <!-- ===================================================================== -->
     <!-- Dialog xác nhận phiếu -->
     <Dialog v-model:visible="phieuDialogVisible"
       :header="phieuAction==='chuyen' ? 'Xác nhận đã gửi tiền đi' : 'Xác nhận đã nhận tiền'"
@@ -646,6 +763,9 @@ onMounted(async () => {
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CHI TIẾT PHIẾU CHUYỂN                                 -->
+    <!-- ===================================================================== -->
     <!-- Dialog chi tiết phiếu chuyển cước -->
     <Dialog v-model:visible="chiTietDialogVisible" header="Chi tiết phiếu chuyển cước" :style="{width:'720px'}" modal :maximizable="true">
       <div v-if="loadingChiTiet" style="text-align:center;padding:2rem;">
@@ -673,7 +793,10 @@ onMounted(async () => {
           <div class="phieu-detail-row">
             <span class="phieu-detail-label">Tổng tiền</span>
             <span class="cuoc-amount" style="font-size:1rem;">{{ fmt(chiTietPhieu.so_tien_tong) }}đ</span>
-            <span style="font-size:.78rem;color:var(--text-muted);margin-left:.75rem;">{{ chiTietPhieu.hinh_thuc === 'tien_mat' ? '💵 Tiền mặt' : '🏦 Chuyển khoản' }}</span>
+            <span style="font-size:.78rem;color:var(--text-muted);margin-left:.75rem;">
+              <i :class="chiTietPhieu.hinh_thuc === 'tien_mat' ? 'pi pi-wallet' : 'pi pi-credit-card'" style="margin-right:.25rem;"></i>
+              {{ chiTietPhieu.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản' }}
+            </span>
           </div>
           <div v-if="chiTietPhieu.ghi_chu" class="phieu-detail-row">
             <span class="phieu-detail-label">Ghi chú</span>
@@ -773,261 +896,71 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.cuoc-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: .75rem;
-  margin-bottom: 1rem;
-}
-@media (max-width: 900px) { .cuoc-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+/* ============================================================================
+   MARK: - STYLES (CuocNhan-specific — chỉ giữ lại styles không có trong base.css)
+   Các class global (page-shell, stats-row, stat-card, tab-bar, tab-btn,
+   page-toolbar, batch-bar, confirm-info, ma-so-cell, no-val, action-cell, v.v.)
+   đã được định nghĩa trong assets/styles/base.css.
+   ============================================================================ */
 
-.cuoc-amount {
-  font-weight: 700;
-  color: #b45309;
-}
+/* ─── Page + Table alias (cn-prefix cho backward compat) ────────── */
+.cn-page      { display: flex; flex-direction: column; height: calc(100vh - var(--header-height) - var(--content-padding) * 2); gap: 0.5rem; }
+.cn-table     { flex: 1; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); }
+.cn-toolbar   { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
+.cn-header    { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 0.5rem; padding: 0.25rem 0; }
+.cn-header-left { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.cn-header-left h1 { font-size: 1.1rem; font-weight: 700; color: var(--secondary); margin: 0; }
+.cn-header-right { display: flex; align-items: center; gap: 0.5rem; }
+.cn-pagination { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #64748b; flex-shrink: 0; padding: 0.25rem 0; }
 
-.info-banner {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .6rem 1rem;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  font-size: .83rem;
-  color: #1e40af;
-  margin-bottom: .75rem;
-}
-.info-banner .pi { font-size: 1rem; flex-shrink: 0; }
+/* ─── Tab bar active variant ─────────────────────────────────────── */
+.tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+.tab-btn.active .tab-badge { background: rgba(255,255,255,0.3); color: white; }
 
-.batch-bar {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .6rem .75rem;
-  background: #f0fdf4;
-  border: 1px solid #86efac;
-  border-radius: 8px;
-  margin-bottom: .5rem;
-  transition: background .2s, border-color .2s;
-}
-.batch-bar--hint {
-  background: #eff6ff;
-  border-color: #93c5fd;
-}
+/* ─── Batch bar CuocNhan (custom colors) ────────────────────────── */
 .batch-bar--hint .batch-info { color: #1e40af; }
-.batch-bar--active {
-  background: #f0fdf4;
-  border-color: #86efac;
-}
-.batch-info {
-  font-size: .83rem;
-  color: #166534;
-  flex: 1;
-}
-.batch-info .pi { margin-right: .3rem; }
+.batch-bar--active .batch-info { color: #166534; }
+.batch-info { font-size: 0.83rem; flex: 1; }
+.batch-info .pi { margin-right: 0.3rem; }
+.cuoc-amount { font-weight: 700; color: #b45309; }
 
-/* Row không thể chọn — ẩn checkbox area */
-:deep(.row-not-selectable .p-checkbox) {
-  opacity: 0;
-  pointer-events: none;
-}
-:deep(.row-not-selectable td:first-child) {
-  pointer-events: none;
-}
+/* ─── CuocBadge unique color (override global) ───────────────────── */
+.cuoc-badge { display: inline-block; font-weight: 700; color: #b45309; font-size: 0.82rem; }
 
-.waiting-label {
-  font-size: .78rem;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: .3rem;
-}
-.waiting-label .pi { font-size: .75rem; }
+/* ─── Row not selectable ─────────────────────────────────────────── */
+:deep(.row-not-selectable .p-checkbox) { opacity: 0; pointer-events: none; }
+:deep(.row-not-selectable td:first-child) { pointer-events: none; }
 
-/* [UX-3] Badge đếm phiếu cần xử lý trên tab */
-.phieu-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: #ef4444;
-  color: #fff;
-  border-radius: 999px;
-  font-size: .65rem;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  pointer-events: none;
-  box-shadow: 0 1px 4px rgba(239,68,68,.4);
-}
+/* ─── Waiting label variant ──────────────────────────────────────── */
+.waiting-label .pi { font-size: 0.75rem; }
 
-/* [UX-3] Mini-label "Bạn gửi / Bạn nhận" trong cột trạng thái phiếu */
-.my-turn-label {
-  font-size: .7rem;
-  color: #7c3aed;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: .2rem;
-}
-.my-turn-label .pi { font-size: .68rem; }
-
-/* Quick filter chip */
-.quick-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: .3rem;
-  padding: .25rem .7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg-base);
-  font-size: .78rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all .15s;
-  font-family: inherit;
-}
-.quick-chip:hover { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
-.quick-chip--active { border-color: #f59e0b; background: #fef3c7; color: #92400e; font-weight: 600; }
-
-/* Phiếu link inline button */
-.phieu-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
-  font-size: .72rem;
-  color: #7c3aed;
-  font-weight: 600;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  font-family: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
+/* ─── My turn label (tab Phiếu) ──────────────────────────────────── */
+.my-turn-label { font-size: 0.7rem; color: #7c3aed; font-weight: 600; display: flex; align-items: center; gap: 0.2rem; }
+.my-turn-label .pi { font-size: 0.68rem; }
+.phieu-link-btn { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: #7c3aed; font-weight: 600; background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .phieu-link-btn:hover { color: #5b21b6; }
 
-/* ── Dialog chi tiết phiếu ── */
-.phieu-detail-header {
-  background: var(--bg-base);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .75rem 1rem;
-  margin-bottom: .75rem;
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
-.phieu-detail-row {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  font-size: .83rem;
-}
-.phieu-detail-label {
-  font-weight: 600;
-  color: var(--text-muted);
-  min-width: 80px;
-}
-.phieu-route-pill {
-  background: #e0e7ff;
-  color: #3730a3;
-  border-radius: 999px;
-  padding: .15rem .55rem;
-  font-size: .75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-}
-.phieu-route-pill--dest {
-  background: #d1fae5;
-  color: #065f46;
-}
+/* ─── Phieu detail dialog ───────────────────────────────────────── */
+.phieu-detail-header { background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.phieu-detail-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.83rem; }
+.phieu-detail-label { font-weight: 600; color: var(--text-muted); min-width: 80px; }
+.phieu-route-pill { background: #e0e7ff; color: #3730a3; border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono); }
+.phieu-route-pill--dest { background: #d1fae5; color: #065f46; }
 
-/* Timeline */
-.phieu-timeline {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  padding: .5rem 0;
-  margin-bottom: .25rem;
-}
-.tl-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-}
-.tl-dot {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .85rem;
-  flex-shrink: 0;
-  margin-bottom: .3rem;
-}
-.tl-done .tl-dot {
-  background: #d1fae5;
-  color: #065f46;
-  border: 2px solid #10b981;
-}
-.tl-pending .tl-dot {
-  background: var(--bg-sunken);
-  color: var(--text-light);
-  border: 2px solid var(--border);
-}
-.tl-content {
-  text-align: center;
-}
-.tl-title {
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--text);
-}
-.tl-sub {
-  font-size: .72rem;
-  color: var(--text-muted);
-  margin-top: .1rem;
-}
-.tl-line {
-  flex: 1;
-  height: 2px;
-  background: var(--border);
-  margin-top: 15px;
-  max-width: 60px;
-}
+/* ─── Timeline ──────────────────────────────────────────────────── */
+.phieu-timeline { display: flex; align-items: flex-start; gap: 0; padding: 0.5rem 0; margin-bottom: 0.25rem; }
+.tl-step { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.tl-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; margin-bottom: 0.3rem; }
+.tl-done .tl-dot    { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
+.tl-pending .tl-dot { background: var(--bg-sunken); color: var(--text-light); border: 2px solid var(--border); }
+.tl-content { text-align: center; }
+.tl-title { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+.tl-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.1rem; }
+.tl-line { flex: 1; height: 2px; background: var(--border); margin-top: 15px; max-width: 60px; }
 
-/* Finance refs */
-.phieu-finance-ref {
-  margin-top: .75rem;
-  padding: .6rem .75rem;
-  background: var(--bg-sunken);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
-.finance-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: .3rem;
-  font-size: .78rem;
-  font-weight: 600;
-  padding: .2rem .6rem;
-  border-radius: 999px;
-}
-.finance-tag--chi {
-  background: #fef3c7;
-  color: #92400e;
-}
-.finance-tag--thu {
-  background: #d1fae5;
-  color: #065f46;
-}
+/* ─── Finance refs ──────────────────────────────────────────────── */
+.phieu-finance-ref { margin-top: 0.75rem; padding: 0.6rem 0.75rem; background: var(--bg-sunken); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.finance-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; }
+.finance-tag--chi { background: #fef3c7; color: #92400e; }
+.finance-tag--thu { background: #d1fae5; color: #065f46; }
 </style>

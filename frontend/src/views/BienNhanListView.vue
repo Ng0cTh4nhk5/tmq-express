@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIGS
+// ============================================================================
 import { ref, onMounted, watch, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useAuthStore } from '../stores/auth.store';
@@ -23,7 +26,10 @@ import { downloadBase64File, createBlobUrl } from '../utils/file';
 const toast = useToast();
 const auth = useAuthStore();
 
-// ── Data ──────────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - COMPONENT STATE
+// ============================================================================
+// Data
 const items = ref([]);
 const loading = ref(false);
 const totalRecords = ref(0);
@@ -32,7 +38,7 @@ const allChanhs = ref([]);
 const page = ref(1);
 const limit = 20;
 
-// ── Header filters ────────────────────────────────────────────────
+// Header filters
 // [H-04] Tách làm 2 filter riêng: VP Gửi và VP Nhận (thay vì 1 vpGiaoDich)
 const vpGui = ref(null);
 const vpNhan = ref(null);
@@ -53,29 +59,26 @@ const trangThaiOptions = [
   { label: 'Khách đã nhận', value: 'khach_da_nhan' },
 ];
 
-
-// ── Right panel state ─────────────────────────────────────────────
+// Right panel state
 const panelMode = ref('empty'); // empty | view | edit | create
 const selectedRow = ref(null);
 const selectedBienNhan = ref(null); // full detail from API
 const saving = ref(false);
 const rightPanelRef = ref(null);
 
-// ── Action bar options ─────────────────────────────────────────────
+// Action bar options
 const autoPrint = ref(true);   // Mặc định luôn tick Lưu & In
 const autoAddNew = ref(true);  // Mặc định luôn tick Lưu & thêm mới
 
-// ── Sort state ────────────────────────────────────────────────
-const sortField = ref('ngay_bien_nhan');
+// Sort state — mặc định created_at DESC: BN mới tạo luôn nằm đầu
+const sortField = ref('created_at');
 const sortOrder = ref(-1); // -1 = DESC
 
-// ── Delete confirm ────────────────────────────────────────────────
+// Delete confirm
 const deleteDialogVisible = ref(false);
 const deleting = ref(false);
 
-
-
-// ── Receipt logbook dialog ────────────────────────────────────────
+// Receipt logbook dialog
 const logbookDialogVisible = ref(false);
 const logbookDateFrom = ref(new Date());
 const logbookDateTo = ref(new Date());
@@ -83,11 +86,9 @@ const logbookVpGui = ref(null);
 const logbookVpNhan = ref(null);
 const logbookLoadingType = ref(null); // 'pdf' | 'excel' | null
 
-// ── Helpers ───────────────────────────────────────────────────────
-// formatCurrency, formatDate, toISODate — import từ utils/format
-// downloadBase64File — import từ utils/file
-
-// ── Load data ─────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - API & DATA FETCHING
+// ============================================================================
 async function loadVanPhongs() {
   try {
     const { data: res } = await api.get('/van-phong?active=true');
@@ -134,7 +135,6 @@ async function loadData() {
   }
 }
 
-// ── Load detail for right panel ───────────────────────────────────
 async function loadDetail(id) {
   try {
     const { data: res } = await api.get(`/bien-nhan/${id}`);
@@ -144,7 +144,9 @@ async function loadDetail(id) {
   }
 }
 
-// ── Events ────────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - EVENT HANDLERS & USER ACTIONS
+// ============================================================================
 function onSearch() {
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => { page.value = 1; loadData(); }, 300);
@@ -156,7 +158,7 @@ function onFilterChange() {
 }
 
 function onSort(event) {
-  sortField.value = event.sortField || 'ngay_bien_nhan';
+  sortField.value = event.sortField || 'created_at';
   sortOrder.value = event.sortOrder ?? -1;
   page.value = 1;
   loadData();
@@ -176,7 +178,6 @@ function onRowSelect(event) {
   loadDetail(row.id);
 }
 
-// ── Status updated from right panel ────────────────────────────
 async function onStatusUpdated() {
   toast.add({ severity: 'success', summary: 'Thành công', detail: 'Cập nhật trạng thái thành công', life: 3000 });
   await loadData();
@@ -185,22 +186,17 @@ async function onStatusUpdated() {
   }
 }
 
-
-
-// ── Action bar: Thêm ──────────────────────────────────────────────
 function onAddNew() {
   selectedRow.value = null;
   selectedBienNhan.value = null;
   panelMode.value = 'create';
 }
 
-// ── Action bar: Sửa ──────────────────────────────────────────────
 function onEdit() {
   if (!selectedBienNhan.value) return;
   panelMode.value = 'edit';
 }
 
-// ── Action bar: Hủy ──────────────────────────────────────────────
 function onCancel() {
   if (selectedBienNhan.value) {
     panelMode.value = 'view';
@@ -209,7 +205,6 @@ function onCancel() {
   }
 }
 
-// ── Action bar: Lưu (gọi từ action bar bên ngoài) ────────────────
 function handleSaveClick() {
   if (!rightPanelRef.value) return;
   // Validate trước — nếu lỗi thì dừng lại
@@ -222,7 +217,6 @@ function handleSaveClick() {
   }
 }
 
-// ── Action bar: In ────────────────────────────────────────────────
 function onPrint() {
   if (!selectedBienNhan.value) return;
   openPdf(selectedBienNhan.value.id);
@@ -232,7 +226,6 @@ function openPdf(id) {
   window.open(`/bien-nhan/${id}/xem-pdf`, '_blank');
 }
 
-// ── Save ──────────────────────────────────────────────────────────
 async function onSave(payload) {
   saving.value = true;
   try {
@@ -290,7 +283,6 @@ async function onSaveContinue(payload) {
   }
 }
 
-// ── Delete ────────────────────────────────────────────────────────
 function onDeleteRequest() {
   if (!selectedBienNhan.value) return;
   deleteDialogVisible.value = true;
@@ -313,7 +305,9 @@ async function confirmDelete() {
   }
 }
 
-// ── Logbook ───────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - RECEIPT LOGBOOK DIALOG LOGIC
+// ============================================================================
 function openLogbookDialog() {
   logbookDateFrom.value = dateFrom.value || new Date();
   logbookDateTo.value = dateTo.value || new Date();
@@ -373,7 +367,6 @@ function applyPreset(preset) {
   logbookDateTo.value = to;
 }
 
-// Chuyển Date object → 'YYYY-MM-DD' theo múi giờ local (tránh lệch ngày do UTC)
 function toLocalDateStr(d) {
   if (!d) return '';
   const date = d instanceof Date ? d : new Date(d);
@@ -433,7 +426,9 @@ async function downloadExcel() {
   }
 }
 
-// ── VP dropdown with "all" option ─────────────────────────────────
+// ============================================================================
+// MARK: - COMPUTED PROPERTIES & WATCHERS
+// ============================================================================
 // [H-03] canDelete: admin luôn xóa được; staff chỉ xóa BN mình tạo
 const canDelete = computed(() => {
   if (!selectedBienNhan.value) return false;
@@ -451,14 +446,16 @@ const vpLogbookOptions = computed(() => [
   ...vanPhongs.value,
 ]);
 
-// ── Watchers ──────────────────────────────────────────────────────
 watch(searchText, onSearch);
 
-// ── Init ──────────────────────────────────────────────────────────
+// ============================================================================
+// MARK: - COMPONENT INITIALIZATION (LIFECYCLE)
+// ============================================================================
 onMounted(async () => {
   await loadVanPhongs();
   await loadChanhs();
   // Default VP Gửi = VP của NV đăng nhập [H-04]
+  // VP Nhận luôn để Tất cả VP (null) theo mặc định
   if (auth.userVanPhong) {
     vpGui.value = auth.userVanPhong.id;
   }
@@ -468,7 +465,9 @@ onMounted(async () => {
 
 <template>
   <div class="bn-page animate-fade-in">
-    <!-- ═══ HEADER ═══ -->
+    <!-- ===================================================================== -->
+    <!-- MARK: - HEADER & FILTER SECTION                                       -->
+    <!-- ===================================================================== -->
     <div class="bn-header">
       <div class="bn-header-left">
         <i class="pi pi-file-edit header-icon"></i>
@@ -498,9 +497,11 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ═══ MAIN SPLIT ═══ -->
+    <!-- ===================================================================== -->
+    <!-- MARK: - MAIN SPLIT LAYOUT                                             -->
+    <!-- ===================================================================== -->
     <div class="bn-split">
-      <!-- LEFT PANEL -->
+      <!-- ── LEFT PANEL: SEARCH & DATATABLE ── -->
       <div class="bn-left">
         <div class="left-search">
           <span class="p-input-icon-left" style="width:100%;">
@@ -531,7 +532,7 @@ onMounted(async () => {
           :sortOrder="sortOrder"
           @sort="onSort"
         >
-          <!-- ── Header nhóm 2 tầng ── -->
+          <!-- Header nhóm 2 tầng -->
           <ColumnGroup type="header">
             <Row>
               <Column header="Mã số" field="ma_so" :rowspan="2" :sortable="true" frozen class="col-hdr-bn" style="vertical-align:middle;min-width:130px;" />
@@ -563,7 +564,7 @@ onMounted(async () => {
             </Row>
           </ColumnGroup>
 
-          <!-- ── Các cột dữ liệu ── -->
+          <!-- Các cột dữ liệu -->
           <Column field="ma_so" frozen style="min-width:130px;font-weight:700;">
             <template #body="{ data }">{{ data.ma_so }}</template>
           </Column>
@@ -606,7 +607,7 @@ onMounted(async () => {
         </DataTable>
       </div>
 
-      <!-- RIGHT PANEL -->
+      <!-- ── RIGHT PANEL: DETAILS & EDITING ── -->
       <div class="bn-right">
         <BienNhanRightPanel
           ref="rightPanelRef"
@@ -626,7 +627,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ═══ ACTION BAR ═══ -->
+    <!-- ===================================================================== -->
+    <!-- MARK: - BOTTOM ACTION BAR                                             -->
+    <!-- ===================================================================== -->
     <div class="bn-action-bar">
       <div class="action-left">
         <div class="action-check" v-if="panelMode === 'create'"> <!-- [H-05] chỉ hiện khi create -->
@@ -649,7 +652,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ═══ DELETE DIALOG ═══ -->
+    <!-- ===================================================================== -->
+    <!-- MARK: - CONFIRM DELETE DIALOG                                         -->
+    <!-- ===================================================================== -->
     <Dialog v-model:visible="deleteDialogVisible" header="Xác nhận xóa" :modal="true" :style="{ width: '380px' }">
       <p style="font-size:0.85rem;">
         Bạn có chắc muốn xóa biên nhận <strong>{{ selectedBienNhan?.ma_so }}</strong>?
@@ -660,8 +665,9 @@ onMounted(async () => {
       </template>
     </Dialog>
 
-
-    <!-- ═══ LOGBOOK DIALOG ═══ -->
+    <!-- ===================================================================== -->
+    <!-- MARK: - IN SỔ BIÊN NHẬN (LOGBOOK) DIALOG                              -->
+    <!-- ===================================================================== -->
     <Dialog v-model:visible="logbookDialogVisible" :modal="true" :style="{ width: '460px' }" :pt="{ header: { class: 'logbook-dlg-header' } }">
       <template #header>
         <div class="logbook-header-custom">
@@ -746,8 +752,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* ═══ Page layout ═══ */
-/* ═══ Column Header Groups (brand-aligned) ═══ */
+/* ============================================================================
+   MARK: - PAGE LAYOUT & HEADERS
+   ============================================================================ */
+/* Column Header Groups (brand-aligned) */
 :deep(.col-hdr-bn)  { background: var(--navy-50) !important; color: var(--navy-500) !important; font-weight: 700 !important; border-right: 2px solid var(--navy-100) !important; }
 :deep(.col-hdr-gui)  { background: var(--success-light) !important; color: #166534 !important; font-weight: 700 !important; border-right: 2px solid var(--success-border) !important; }
 :deep(.col-hdr-nhan) { background: var(--gold-50) !important; color: var(--gold-600) !important; font-weight: 700 !important; border-right: 2px solid var(--gold-200) !important; }
@@ -767,7 +775,7 @@ onMounted(async () => {
   gap: 0;
 }
 
-/* ═══ Header ═══ */
+/* Header */
 .bn-header {
   display: flex;
   align-items: center;
@@ -821,7 +829,10 @@ onMounted(async () => {
 :deep(.header-dp) { width: 130px; }
 :deep(.header-dp .p-inputtext) { font-size: 0.8rem; padding: 0.2rem 0.4rem; height: 28px; }
 
-/* ═══ Split layout ═══ */
+/* ============================================================================
+   MARK: - MAIN SPLIT LAYOUT STYLES
+   ============================================================================ */
+/* Split layout */
 .bn-split {
   display: flex;
   gap: 0.5rem;
@@ -847,7 +858,10 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-/* ═══ Left panel ═══ */
+/* ============================================================================
+   MARK: - LEFT TABLE PANEL STYLES
+   ============================================================================ */
+/* Left panel */
 .left-search {
   flex-shrink: 0;
 }
@@ -925,7 +939,10 @@ onMounted(async () => {
   font-size: 0.75rem;
 }
 
-/* ═══ Action bar ═══ */
+/* ============================================================================
+   MARK: - ACTION BAR STYLES
+   ============================================================================ */
+/* Action bar */
 .bn-action-bar {
   display: flex;
   align-items: center;
@@ -974,7 +991,10 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* ═══ Logbook Dialog — Custom Header ═══ */
+/* ============================================================================
+   MARK: - LOGBOOK DIALOG STYLES
+   ============================================================================ */
+/* Logbook Dialog — Custom Header */
 .logbook-header-custom {
   display: flex;
   align-items: center;
@@ -1009,7 +1029,7 @@ onMounted(async () => {
   margin-top: 0.1rem;
 }
 
-/* ═══ Logbook Dialog — Sections ═══ */
+/* Logbook Dialog — Sections */
 .logbook-section {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1036,7 +1056,7 @@ onMounted(async () => {
   font-size: 0.82rem;
 }
 
-/* ═══ Logbook preset chips ═══ */
+/* Logbook preset chips */
 .logbook-presets {
   display: flex;
   flex-wrap: wrap;
@@ -1068,7 +1088,7 @@ onMounted(async () => {
   color: #fff;
 }
 
-/* ═══ Logbook VP rows ═══ */
+/* Logbook VP rows */
 .logbook-vp-row {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1111,9 +1131,7 @@ onMounted(async () => {
   font-size: 0.85rem;
 }
 
-
-
-/* ═══ Logbook footer ═══ */
+/* Logbook footer */
 .logbook-footer {
   display: flex;
   align-items: center;

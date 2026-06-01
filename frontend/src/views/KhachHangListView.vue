@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
@@ -20,6 +23,9 @@ const router = useRouter();
 const toast = useToast();
 const auth = useAuthStore();
 
+// ============================================================================
+// MARK: - STATE VARIABLES
+// ============================================================================
 const allCustomers = ref([]);
 const loading = ref(false);
 const totalRecords = ref(0);
@@ -29,12 +35,18 @@ const limit = 20;
 const activeTab = ref('all'); // 'all' | 'doanh_nghiep' | 'ca_nhan'
 let searchTimeout = null;
 
+// ============================================================================
+// MARK: - COMPUTED FILTERS
+// ============================================================================
 const loaiKhFilter = computed(() => {
   if (activeTab.value === 'doanh_nghiep') return 'doanh_nghiep';
   if (activeTab.value === 'ca_nhan') return 'ca_nhan';
   return undefined;
 });
 
+// ============================================================================
+// MARK: - API & ACTIONS
+// ============================================================================
 async function loadData() {
   loading.value = true;
   try {
@@ -76,12 +88,18 @@ function onTabChange() {
   loadData();
 }
 
+// ============================================================================
+// MARK: - WATCHERS & LIFECYCLE
+// ============================================================================
 watch(search, onSearch);
 watch(activeTab, onTabChange);
 onMounted(loadData);
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & SEARCH                                               -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Khách hàng" icon="pi pi-users">
       <template #actions>
@@ -95,6 +113,9 @@ onMounted(loadData);
       </template>
     </PageHeader>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - GROUP FILTERS (TABS)                                          -->
+    <!-- ===================================================================== -->
     <!-- Tab DN / CN -->
     <Tabs v-model:value="activeTab" class="kh-tabs">
       <TabList>
@@ -108,6 +129,9 @@ onMounted(loadData);
       </TabList>
     </Tabs>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DATA TABLE LISTING                                            -->
+    <!-- ===================================================================== -->
     <div class="card" style="margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0;">
       <DataTable
         :value="allCustomers"
@@ -165,6 +189,9 @@ onMounted(loadData);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .kh-tabs {
   margin-bottom: 0;
 }

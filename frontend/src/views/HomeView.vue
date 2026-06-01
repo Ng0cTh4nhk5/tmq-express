@@ -1,12 +1,19 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIGS
+// ============================================================================
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth.store';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import StatCard from '../components/shared/StatCard.vue';
+import StatusBadge from '../components/bien-nhan/StatusBadge.vue';
 import api from '../api/client';
 import { formatDate, formatNumber } from '../utils/format';
 
+// ============================================================================
+// MARK: - COMPONENT STATE
+// ============================================================================
 const auth = useAuthStore();
 const router = useRouter();
 
@@ -18,6 +25,9 @@ const cuocStats = ref(null); // tong-hop cuoc nhan
 // formatDate, formatNumber — đã import từ utils/format
 const fmt = formatNumber;
 
+// ============================================================================
+// MARK: - COMPUTED PROPERTIES
+// ============================================================================
 const greeting = computed(() => {
   const hour = new Date().getHours();
   const name = auth.user?.ten || 'bạn';
@@ -57,13 +67,24 @@ const quickActions = computed(() => {
   return actions;
 });
 
+// ============================================================================
+// MARK: - API & DATA FETCHING
+// ============================================================================
 // Fetch dashboard data
 async function fetchData() {
   loading.value = true;
   try {
+    // Staff: scope các API về VP của mình
+    const myVpId = auth.isStaff ? auth.userVanPhong?.id : undefined;
     const [bnRes, dtRes, cuocRes] = await Promise.allSettled([
-      api.get('/bien-nhan', { params: { limit: 5, page: 1 } }),
-      api.get('/doanh-thu', { params: { nhom: 'thang' } }),
+      api.get('/bien-nhan', { params: {
+        limit: 5, page: 1,
+        ...(myVpId ? { vp_gui: myVpId } : {}),
+      }}),
+      api.get('/doanh-thu', { params: {
+        nhom: 'thang',
+        ...(myVpId ? { van_phong_id: myVpId } : {}),
+      }}),
       api.get('/cuoc-nhan/tong-hop'),
     ]);
 
@@ -93,11 +114,17 @@ async function fetchData() {
   }
 }
 
+// ============================================================================
+// MARK: - LIFECYCLE HOOKS
+// ============================================================================
 onMounted(fetchData);
 </script>
 
 <template>
   <div class="animate-fade-in">
+    <!-- ===================================================================== -->
+    <!-- MARK: - HEADER & WELCOME                                              -->
+    <!-- ===================================================================== -->
     <!-- Compact Welcome -->
     <div class="welcome-row">
       <div class="welcome-text">
@@ -109,6 +136,9 @@ onMounted(fetchData);
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - KPI STATISTICS                                                -->
+    <!-- ===================================================================== -->
     <!-- KPI Stats -->
     <div v-if="dashStats" class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
       <StatCard
@@ -141,6 +171,9 @@ onMounted(fetchData);
       />
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - ALERTS & NOTIFICATIONS                                        -->
+    <!-- ===================================================================== -->
     <!-- Alert: Cước nhận cần xử lý -->
     <div v-if="cuocStats && cuocStats.cho_thu?.count > 0"
       class="cuoc-alert-banner"
@@ -150,6 +183,9 @@ onMounted(fetchData);
       <span><b>{{ cuocStats.cho_thu.count }} BN cước nhận</b> đã giao nhưng chưa thu — <span style="text-decoration:underline;cursor:pointer;">Xử lý ngay</span></span>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - QUICK ACTIONS                                                 -->
+    <!-- ===================================================================== -->
     <!-- Quick Actions — Icon Grid -->
     <div class="card" style="margin-bottom: 0.75rem;">
       <div class="card-header">
@@ -175,6 +211,9 @@ onMounted(fetchData);
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - RECENT RECEIPTS                                               -->
+    <!-- ===================================================================== -->
     <!-- Recent BN -->
     <div class="card" v-if="recentBN.length">
       <div class="card-header">
@@ -189,9 +228,7 @@ onMounted(fetchData);
             <span class="recent-goods text-truncate">{{ bn.ten_hang_hoa }}</span>
           </div>
           <div class="recent-status">
-            <span class="badge" :class="`badge-${bn.trang_thai}`">
-              {{ { cho_vc: 'Chờ VC', dang_vc: 'Đang VC', da_den_kho: 'Đến kho', da_bao_khach: 'Đã báo', khach_da_nhan: 'Đã nhận' }[bn.trang_thai] }}
-            </span>
+            <StatusBadge :value="bn.trang_thai" type="trang_thai" />
           </div>
           <div class="recent-date">{{ formatDate(bn.ngay_bien_nhan) }}</div>
         </div>
@@ -207,6 +244,9 @@ onMounted(fetchData);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - PAGE LAYOUT & WELCOME
+   ============================================================================ */
 /* Welcome row — compact */
 .welcome-row {
   display: flex;
@@ -232,6 +272,9 @@ onMounted(fetchData);
   color: var(--text-light);
 }
 
+/* ============================================================================
+   MARK: - QUICK ACTIONS STYLES
+   ============================================================================ */
 /* Quick Actions — Icon Grid */
 .action-grid {
   display: grid;
@@ -259,18 +302,24 @@ onMounted(fetchData);
 }
 
 .action-card.action-navy {
-  border-color: var(--navy-100);
-  background: var(--navy-50);
+  border-color: var(--border);
+  background: var(--bg-base);
 }
-.action-card.action-navy:hover { border-color: var(--navy-400); }
+.action-card.action-navy:hover { border-color: var(--navy-300); background: var(--navy-50); }
 .action-card.action-navy .action-icon { color: var(--navy-500); }
 
 .action-card.action-gold {
-  border-color: var(--gold-100);
-  background: var(--gold-50);
+  border-color: var(--border);
+  background: var(--bg-base);
 }
-.action-card.action-gold:hover { border-color: var(--gold-400); }
+.action-card.action-gold:hover { border-color: var(--gold-300); background: var(--gold-50); }
 .action-card.action-gold .action-icon { color: var(--gold-500); }
+
+.action-card.action-default {
+  border-color: var(--border);
+  background: var(--bg-base);
+}
+.action-card.action-default:hover { border-color: var(--navy-200); background: var(--bg-sunken); }
 
 .action-icon {
   font-size: 1.1rem;
@@ -284,6 +333,9 @@ onMounted(fetchData);
   text-align: center;
 }
 
+/* ============================================================================
+   MARK: - RECENT LIST STYLES
+   ============================================================================ */
 /* Recent list */
 .recent-list {
   display: flex;
@@ -315,7 +367,6 @@ onMounted(fetchData);
   color: var(--navy-400);
   white-space: nowrap;
   min-width: 90px;
-  font-family: var(--font-mono);
 }
 
 .recent-info {
@@ -348,6 +399,9 @@ onMounted(fetchData);
   text-align: right;
 }
 
+/* ============================================================================
+   MARK: - ALERTS & BADGES STYLES
+   ============================================================================ */
 /* Cước nhận alert banner */
 .cuoc-alert-banner {
   display: flex;
@@ -387,9 +441,9 @@ onMounted(fetchData);
 
 /* action-card warning variant */
 .action-card.action-warning {
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: var(--border);
+  background: var(--bg-base);
 }
-.action-card.action-warning:hover { border-color: #f59e0b; }
+.action-card.action-warning:hover { border-color: #f59e0b; background: #fffbeb; }
 .action-card.action-warning .action-icon { color: #d97706; }
 </style>

@@ -25,7 +25,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
       },
     },
     handler: async (request) => {
-      const result = await listPhieuChuyenCOD(request.query);
+      const result = await listPhieuChuyenCOD(request.query, request.user);
       return { success: true, ...result };
     },
   });

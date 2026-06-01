@@ -1,6 +1,10 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useAuthStore } from '../stores/auth.store';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -24,7 +28,12 @@ import { handleApiError } from '../utils/error-handler';
 import { formatNumber, toISODate } from '../utils/format';
 
 const toast = useToast();
+const auth = useAuthStore();
+const isStaff = computed(() => auth.isStaff);
 
+// ============================================================================
+// MARK: - STATE: FILTER PRESETS
+// ============================================================================
 // ── Filter state ─────────────────────────────
 const now = new Date();
 const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -35,6 +44,9 @@ const to     = ref(today);
 const vpId   = ref('');
 const nhom   = ref('ngay');
 
+// ============================================================================
+// MARK: - STATE: CORE DATA
+// ============================================================================
 // ── Data state ───────────────────────────────
 const loading    = ref(false);
 const chiTiet    = ref([]);
@@ -54,6 +66,9 @@ function toLocalDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
+// ============================================================================
+// MARK: - API: DATA FETCHING
+// ============================================================================
 // ── Fetch VP list ─────────────────────────────
 async function fetchVanPhong() {
   try {
@@ -109,6 +124,9 @@ function setNhom(value) {
   }
 }
 
+// ============================================================================
+// MARK: - ECHARTS BAR CHART CONFIG
+// ============================================================================
 // ── Chart config ─────────────────────────────
 const chartOption = computed(() => {
   if (!chiTiet.value.length) return null;
@@ -131,13 +149,23 @@ const chartOption = computed(() => {
   };
 });
 
+// ============================================================================
+// MARK: - LIFECYCLE
+// ============================================================================
 onMounted(async () => {
   await fetchVanPhong();
+  // Staff: tự động scope về VP của mình, không cho chọn VP khác
+  if (auth.isStaff && auth.userVanPhong) {
+    vpId.value = String(auth.userVanPhong.id);
+  }
   await fetchReport();
 });
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & OFFICE SWITCHER                                      -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Báo cáo doanh thu" icon="pi pi-chart-line" />
 
@@ -150,11 +178,13 @@ onMounted(async () => {
         <label class="filter-spacer">Đến ngày</label>
         <DatePicker v-model="to" dateFormat="dd/mm/yy" showIcon style="width: 140px;" />
 
-        <label class="filter-spacer">VP gửi</label>
-        <select v-model="vpId" style="width: 160px;">
-          <option value="">Tất cả</option>
-          <option v-for="vp in vanPhongs" :key="vp.id" :value="vp.id">{{ vp.ma_vp }} — {{ vp.ten }}</option>
-        </select>
+        <template v-if="!isStaff">
+          <label class="filter-spacer">VP gửi</label>
+          <select v-model="vpId" style="width: 160px;">
+            <option value="">Tất cả</option>
+            <option v-for="vp in vanPhongs" :key="vp.id" :value="vp.id">{{ vp.ma_vp }} — {{ vp.ten }}</option>
+          </select>
+        </template>
 
         <label class="filter-spacer">Nhóm theo</label>
         <div class="seg-group">
@@ -167,21 +197,30 @@ onMounted(async () => {
         <Button label="Xem" icon="pi pi-search" style="margin-left: auto;" :loading="loading" @click="fetchReport" />
       </div>
 
-      <!-- Stat cards -->
-      <div v-if="tongHop" class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
+    <!-- ===================================================================== -->
+    <!-- MARK: - STATISTICS CARDS                                              -->
+    <!-- ===================================================================== -->
+    <!-- Stat cards -->
+    <div v-if="tongHop" class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
         <StatCard icon="pi pi-inbox"               label="Số biên nhận"   :value="fmt(tongHop.so_bn) + ' BN'"                              variant="info" />
         <StatCard icon="pi pi-wallet"              label="Tổng doanh thu" :value="fmt(tongHop.tong_cuoc) + 'đ'"                             variant="gold" />
         <StatCard icon="pi pi-check-circle"        label="Đã thu"         :value="fmt(tongHop.da_thu) + 'đ'"                                variant="success" />
         <StatCard icon="pi pi-exclamation-triangle" label="Chưa thu + Nợ" :value="fmt(tongHop.chua_thu + tongHop.cong_no) + 'đ'"            variant="danger" />
       </div>
 
-      <!-- Chart -->
-      <div v-if="chartOption" class="chart-wrap">
+    <!-- ===================================================================== -->
+    <!-- MARK: - BAR CHART                                                     -->
+    <!-- ===================================================================== -->
+    <!-- Chart -->
+    <div v-if="chartOption" class="chart-wrap">
         <VChart :option="chartOption" autoresize style="height: 220px;" />
       </div>
 
-      <!-- Data table -->
-      <DataTable
+    <!-- ===================================================================== -->
+    <!-- MARK: - DATA TABLE                                                    -->
+    <!-- ===================================================================== -->
+    <!-- Data table -->
+    <DataTable
         :value="chiTiet"
         :loading="loading"
         stripedRows
@@ -250,6 +289,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 /* Segmented control buttons */
 .seg-group {
   display: flex;

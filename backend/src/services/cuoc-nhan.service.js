@@ -144,6 +144,11 @@ export async function xacNhanThuCuocNhan(
     throw Object.assign(new Error('Biên nhận không có tiền cước để thu'), { statusCode: 400 });
   }
 
+  // [FIX-VP] Staff chỉ được thu cước của BN thuộc VP nhận của mình
+  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+    throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được thu cước của biên nhận này'), { statusCode: 403 });
+  }
+
   const tenNguoiNop = nguoi_nop || bn.don_vi_nhan || bn.nguoi_nhan || 'Không xác định';
   const ht = hinh_thuc || 'tien_mat';
 

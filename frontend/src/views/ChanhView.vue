@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
@@ -13,6 +16,9 @@ import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 import { formatPhone } from '../utils/format';
 
+// ============================================================================
+// MARK: - STATE VARIABLES
+// ============================================================================
 const toast = useToast();
 const chanhs = ref([]);
 const loading = ref(false);
@@ -28,6 +34,9 @@ const form = ref({
   ghi_chu: '',
 });
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 async function loadData() {
   loading.value = true;
   try {
@@ -40,6 +49,9 @@ async function loadData() {
   }
 }
 
+// ============================================================================
+// MARK: - ACTIONS
+// ============================================================================
 function openNew() {
   form.value = { ten: '', dia_chi: '', dien_thoai: '', nguoi_lien_he: '', ghi_chu: '' };
   isEdit.value = false;
@@ -98,12 +110,18 @@ async function toggleActive(row) {
   }
 }
 
+// ============================================================================
+// MARK: - LIFECYCLE
+// ============================================================================
 onMounted(() => {
   loadData();
 });
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & TOOLBAR                                              -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Quản lý Chành" icon="pi pi-map-marker">
       <template #actions>
@@ -116,6 +134,9 @@ onMounted(() => {
       <Button icon="pi pi-refresh" text rounded size="small" @click="loadData" v-tooltip.top="'Tải lại'" />
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DATA TABLE                                                    -->
+    <!-- ===================================================================== -->
     <div class="card">
       <DataTable :value="chanhs" :loading="loading" stripedRows responsiveLayout="scroll" size="small" dataKey="id">
         <Column header="STT" style="width: 40px; text-align: center;">
@@ -158,6 +179,9 @@ onMounted(() => {
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CREATE/EDIT CHANH                                     -->
+    <!-- ===================================================================== -->
     <!-- Create/Edit Dialog -->
     <Dialog
       v-model:visible="dialogVisible"
@@ -243,6 +267,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .dialog-section-title {
   font-size: 0.78rem;
   font-weight: 700;

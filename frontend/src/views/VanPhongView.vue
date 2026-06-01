@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
@@ -14,6 +17,9 @@ import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 import { formatPhone, stripPhone } from '../utils/phone';
 
+// ============================================================================
+// MARK: - STATE VARIABLES
+// ============================================================================
 const toast = useToast();
 const confirm = useConfirm();
 const vanPhongs = ref([]);
@@ -23,6 +29,9 @@ const isEdit = ref(false);
 const form = ref({ ma_vp: '', ten: '', dia_chi: '', dien_thoai: '' });
 const saving = ref(false);
 
+// ============================================================================
+// MARK: - API: FETCH DATA
+// ============================================================================
 async function loadData() {
   loading.value = true;
   try {
@@ -35,6 +44,9 @@ async function loadData() {
   }
 }
 
+// ============================================================================
+// MARK: - ACTIONS
+// ============================================================================
 function openNew() {
   form.value = { ma_vp: '', ten: '', dia_chi: '', dien_thoai: '' };
   isEdit.value = false;
@@ -79,6 +91,9 @@ async function save() {
   }
 }
 
+// ============================================================================
+// MARK: - CONFIRMATION DIALOG ACTIONS
+// ============================================================================
 function confirmToggleActive(vp) {
   if (vp.active) {
     // Deactivate → cần confirm
@@ -119,6 +134,9 @@ onMounted(loadData);
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & TOOLBAR                                              -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <!-- ConfirmDialog cần mount trong component dùng nó -->
     <ConfirmDialog />
@@ -129,6 +147,9 @@ onMounted(loadData);
       </template>
     </PageHeader>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DATA TABLE                                                    -->
+    <!-- ===================================================================== -->
     <div class="card">
       <DataTable
         :value="vanPhongs"
@@ -166,6 +187,9 @@ onMounted(loadData);
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CREATE/EDIT OFFICE                                    -->
+    <!-- ===================================================================== -->
     <Dialog
       v-model:visible="dialogVisible"
       :header="isEdit ? 'Sửa văn phòng' : 'Thêm văn phòng mới'"
@@ -237,6 +261,9 @@ onMounted(loadData);
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 .dialog-section-title {
   font-size: 0.78rem;
   font-weight: 700;

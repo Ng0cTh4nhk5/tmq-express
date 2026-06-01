@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
@@ -26,6 +29,9 @@ import { downloadBase64File } from '../utils/file';
 
 const toast = useToast();
 
+// ============================================================================
+// MARK: - STATE & METHODS: MONTHLY LOGS
+// ============================================================================
 // ─── Bảng kê công nợ tháng ────────────────────────────────────────────────
 const bkThang = ref(new Date().getMonth() + 1);
 const bkNam   = ref(new Date().getFullYear());
@@ -63,6 +69,9 @@ async function exportBangKe(doiTuong = null) {
   bkExporting.value = false;
 }
 
+// ============================================================================
+// MARK: - STATE & METHODS: TARGET DETAILS
+// ============================================================================
 // ─── Dialog chi tiết đối tượng ────────────────────────────────────────────
 const detailVisible  = ref(false);
 const detailDoiTuong = ref('');
@@ -108,6 +117,9 @@ async function exportDetailPDF() {
   pdfExporting.value = false;
 }
 
+// ============================================================================
+// MARK: - STATE & METHODS: AUDITING
+// ============================================================================
 // ─── Đối soát cước ────────────────────────────────────────────────────────
 const dsThang   = ref(new Date().getMonth() + 1);
 const dsNam     = ref(new Date().getFullYear());
@@ -129,6 +141,9 @@ async function fetchDoiSoat() {
   dsLoading.value = false;
 }
 
+// ============================================================================
+// MARK: - GENERAL HELPERS
+// ============================================================================
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function fmt(n) { return Number(n || 0).toLocaleString('vi-VN'); }
 
@@ -148,6 +163,9 @@ function downloadFile(binaryStr, filename, mimeType) {
   setTimeout(() => URL.revokeObjectURL(link.href), 5000);
 }
 
+// ============================================================================
+// MARK: - ECHARTS CONFIG
+// ============================================================================
 // ─── Doughnut chart ──────────────────────────────────────────────────────
 const doughnutOption = computed(() => {
   if (!bkTong.value) return null;
@@ -170,9 +188,15 @@ const doughnutOption = computed(() => {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER                                                        -->
+  <!-- ===================================================================== -->
   <div class="animate-fade-in">
     <PageHeader title="Bảng kê công nợ" icon="pi pi-chart-bar" />
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - SECTION: MONTHLY E-INVOICES                                   -->
+    <!-- ===================================================================== -->
     <!-- ══ PHẦN 1: Bảng kê tháng ══ -->
     <div class="card" style="margin-bottom: 1rem;">
       <div class="form-section-title">Bảng kê công nợ cuối tháng theo đối tượng</div>
@@ -255,6 +279,9 @@ const doughnutOption = computed(() => {
       </div>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - SECTION: AUDITING                                             -->
+    <!-- ===================================================================== -->
     <!-- ══ PHẦN 2: Đối soát cước ══ -->
     <div class="card">
       <div class="form-section-title" style="display:flex; align-items:center; gap:0.5rem;">
@@ -336,6 +363,9 @@ const doughnutOption = computed(() => {
       </DataTable>
     </div>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: TARGET DETAILS                                        -->
+    <!-- ===================================================================== -->
     <!-- ══ DIALOG: Chi tiết công nợ đối tượng ══ -->
     <Dialog v-model:visible="detailVisible" :header="`Chi tiết công nợ — ${detailDoiTuong}`"
       :style="{ width: '800px' }" modal scrollable>
@@ -387,6 +417,9 @@ const doughnutOption = computed(() => {
 </template>
 
 <style scoped>
+/* ============================================================================
+   MARK: - STYLES
+   ============================================================================ */
 /* Stats + Doughnut row */
 .cn-stats-row {
   display: flex;

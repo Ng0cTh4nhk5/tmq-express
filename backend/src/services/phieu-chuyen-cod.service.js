@@ -6,13 +6,21 @@ import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 /**
  * Danh sách PhieuChuyenCOD
  */
-export async function listPhieuChuyenCOD({ vp_nhan, vp_gui, trang_thai, from, to, page = 1, limit = 20 }) {
+export async function listPhieuChuyenCOD({ vp_nhan, vp_gui, trang_thai, from, to, page = 1, limit = 20 }, user) {
   const p = parseInt(page, 10) || 1;
   const l = Math.min(parseInt(limit, 10) || 20, 100);
   const where = {};
 
-  if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
-  if (vp_gui) where.van_phong_gui_id = Number(vp_gui);
+  // Phân quyền: staff chỉ xem phiếu liên quan VP mình (VP Nhận lập hoặc VP Gửi xác nhận)
+  if (user.role !== 'admin') {
+    where.OR = [
+      { van_phong_nhan_id: user.van_phong_id },
+      { van_phong_gui_id:  user.van_phong_id },
+    ];
+  } else {
+    if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
+    if (vp_gui)  where.van_phong_gui_id  = Number(vp_gui);
+  }
   if (trang_thai) where.trang_thai = trang_thai;
   if (from || to) {
     where.ngay_lap = {};
@@ -159,7 +167,8 @@ export async function xacNhanChuyen(phieuId, { ghi_chu } = {}, user) {
   if (phieu.trang_thai !== 'cho_chuyen') {
     throw Object.assign(new Error('Phiếu không ở trạng thái chờ chuyển'), { statusCode: 400 });
   }
-  if (phieu.van_phong_nhan_id !== user.van_phong_id) {
+  // [FIX-ADMIN] Admin không thuộc VP nào — bypass check VP
+  if (user.role !== 'admin' && phieu.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Nhận mới có thể xác nhận đã gửi tiền'), { statusCode: 403 });
   }
 
@@ -191,7 +200,8 @@ export async function xacNhanNhan(phieuId, { hinh_thuc } = {}, user) {
   if (phieu.trang_thai !== 'da_chuyen') {
     throw Object.assign(new Error('Phiếu chưa được xác nhận gửi đi'), { statusCode: 400 });
   }
-  if (phieu.van_phong_gui_id !== user.van_phong_id) {
+  // [FIX-ADMIN] Admin không thuộc VP nào — bypass check VP
+  if (user.role !== 'admin' && phieu.van_phong_gui_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Gửi mới có thể xác nhận nhận tiền'), { statusCode: 403 });
   }
 

@@ -1,6 +1,7 @@
 import {
   listThuHo,
   tongHopThuHo,
+  xacNhanThuCOD,
   xacNhanThuChanh,
   xacNhanNhanTuChanh,
   traLo,
@@ -36,7 +37,7 @@ export default async function thuHoRoutes(fastify) {
       },
     },
     handler: async (request) => {
-      const result = await listThuHo(request.query);
+      const result = await listThuHo(request.query, request.user);
       return { success: true, ...result };
     },
   });
@@ -56,8 +57,23 @@ export default async function thuHoRoutes(fastify) {
       },
     },
     handler: async (request) => {
-      const data = await tongHopThuHo(request.query);
+      const data = await tongHopThuHo(request.query, request.user);
       return { success: true, data };
+    },
+  });
+
+  // POST /api/thu-ho/:id/xac-nhan-thu — Thu COD thủ công khi auto-thu đã fail
+  // Cho phép thu khi BN ở bất kỳ trang_thai vận chuyển (kể cả khach_da_nhan)
+  // Chỉ kiểm tra trang_thai_cod === 'cho_thu' + thu_ho > 0 (trong service)
+  fastify.post('/:id/xac-nhan-thu', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    schema: {
+      params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
+      body: xacNhanBody,
+    },
+    handler: async (request) => {
+      const result = await xacNhanThuCOD(Number(request.params.id), request.body || {}, request.user);
+      return { success: true, data: result, message: 'Đã thu COD thành công' };
     },
   });
 
@@ -87,7 +103,17 @@ export default async function thuHoRoutes(fastify) {
     },
     handler: async (request) => {
       const result = await xacNhanNhanTuChanh(Number(request.params.id), request.body || {}, request.user);
-      return { success: true, data: result, message: 'VP Nhận đã xác nhận nhận tiền từ chành và tạo biên nhận thu hộ' };
+      const messages = ['VP Nhận đã xác nhận nhận tiền từ chành và tạo biên nhận thu hộ'];
+      // [CHANH-CUOC] Thông báo nếu đã tự động thu cước luôn
+      if (result.phieu_thu_cuoc) {
+        messages.push(`Đã tự động thu cước (${result.phieu_thu_cuoc.ma_phieu})`);
+      }
+      return {
+        success: true,
+        data: result,
+        message: messages.join('. '),
+        ...(result.phieu_thu_cuoc ? { auto_thu_cuoc: true, phieu_thu_cuoc: result.phieu_thu_cuoc } : {}),
+      };
     },
   });
 

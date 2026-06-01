@@ -15,11 +15,7 @@ const ui = useUiStore();
     <Toast position="top-right" />
     <ConfirmDialog />
     <main class="app-main">
-      <router-view v-slot="{ Component }">
-        <Transition name="page-fade" mode="out-in">
-          <component :is="Component" />
-        </Transition>
-      </router-view>
+      <router-view />
     </main>
 
     <!-- Backdrop khi sidebar expanded -->

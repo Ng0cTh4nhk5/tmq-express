@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useAuthStore } from '../stores/auth.store.js';
@@ -9,17 +12,22 @@ import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
 import DatePicker from 'primevue/datepicker';
-import MultiSelect from 'primevue/multiselect';
-import PageHeader from '../components/shared/PageHeader.vue';
-import StatCard from '../components/shared/StatCard.vue';
+// MultiSelect removed — lập phiếu COD giờ dùng checkbox-table (giống CuocNhan)
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 import { COD_STATUS, COD_STATUS_OPTIONS, HINH_THUC_OPTIONS } from '../constants/cod.js';
 import { formatDate, formatNumber, toISODate } from '../utils/format';
+import { useThuHoStore } from '../stores/thu-ho.store.js';
 
+// ============================================================================
+// MARK: - USER CONTEXT & PERMISSIONS
+// ============================================================================
 const toast  = useToast();
 const auth   = useAuthStore();
+const thuHoStore = useThuHoStore();
 const userVpId = computed(() => auth.user?.van_phong?.id || null);
 const isAdmin  = computed(() => auth.user?.role === 'admin');
 
@@ -32,6 +40,9 @@ function canActOnPhieu(phieu, action) {
   return false;
 }
 
+// ============================================================================
+// MARK: - STATE: TAB BIÊN NHẬN
+// ============================================================================
 // Tab active
 const activeView = ref('bn');
 
@@ -67,6 +78,9 @@ const confirmingTra   = ref(false);
 // Multi-select trả lô batch từ table
 const selectedDaChuyen = ref([]);
 
+// ============================================================================
+// MARK: - STATE: TAB PHIẾU CHUYỂN COD
+// ============================================================================
 // ─── State — Tab Phiếu ────────────────────────────────────────────────────
 const phieuData       = ref([]);
 const phieuPagi       = ref(null);
@@ -76,22 +90,33 @@ const filterPhieu     = ref('');
 const filterPhieuFrom = ref(null);
 const filterPhieuTo   = ref(null);
 
-// Lập phiếu
+// Lập phiếu — dùng checkbox-table thay MultiSelect
 const lapPhieuVisible = ref(false);
-const bnDaThu         = ref([]);
-const loadingBN       = ref(false);
-const selectedBNIds   = ref([]);
+const selectedForLap  = ref([]);  // BN rows đã chọn từ table
 const vanPhongs       = ref([]);
 const vpGuiId         = ref(null);
+const vpGuiAutoDetected = ref(false);
+const vpGuiOverride   = ref(false);
 const hinhThucLap     = ref('tien_mat');
 const ghiChuLap       = ref('');
 const creating        = ref(false);
 
-const soTienTong = computed(() =>
-  bnDaThu.value
-    .filter(bn => selectedBNIds.value.includes(bn.id))
-    .reduce((s, bn) => s + Number(bn.thu_ho || 0), 0)
+// Multi-select gom lô lập phiếu từ table (da_thu)
+const selectedDaThu   = ref([]);
+
+// ============================================================================
+// MARK: - COMPUTED STATE
+// ============================================================================
+const tongTienSelected = computed(() =>
+  selectedDaThu.value.reduce((s, r) => s + Number(r.thu_ho || 0), 0)
 );
+
+const daThuCount = computed(() => data.value.filter(r => r.trang_thai_cod === 'da_thu').length);
+
+const allDaThuSelected = computed(() => {
+  const daThu = data.value.filter(r => r.trang_thai_cod === 'da_thu');
+  return daThu.length > 0 && selectedDaThu.value.length === daThu.length;
+});
 
 // Xác nhận phiếu
 const actionDialog = ref(false);
@@ -143,6 +168,9 @@ function openTraLoBatch() {
   traLoVisible.value = true;
 }
 
+// ============================================================================
+// MARK: - API: DATA FETCHING
+// ============================================================================
 // ─── API ──────────────────────────────────────────────────────────────────
 async function fetchData() {
   loading.value = true;
@@ -157,6 +185,8 @@ async function fetchData() {
     data.value       = res.data.data;
     pagination.value = res.data.pagination;
     summary.value    = res.data.summary;
+    // [Store-B6] Đồng bộ badge sidebar
+    thuHoStore.setFromSummary(res.data.summary);
   } catch (err) {
     handleApiError(err, toast, 'Không thể tải danh sách thu hộ');
   }
@@ -167,15 +197,25 @@ async function fetchTongHop() {
   try {
     const res = await api.get('/thu-ho/tong-hop');
     tongHop.value = res.data.data;
+    // [Store-B6] Cache vào store
+    thuHoStore.setTongHop(res.data.data);
   } catch { /* silent */ }
 }
 
 function onSearch() { page.value = 1; fetchData(); }
 
+async function manualRefresh() {
+  selectedDaChuyen.value = [];
+  await Promise.all([fetchData(), fetchTongHop()]);
+}
+
+// ============================================================================
+// MARK: - ACTIONS: CHÀNH
+// ============================================================================
 // ─── Dialog chành ─────────────────────────────────────────────────────────
-// Lưu ý: action 'xac-nhan-thu' (thu trực tiếp thủ công) đã bị bỏ.
-// COD được tự động thu khi BN chuyển sang khach_da_nhan.
-// Chỉ giữ luồng chành vì tiền COD chưa về VP khi giao qua chành.
+// Đối với BN giao trực tiếp: COD được tự động thu khi BN chuyển sang khach_da_nhan.
+// Nếu auto-thu fail, dùng nút "Thu COD" thủ công (xem thuCODThuCong bên dưới).
+// Giữ luồng chành vì tiền COD chưa về VP khi giao qua chành.
 const DIALOG_CONFIG = {
   'xac-nhan-thu-chanh':     { title: 'Ghi nhận chành đã thu COD',     showNguoiNop: false },
   'xac-nhan-nhan-tu-chanh': { title: 'VP Nhận xác nhận nhận từ chành', showNguoiNop: true },
@@ -184,19 +224,15 @@ const DIALOG_CONFIG = {
 function getAction(bn) {
   switch (bn.trang_thai_cod) {
     case 'cho_thu':
-      // Nếu qua chành: chỉ có nút "Chành đã thu" (tiền đang ở chành)
-      // Nếu không qua chành: COD đã được thu tự động → không cần nút
-      return bn.chanh_id
-        ? [{ label: 'Chành đã thu', action: 'xac-nhan-thu-chanh', severity: 'secondary' }]
-        : [];
+      // Nếu qua chành: chỉ hiện nút "Chành đã thu" khi BN đã thực sự giao cho chành
+      // (trang_thai = da_giao_chanh). Trước đó hiển thị nhãn passive trong template.
+      if (bn.chanh_id && bn.trang_thai === 'da_giao_chanh') {
+        return [{ label: 'Chành đã thu', action: 'xac-nhan-thu-chanh', severity: 'secondary' }];
+      }
+      return [];
     case 'da_thu_chanh':
       return [{ label: 'Nhận từ chành', action: 'xac-nhan-nhan-tu-chanh', severity: 'info' }];
-    case 'da_thu':
-      return [{ label: 'Lập phiếu chuyển', action: 'goto-lap-phieu', severity: 'help' }];
-    case 'cho_chuyen_pending':
-      return [];
-    case 'da_chuyen':
-      return [{ label: 'Trả người gửi', action: 'tra-lo', severity: 'warn' }];
+    // da_thu, cho_chuyen_pending, da_chuyen, da_tra: handled trực tiếp trong template
     default:
       return [];
   }
@@ -232,7 +268,7 @@ async function xacNhan() {
       body.nguoi_nop = nguoiNop.value;
     }
     const res = await api.post(`/thu-ho/${selectedBN.value.id}/${currentAction.value}`, body);
-    toast.add({ severity: 'success', summary: '✅ Thành công', detail: res.data.message, life: 3000 });
+    toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
     dialogVisible.value = false;
     await Promise.all([fetchData(), fetchTongHop()]);
   } catch (err) {
@@ -241,6 +277,9 @@ async function xacNhan() {
   confirming.value = false;
 }
 
+// ============================================================================
+// MARK: - ACTIONS: TRẢ LÔ
+// ============================================================================
 // ─── Dialog trả lô ────────────────────────────────────────────────────────
 async function traLo() {
   if (!selectedForTra.value.length) return;
@@ -251,7 +290,7 @@ async function traLo() {
       hinh_thuc: hinhThucTra.value,
       ghi_chu: ghiChuTra.value || undefined,
     });
-    toast.add({ severity: 'success', summary: '✅ Thành công', detail: res.data.message, life: 3000 });
+    toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
     traLoVisible.value = false;
     selectedForTra.value = [];
     await Promise.all([fetchData(), fetchTongHop()]);
@@ -265,6 +304,21 @@ async function traLo() {
 const fmt     = formatNumber;
 const fmtDate = formatDate;
 
+// ============================================================================
+// MARK: - ACTIONS: THU COD THỦ CÔNG
+// ============================================================================
+// Khi auto-thu COD đã fail (BN kẹt cho_thu sau khi giao hàng)
+async function thuCODThuCong(row) {
+  try {
+    const res = await api.post(`/thu-ho/${row.id}/xac-nhan-thu`, { hinh_thuc: 'tien_mat' });
+    toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
+    await Promise.all([fetchData(), fetchTongHop()]);
+  } catch (err) { handleApiError(err, toast, 'Lỗi thu COD'); }
+}
+
+// ============================================================================
+// MARK: - API & HELPERS: TAB PHIẾU
+// ============================================================================
 // ─── API — Tab Phiếu ──────────────────────────────────────────────────────
 async function fetchPhieu() {
   loadingP.value = true;
@@ -287,40 +341,81 @@ async function loadVanPhongs() {
   } catch { vanPhongs.value = []; }
 }
 
-async function loadBNDaThu() {
-  loadingBN.value = true;
-  try {
-    const res = await api.get('/thu-ho', { params: { trang_thai_cod: 'da_thu', limit: 500 } });
-    bnDaThu.value = res.data.data;
-  } catch { bnDaThu.value = []; }
-  loadingBN.value = false;
-}
+// [UX-1] Loại trừ VP của nhân viên (VP Nhận) — không thể chuyển COD về chính mình
+const vanPhongsGui = computed(() =>
+  vanPhongs.value.filter(v => v.value !== userVpId.value)
+);
 
-function openLapPhieuFor(bn) {
-  selectedBNIds.value = bn ? [bn.id] : [];
-  vpGuiId.value       = bn?.van_phong_gui_id || null;
-  hinhThucLap.value   = 'tien_mat';
-  ghiChuLap.value     = '';
-  loadBNDaThu();
+function openLapPhieu(bns) {
+  selectedForLap.value = Array.isArray(bns) ? bns : [bns];
+  hinhThucLap.value    = 'tien_mat';
+  ghiChuLap.value      = '';
+
+  // Auto-detect VP Gửi từ BN đầu tiên
+  const firstBN = selectedForLap.value[0];
+  const guiId   = firstBN?.van_phong_gui_id ?? null;
+  if (guiId && guiId !== userVpId.value) {
+    vpGuiId.value          = guiId;
+    vpGuiAutoDetected.value = true;
+    vpGuiOverride.value    = false;
+  } else {
+    vpGuiId.value          = null;
+    vpGuiAutoDetected.value = false;
+    vpGuiOverride.value    = false;
+  }
+
   lapPhieuVisible.value = true;
 }
 
+function openLapPhieuBatch() {
+  const daThu = selectedDaThu.value.filter(r => r.trang_thai_cod === 'da_thu');
+  if (!daThu.length) {
+    toast.add({ severity: 'warn', summary: 'Lưu ý', detail: 'Chọn ít nhất 1 biên nhận đã thu COD', life: 3000 });
+    return;
+  }
+  openLapPhieu(daThu);
+}
+
+function selectAllDaThu() {
+  const daThu = data.value.filter(r => r.trang_thai_cod === 'da_thu');
+  if (selectedDaThu.value.length === daThu.length) {
+    selectedDaThu.value = [];
+  } else {
+    selectedDaThu.value = daThu;
+  }
+}
+
+function openLapPhieuFor(bn) {
+  if (bn) {
+    openLapPhieu(bn);
+  } else {
+    // Từ tab Phiếu nhấn "Lập phiếu mới" → chuyển về tab BN
+    activeView.value = 'bn';
+    toast.add({ severity: 'info', summary: 'Gợi ý', detail: 'Tick ☑ biên nhận đã thu COD trong bảng để lập phiếu chuyển', life: 4000 });
+  }
+}
+
 async function submitLapPhieu() {
-  if (!vpGuiId.value || !selectedBNIds.value.length) {
-    toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Chọn BN và VP Gửi', life: 3000 });
+  if (!vpGuiId.value) {
+    toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Vui lòng chọn VP Gửi', life: 3000 });
+    return;
+  }
+  if (!selectedForLap.value.length) {
+    toast.add({ severity: 'warn', summary: 'Thiếu thông tin', detail: 'Chưa chọn biên nhận nào', life: 3000 });
     return;
   }
   creating.value = true;
   try {
     const res = await api.post('/phieu-chuyen-cod', {
       van_phong_gui_id: vpGuiId.value,
-      bien_nhan_ids:    selectedBNIds.value,
+      bien_nhan_ids:    selectedForLap.value.map(b => b.id),
       hinh_thuc:        hinhThucLap.value,
       ghi_chu:          ghiChuLap.value || undefined,
     });
     toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
     lapPhieuVisible.value = false;
-    selectedBNIds.value   = [];
+    selectedForLap.value  = [];
+    selectedDaThu.value   = [];
     await Promise.all([fetchData(), fetchTongHop(), fetchPhieu()]);
   } catch (err) { handleApiError(err, toast, 'Lỗi lập phiếu'); }
   creating.value = false;
@@ -359,6 +454,9 @@ async function openDetail(phieu) {
   loadingDetail.value = false;
 }
 
+// ============================================================================
+// MARK: - ACTIONS: IN PHIẾU THU HỘ (BNTH)
+// ============================================================================
 // ─── In phiếu thu hộ BNTH ─────────────────────────────────────────────────
 function openPrintDialog(row) {
   printTarget.value = {
@@ -383,146 +481,275 @@ async function printBNTH(bienNhanId) {
   printingBNTH.value = false;
 }
 
+// ============================================================================
+// MARK: - LIFECYCLE
+// ============================================================================
 onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); });
 
 </script>
 
 <template>
-  <div class="animate-fade-in">
-    <PageHeader title="Thu hộ (COD)" icon="pi pi-money-bill" />
+  <!-- ===================================================================== -->
+  <!-- MARK: - HEADER & STATISTICS                                           -->
+  <!-- ===================================================================== -->
+  <div class="th-page animate-fade-in">
 
-    <!-- StatCards -->
-    <div class="cod-stats-grid">
-      <StatCard icon="pi pi-clock"        label="Chờ thu"        :value="fmt(tongHop?.cho_thu?.total||0)+'đ'"      :subtitle="(tongHop?.cho_thu?.count||0)+' BN'"          variant="warning" />
-      <StatCard icon="pi pi-map-marker"   label="Chành đã thu"  :value="fmt(tongHop?.da_thu_chanh?.total||0)+'đ'" :subtitle="(tongHop?.da_thu_chanh?.count||0)+' BN'"    variant="" />
-      <StatCard icon="pi pi-check"        label="Đã thu"         :value="fmt(tongHop?.da_thu?.total||0)+'đ'"       :subtitle="(tongHop?.da_thu?.count||0)+' BN'"           variant="info" />
-      <StatCard icon="pi pi-hourglass"    label="Chờ chuyển"    :value="fmt(tongHop?.cho_chuyen_pending?.total||0)+'đ'" :subtitle="(tongHop?.cho_chuyen_pending?.count||0)+' BN'" variant="gold" />
-      <StatCard icon="pi pi-send"         label="Đã chuyển"      :value="fmt(tongHop?.da_chuyen?.total||0)+'đ'"    :subtitle="(tongHop?.da_chuyen?.count||0)+' BN'"       variant="info" />
-      <StatCard icon="pi pi-check-circle" label="Hoàn tất"      :value="fmt(tongHop?.da_tra?.total||0)+'đ'"       :subtitle="(tongHop?.da_tra?.count||0)+' BN'"           variant="success" />
+    <!-- ═══ HEADER ═══ -->
+    <div class="th-header">
+      <div class="th-header-left">
+        <i class="pi pi-money-bill header-icon"></i>
+        <h1>Thu hộ (COD)</h1>
+        <div class="vp-badge">
+          <i class="pi pi-building"></i>
+          {{ auth.userVanPhong?.ten || auth.userVanPhong?.ma_vp || 'VP' }}
+        </div>
+      </div>
+      <div class="th-header-right">
+        <Button icon="pi pi-refresh" v-tooltip.bottom="'Làm mới'" severity="secondary"
+          text rounded size="small" :loading="loading" @click="manualRefresh" />
+      </div>
     </div>
 
-    <!-- Info banner -->
+    <!-- ═══ STATS CARDS ═══ -->
+    <div class="stats-row">
+      <div class="stat-card stat-warning">
+        <div class="stat-icon"><i class="pi pi-clock"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.cho_thu?.total||0) }}đ</span>
+          <span class="stat-label">Chờ thu · {{ tongHop?.cho_thu?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-neutral">
+        <div class="stat-icon"><i class="pi pi-map-marker"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_thu_chanh?.total||0) }}đ</span>
+          <span class="stat-label">Chành đã thu · {{ tongHop?.da_thu_chanh?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-info">
+        <div class="stat-icon"><i class="pi pi-check"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_thu?.total||0) }}đ</span>
+          <span class="stat-label">Đã thu · {{ tongHop?.da_thu?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-gold">
+        <div class="stat-icon"><i class="pi pi-hourglass"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.cho_chuyen_pending?.total||0) }}đ</span>
+          <span class="stat-label">Chờ chuyển · {{ tongHop?.cho_chuyen_pending?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-send">
+        <div class="stat-icon"><i class="pi pi-send"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_chuyen?.total||0) }}đ</span>
+          <span class="stat-label">Đã chuyển · {{ tongHop?.da_chuyen?.count||0 }} BN</span>
+        </div>
+      </div>
+      <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="pi pi-check-circle"></i></div>
+        <div class="stat-body">
+          <span class="stat-value">{{ fmt(tongHop?.da_tra?.total||0) }}đ</span>
+          <span class="stat-label">Hoàn tất · {{ tongHop?.da_tra?.count||0 }} BN</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ INFO BANNER ═══ -->
     <div class="info-banner-cod">
       <i class="pi pi-info-circle"></i>
       <span>COD được <b>tự động thu</b> khi giao hàng trực tiếp. Với đơn giao qua chành, dùng nút <b>"Chành đã thu"</b> để ghi nhận.</span>
     </div>
 
-    <!-- Tab Switcher -->
-    <div class="card view-switcher-card">
-      <Button label="Biên nhận COD" icon="pi pi-list"
-        :outlined="activeView!=='bn'"
-        @click="activeView='bn'; fetchData()" />
-      <div style="position:relative;display:inline-block;margin-left:.4rem;">
-        <Button label="Phiếu chuyển COD" icon="pi pi-send"
-          :outlined="activeView!=='phieu'"
-          @click="activeView='phieu'; fetchPhieu()" />
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB SWITCHER                                                  -->
+    <!-- ===================================================================== -->
+    <!-- ═══ TAB BAR ═══ -->
+    <div class="tab-bar">
+      <button class="tab-btn" :class="{ active: activeView === 'bn' }"
+        @click="activeView='bn'; fetchData()">
+        <i class="pi pi-list"></i>
+        <span>Biên nhận COD</span>
+      </button>
+      <button class="tab-btn" :class="{ active: activeView === 'phieu' }"
+        @click="activeView='phieu'; fetchPhieu()">
+        <i class="pi pi-send"></i>
+        <span>Phiếu chuyển COD</span>
         <span v-if="pendingForMe > 0" class="tab-badge">{{ pendingForMe }}</span>
+      </button>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB BIÊN NHẬN: FILTERS & TABLE                                -->
+    <!-- ===================================================================== -->
+    <!-- Tab BN -->
+    <template v-if="activeView==='bn'">
+      <!-- ═══ TOOLBAR ═══ -->
+      <div class="th-toolbar">
+        <div class="toolbar-row">
+          <IconField class="search-wrap">
+            <InputIcon class="pi pi-search" />
+            <InputText v-model="search" placeholder="Tìm mã BN, tên..." class="search-input" @keyup.enter="onSearch" />
+          </IconField>
+          <Select v-model="filterTrangThai" :options="COD_STATUS_OPTIONS" optionLabel="label" optionValue="value"
+            class="filter-select" placeholder="Trạng thái..." @change="onSearch" />
+          <DatePicker v-model="filterFrom" dateFormat="dd/mm/yy" showIcon placeholder="Từ ngày" class="filter-date" />
+          <DatePicker v-model="filterTo" dateFormat="dd/mm/yy" showIcon placeholder="Đến ngày" class="filter-date" />
+          <Button icon="pi pi-search" label="Xem" size="small" @click="onSearch" :loading="loading" />
+          <Button icon="pi pi-times" label="Xóa lọc" severity="secondary" text size="small"
+            @click="filterTrangThai=''; filterFrom=null; filterTo=null; search=''; selectedDaChuyen=[]; onSearch()" />
+        </div>
+        <div v-if="filterTrangThai || filterFrom || filterTo || search" class="filter-active-hint">
+          <i class="pi pi-filter-fill"></i>
+          <span v-if="filterTrangThai">{{ COD_STATUS_OPTIONS.find(o=>o.value===filterTrangThai)?.label }}</span>
+          <span v-if="search"> · Tìm: <strong>{{ search }}</strong></span>
+          — {{ pagination?.total || 0 }} kết quả
+          <button class="clear-filter" @click="filterTrangThai=''; filterFrom=null; filterTo=null; search=''; selectedDaChuyen=[]; onSearch()">✕ Bỏ lọc</button>
+        </div>
       </div>
-    </div>
 
-    <!-- Batch trả lô bar -->
-    <div v-if="activeView==='bn' && selectedDaChuyen.length" class="batch-bar-cod">
-      <span><i class="pi pi-check-square"></i> Đã chọn <b>{{ selectedDaChuyen.length }}</b> BN đã chuyển</span>
-      <Button label="Trả người gửi (batch)" icon="pi pi-money-bill" severity="warn" size="small" @click="openTraLoBatch" />
-      <Button label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaChuyen=[]" />
-    </div>
-
-    <!-- Tab BN — Bộ lọc + Table -->
-    <div v-if="activeView==='bn'">
-    <!-- Bộ lọc -->
-    <div class="card" style="margin-bottom: 1rem;">
-      <div class="filter-section">
-        <label>Trạng thái</label>
-        <Select v-model="filterTrangThai" :options="COD_STATUS_OPTIONS" optionLabel="label" optionValue="value" style="width:195px;" @change="onSearch" />
-        <label class="filter-spacer">Từ ngày</label>
-        <DatePicker v-model="filterFrom" dateFormat="dd/mm/yy" showIcon style="width:140px;" />
-        <label class="filter-spacer">Đến ngày</label>
-        <DatePicker v-model="filterTo" dateFormat="dd/mm/yy" showIcon style="width:140px;" />
-        <label class="filter-spacer">Tìm kiếm</label>
-        <InputText v-model="search" placeholder="Mã BN, tên..." style="width:200px;" @keyup.enter="onSearch" />
-        <Button label="Xem" icon="pi pi-search" style="margin-left:auto;" @click="onSearch" :loading="loading" />
-        <Button label="Xóa lọc" icon="pi pi-times" severity="secondary" text
-                @click="() => { filterTrangThai=''; filterFrom=null; filterTo=null; search=''; selectedDaChuyen=[]; onSearch(); }" />
+      <!-- Batch trả lô bar -->
+      <div v-if="selectedDaChuyen.length" class="batch-bar-cod">
+        <span><i class="pi pi-check-square"></i> Đã chọn <b>{{ selectedDaChuyen.length }}</b> BN đã chuyển</span>
+        <Button label="Trả người gửi (batch)" icon="pi pi-money-bill" severity="warn" size="small" @click="openTraLoBatch" />
+        <Button label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaChuyen=[]" />
       </div>
-    </div>
 
-    <!-- DataTable -->
-    <div class="card">
-      <DataTable :value="data" :loading="loading" stripedRows size="small" responsiveLayout="scroll">
+      <!-- Batch gom lô lập phiếu bar -->
+      <div v-if="selectedDaThu.length" class="batch-bar-cod" style="border-color:var(--info-border);background:var(--info-light);">
+        <span><i class="pi pi-check-square"></i> Đã chọn <b>{{ selectedDaThu.length }}</b> BN đã thu · Tổng: <b class="text-danger">{{ fmt(tongTienSelected) }}đ</b></span>
+        <Button label="Lập phiếu chuyển (gom lô)" icon="pi pi-send" severity="help" size="small" @click="openLapPhieuBatch" />
+        <Button label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaThu=[]" />
+      </div>
+
+      <!-- ═══ TABLE ═══ -->
+      <DataTable :value="data" :loading="loading" stripedRows size="small" scrollable scrollHeight="flex"
+        :rowClass="(d) => Number(d.thu_ho) > 0 ? 'row-has-cod' : ''" class="th-table">
         <template #empty>
-          <div style="text-align:center;padding:2rem;color:var(--text-muted);">
-            <i class="pi pi-money-bill" style="font-size:1.5rem;opacity:.3;"></i>
-            <p style="font-size:0.85rem;margin-top:.5rem;">Không có biên nhận COD nào</p>
+          <div class="table-empty">
+            <i class="pi pi-money-bill" style="font-size:2rem;color:#94a3b8;"></i>
+            <p>Không có biên nhận COD nào</p>
           </div>
         </template>
 
-        <Column header="Mã BN" style="width:130px;font-weight:600;">
-          <template #body="{ data: row }">{{ row.ma_so }}</template>
+        <Column header="Mã BN" field="ma_so" frozen style="min-width:130px;">
+          <template #body="{ data: row }"><span class="ma-so-cell">{{ row.ma_so }}</span></template>
         </Column>
-        <Column header="Ngày" style="width:90px;">
+        <Column header="Ngày" style="min-width:85px;">
           <template #body="{ data: row }">{{ fmtDate(row.ngay_bien_nhan) }}</template>
         </Column>
-        <Column header="Tuyến" style="width:110px;">
+        <Column header="Tuyến" style="min-width:110px;">
           <template #body="{ data: row }">
-            <span style="font-size:.8rem;font-weight:600;">{{ row.van_phong_gui?.ma_vp }} → {{ row.van_phong_nhan?.ma_vp }}</span>
+            <span class="vp-tag vp-gui">{{ row.van_phong_gui?.ma_vp }}</span>
+            <span style="margin:0 2px;color:var(--text-light);">→</span>
+            <span class="vp-tag vp-nhan">{{ row.van_phong_nhan?.ma_vp }}</span>
           </template>
         </Column>
-        <Column header="Người gửi">
-          <template #body="{ data: row }"><span style="font-size:.82rem;">{{ row.don_vi_gui||row.nguoi_gui||'—' }}</span></template>
+        <Column header="Người gửi" style="min-width:140px;">
+          <template #body="{ data: row }">
+            <div class="person-cell">
+              <span class="name">{{ row.don_vi_gui || row.nguoi_gui || '—' }}</span>
+              <span v-if="row.don_vi_gui && row.nguoi_gui" class="sub">{{ row.nguoi_gui }}</span>
+            </div>
+          </template>
         </Column>
-        <Column header="Người nhận">
-          <template #body="{ data: row }"><span style="font-size:.82rem;">{{ row.don_vi_nhan||row.nguoi_nhan||'—' }}</span></template>
+        <Column header="Người nhận" style="min-width:140px;">
+          <template #body="{ data: row }">
+            <div class="person-cell">
+              <span class="name">{{ row.don_vi_nhan || row.nguoi_nhan || '—' }}</span>
+              <span v-if="row.don_vi_nhan && row.nguoi_nhan" class="sub">{{ row.nguoi_nhan }}</span>
+            </div>
+          </template>
         </Column>
-        <Column header="Tiền COD" style="width:130px;">
-          <template #body="{ data: row }"><span class="text-danger fw-700">{{ fmt(row.thu_ho) }}đ</span></template>
+        <Column header="Tiền COD" style="min-width:110px;text-align:right;">
+          <template #body="{ data: row }">
+            <span class="cod-badge">
+              <i class="pi pi-exclamation-circle" style="font-size:0.65rem;"></i>
+              {{ fmt(row.thu_ho) }}đ
+            </span>
+          </template>
         </Column>
-        <Column header="Trạng thái" style="width:130px;text-align:center;">
+        <Column header="Trạng thái" style="min-width:130px;text-align:center;">
           <template #body="{ data: row }">
             <Tag v-if="COD_STATUS[row.trang_thai_cod]" :value="COD_STATUS[row.trang_thai_cod].label" :severity="COD_STATUS[row.trang_thai_cod].severity" />
           </template>
         </Column>
-        <Column header="Chành" style="width:100px;">
-          <template #body="{ data: row }"><span class="text-muted" style="font-size:.78rem;">{{ row.chanh?.ten || '—' }}</span></template>
-        </Column>
-        <Column header="Biên nhận TH" style="width:130px;text-align:center;">
+        <Column header="Chành" style="min-width:100px;">
           <template #body="{ data: row }">
-            <span v-if="row.bien_nhan_thu_ho?.length"
-              class="bnth-badge">
+            <span v-if="row.chanh" class="chanh-tag">{{ row.chanh.ten }}</span>
+            <span v-else class="no-val">—</span>
+          </template>
+        </Column>
+        <Column header="BN Thu hộ" style="min-width:120px;text-align:center;">
+          <template #body="{ data: row }">
+            <span v-if="row.bien_nhan_thu_ho?.length" class="bnth-badge">
               <i class="pi pi-file-check"></i> {{ row.bien_nhan_thu_ho[0].ma_bnth }}
               <button class="bnth-print-btn" title="In phiếu thu hộ" @click.stop="openPrintDialog(row)">
                 <i class="pi pi-print"></i>
               </button>
             </span>
-            <span v-else class="text-muted" style="font-size:.75rem;">—</span>
+            <span v-else class="no-val">—</span>
           </template>
         </Column>
-        <Column header="Thao tác" style="width:220px;">
+        <Column frozen alignFrozen="right" style="min-width:180px;text-align:center;">
+          <template #header><span style="font-size:0.75rem;">Thao tác</span></template>
           <template #body="{ data: row }">
-            <div style="display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;">
+            <div class="action-cell">
               <template v-if="row.trang_thai_cod === 'da_tra'">
                 <Tag value="Hoàn tất" severity="success" />
+              </template>
+              <template v-else-if="row.trang_thai_cod === 'da_thu'">
+                <!-- Chỉ VP Nhận (chành nhận) mới lập phiếu chuyển COD -->
+                <template v-if="isAdmin || row.van_phong_nhan_id === userVpId">
+                  <input type="checkbox" class="batch-checkbox"
+                    :checked="selectedDaThu.some(r=>r.id===row.id)"
+                    @change="e=>{ if(e.target.checked) selectedDaThu.push(row); else selectedDaThu=selectedDaThu.filter(r=>r.id!==row.id); }" />
+                  <Button label="Lập phiếu" severity="help" size="small" @click="openLapPhieuFor(row)" />
+                </template>
+                <span v-else class="waiting-cod-label"><i class="pi pi-clock"></i> Chờ VP Nhận xử lý</span>
               </template>
               <template v-else-if="row.trang_thai_cod === 'cho_chuyen_pending'">
                 <Tag value="Đang trong phiếu" severity="help" />
               </template>
               <template v-else-if="row.trang_thai_cod === 'cho_thu' && !row.chanh_id">
-                <span class="waiting-cod-label"><i class="pi pi-truck"></i> Chờ giao hàng</span>
+                <template v-if="row.trang_thai === 'khach_da_nhan'">
+                  <Button label="Thu COD" icon="pi pi-dollar" size="small" severity="warn"
+                    @click="thuCODThuCong(row)" />
+                </template>
+                <template v-else>
+                  <span class="waiting-cod-label"><i class="pi pi-truck"></i> Chờ giao hàng</span>
+                </template>
               </template>
               <template v-else-if="row.trang_thai_cod === 'da_chuyen'">
-                <input type="checkbox" style="margin-right:.4rem;"
-                  :checked="selectedDaChuyen.some(r=>r.id===row.id)"
-                  @change="e=>{ if(e.target.checked) selectedDaChuyen.push(row); else selectedDaChuyen=selectedDaChuyen.filter(r=>r.id!==row.id); }" />
-                <Button label="Trả người gửi" severity="warn" size="small" @click="openDialog(row,'tra-lo')" />
+                <!-- Chỉ VP Gửi (chành gửi) mới có thể trả COD cho người gửi -->
+                <template v-if="isAdmin || row.van_phong_gui_id === userVpId">
+                  <input type="checkbox" class="batch-checkbox"
+                    :checked="selectedDaChuyen.some(r=>r.id===row.id)"
+                    @change="e=>{ if(e.target.checked) selectedDaChuyen.push(row); else selectedDaChuyen=selectedDaChuyen.filter(r=>r.id!==row.id); }" />
+                  <Button label="Trả người gửi" severity="warn" size="small" @click="openDialog(row,'tra-lo')" />
+                </template>
+                <span v-else class="waiting-cod-label">
+                  <i class="pi pi-check-circle"></i> Đã gửi tiền đi
+                </span>
               </template>
               <template v-else>
-                <Button
-                  v-for="btn in getAction(row)"
-                  :key="btn.action"
-                  :label="btn.label"
-                  :severity="btn.severity"
-                  size="small"
-                  @click="openDialog(row, btn.action)"
-                />
+                <!-- cho_thu + chanh_id + chưa da_giao_chanh: hiện nhãn passive -->
+                <span
+                  v-if="row.trang_thai_cod === 'cho_thu' && row.chanh_id && row.trang_thai !== 'da_giao_chanh'"
+                  class="waiting-cod-label"
+                ><i class="pi pi-send"></i> Chờ giao chành</span>
+                <!-- các trường hợp còn lại: render nút từ getAction() -->
+                <template v-else>
+                  <Button
+                    v-for="btn in getAction(row)"
+                    :key="btn.action"
+                    :label="btn.label"
+                    :severity="btn.severity"
+                    size="small"
+                    @click="openDialog(row, btn.action)"
+                  />
+                </template>
               </template>
             </div>
           </template>
@@ -530,12 +757,11 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </DataTable>
 
       <!-- Pagination -->
-      <div v-if="pagination && pagination.total > 20"
-        style="display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;font-size:.82rem;color:#64748b;">
+      <div v-if="pagination && pagination.total > 20" class="th-pagination">
         <span>Tổng {{ pagination.total }} biên nhận</span>
-        <div style="display:flex;gap:.5rem;">
+        <div class="pagi-controls">
           <Button icon="pi pi-chevron-left" text rounded size="small" :disabled="page<=1" @click="page--;fetchData()" />
-          <span style="line-height:2rem;">Trang {{ page }}/{{ pagination.totalPages }}</span>
+          <span>{{ page }}/{{ pagination.totalPages }}</span>
           <Button icon="pi pi-chevron-right" text rounded size="small" :disabled="page>=pagination.totalPages" @click="page++;fetchData()" />
         </div>
       </div>
@@ -543,11 +769,13 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       <!-- Footer tổng -->
       <div v-if="summary" class="summary-footer">
         <span>{{ summary.count }} biên nhận</span>
-        <span class="text-danger">Tổng COD: {{ fmt(summary.total_thu_ho) }}đ</span>
+        <span class="cod-total">Tổng COD: {{ fmt(summary.total_thu_ho) }}đ</span>
       </div>
-    </div>
-    </div><!-- /activeView bn -->
+    </template><!-- /activeView bn -->
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: XÁC NHẬN THU/CHÀNH                                    -->
+    <!-- ===================================================================== -->
     <!-- Dialog xác nhận thu / thu-chanh / nhan-tu-chanh -->
     <Dialog v-model:visible="dialogVisible" :header="DIALOG_CONFIG[currentAction]?.title" :style="{width:'480px'}" modal>
       <div style="margin-bottom:1rem;padding:.75rem;background:#f8fafc;border-radius:8px;font-size:.85rem;">
@@ -562,7 +790,7 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </div>
 
       <div style="background:#f1f5f9;padding:.75rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem;border-left:3px solid #2563eb;">
-        <p style="font-weight:700;margin-bottom:.4rem;color:#1e40af;">📄 Phiếu sẽ tự động tạo:</p>
+        <p style="font-weight:700;margin-bottom:.4rem;color:#1e40af;"><i class="pi pi-file-check" style="margin-right:.35rem;"></i>Phiếu sẽ tự động tạo:</p>
         <p v-if="currentAction==='xac-nhan-thu'" style="margin:0;color:#475569;">• Phiếu <b>thu</b> tại VP <b>{{ selectedBN?.van_phong_nhan?.ten }}</b> + Biên nhận thu hộ</p>
         <p v-if="currentAction==='xac-nhan-thu-chanh'" style="margin:0;color:#475569;">• Chỉ cập nhật trạng thái — <b>chưa</b> tạo phiếu thu (tiền đang ở chành)</p>
         <p v-if="currentAction==='xac-nhan-nhan-tu-chanh'" style="margin:0;color:#475569;">• Phiếu <b>thu</b> tại VP <b>{{ selectedBN?.van_phong_nhan?.ten }}</b> + Biên nhận thu hộ (qua chành)</p>
@@ -591,8 +819,11 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: TRẢ LÔ COD                                            -->
+    <!-- ===================================================================== -->
     <!-- Dialog trả lô -->
-    <Dialog v-model:visible="traLoVisible" header="💸 Trả COD cho người gửi" :style="{width:'460px'}" modal>
+    <Dialog v-model:visible="traLoVisible" header="Trả COD cho người gửi" :style="{width:'460px'}" modal>
       <div style="margin-bottom:1rem;font-size:.85rem;">
         <p style="color:#475569;margin-bottom:.75rem;">Xác nhận trả <b>{{ selectedForTra.length }}</b> biên nhận cho người gửi:</p>
         <ul style="margin:0;padding-left:1.2rem;color:#334155;">
@@ -617,6 +848,9 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - TAB PHIẾU CHUYỂN COD: FILTERS & TABLE                         -->
+    <!-- ===================================================================== -->
     <!-- ═══ TAB PHIẾU CHUYỂN COD ═══ -->
     <div v-if="activeView==='phieu'" class="card">
       <div class="filter-section" style="margin-bottom:.75rem;">
@@ -701,16 +935,45 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </div>
     </div><!-- /activeView phieu -->
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: LẬP PHIẾU CHUYỂN                                      -->
+    <!-- ===================================================================== -->
     <!-- Dialog lập phiếu chuyển COD -->
     <Dialog v-model:visible="lapPhieuVisible" header="Lập phiếu chuyển COD" :style="{width:'680px'}" modal>
+      <!-- Preview table — danh sách BN đã chọn từ bảng -->
       <div style="margin-bottom:1rem;">
-        <label class="bk-label" style="margin-bottom:.4rem;display:block;">Chọn biên nhận đã thu COD</label>
-        <MultiSelect v-model="selectedBNIds" :options="bnDaThu" optionLabel="ma_so" optionValue="id"
-          :loading="loadingBN" filter placeholder="Tìm và chọn biên nhận..."
-          style="width:100%;" display="chip"
-          :maxSelectedLabels="5" />
-        <div v-if="selectedBNIds.length" style="margin-top:.5rem;font-size:.82rem;color:#64748b;">
-          Đã chọn {{ selectedBNIds.length }} BN · Tổng COD: <b class="text-danger">{{ fmt(soTienTong) }}đ</b>
+        <label class="bk-label" style="margin-bottom:.4rem;display:block;">
+          Biên nhận đã chọn ({{ selectedForLap.length }})
+        </label>
+        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+            <thead>
+              <tr style="background:var(--bg-sunken);">
+                <th style="padding:4px 8px;text-align:left;">Mã BN</th>
+                <th style="padding:4px 8px;text-align:left;">Người gửi</th>
+                <th style="padding:4px 8px;text-align:left;">Tuyến</th>
+                <th style="padding:4px 8px;text-align:right;">COD</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="bn in selectedForLap" :key="bn.id" style="border-top:1px solid var(--border-light);">
+                <td style="padding:4px 8px;font-family:monospace;">{{ bn.ma_so }}</td>
+                <td style="padding:4px 8px;">{{ bn.don_vi_gui || bn.nguoi_gui || '—' }}</td>
+                <td style="padding:4px 8px;">
+                  <span class="vp-tag vp-gui">{{ bn.van_phong_gui?.ma_vp }}</span>
+                  <span style="margin:0 2px;">→</span>
+                  <span class="vp-tag vp-nhan">{{ bn.van_phong_nhan?.ma_vp }}</span>
+                </td>
+                <td style="padding:4px 8px;text-align:right;font-weight:600;color:var(--danger);">{{ fmt(bn.thu_ho) }}đ</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr style="background:var(--bg-sunken);border-top:1px solid var(--border);font-weight:700;">
+                <td colspan="3" style="padding:4px 8px;text-align:right;">Tổng cộng:</td>
+                <td style="padding:4px 8px;text-align:right;color:var(--danger);">{{ fmt(selectedForLap.reduce((s,b) => s + Number(b.thu_ho||0), 0)) }}đ</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.75rem;">
@@ -735,6 +998,9 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: XÁC NHẬN GỬI/NHẬN                                     -->
+    <!-- ===================================================================== -->
     <!-- Dialog xác nhận gửi/nhận phiếu -->
     <Dialog v-model:visible="actionDialog"
       :header="actionType==='chuyen' ? 'Xác nhận đã gửi tiền đi' : 'Xác nhận đã nhận tiền'"
@@ -762,6 +1028,9 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: CHI TIẾT PHIẾU CHUYỂN                                 -->
+    <!-- ===================================================================== -->
     <!-- Dialog chi tiết phiếu -->
     <Dialog v-model:visible="detailVisible" header="Chi tiết phiếu chuyển COD" :style="{width:'700px'}" modal :maximizable="true">
       <div v-if="loadingDetail" style="text-align:center;padding:2rem;">
@@ -815,6 +1084,9 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       </template>
     </Dialog>
 
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: IN PHIẾU THU HỘ (BNTH)                                -->
+    <!-- ===================================================================== -->
     <!-- Dialog in phiếu thu hộ BNTH -->
     <Dialog v-model:visible="printDialogVisible" header="In phiếu thu hộ" :style="{width:'380px'}" modal>
       <div v-if="printTarget" style="text-align:center;padding:.5rem 0;">
@@ -837,174 +1109,54 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
 </template>
 
 <style scoped>
-.cod-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-@media (max-width: 1400px) { .cod-stats-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 900px)  { .cod-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+/* ============================================================================
+   MARK: - STYLES (ThuHo-specific — chỉ giữ lại styles không có trong base.css)
+   Các class global (page-shell, stats-row, stat-card, tab-bar, tab-btn,
+   page-toolbar, batch-bar-cod, confirm-info, ma-so-cell, cod-badge, v.v.)
+   đã được định nghĩa trong assets/styles/base.css.
+   ============================================================================ */
 
-.summary-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1.5rem;
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-sunken);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
+/* ─── Page + Table alias (th-prefix cho backward compat) ────────── */
+.th-page   { display: flex; flex-direction: column; height: calc(100vh - var(--header-height) - var(--content-padding) * 2); gap: 0.5rem; }
+.th-table  { flex: 1; overflow: hidden; border-radius: var(--radius); border: 1px solid var(--border); }
+.th-toolbar { display: flex; flex-direction: column; gap: 0.4rem; flex-shrink: 0; }
+.th-header  { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 0.5rem; padding: 0.25rem 0; }
+.th-header-left  { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.th-header-left h1 { font-size: 1.1rem; font-weight: 700; color: var(--secondary); margin: 0; }
+.th-header-right { display: flex; align-items: center; gap: 0.5rem; }
+.th-pagination  { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: #64748b; flex-shrink: 0; padding: 0.25rem 0; }
 
-.info-banner-cod {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .6rem 1rem;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  font-size: .83rem;
-  color: #1e40af;
-  margin-bottom: .75rem;
-}
+/* ─── Tab bar active variant (ThuHo dùng nền đậm hơn) ───────────── */
+.tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+.tab-btn.active .tab-badge { background: rgba(255,255,255,0.3); color: white; }
+
+/* ─── Info banner COD ───────────────────────────────────────────── */
+.info-banner-cod { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.85rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); font-size: 0.78rem; color: #1e40af; flex-shrink: 0; }
 .info-banner-cod .pi { flex-shrink: 0; }
 
-.batch-bar-cod {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .6rem .75rem;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 8px;
-  font-size: .83rem;
-  color: #9a3412;
-  margin-bottom: .5rem;
-}
+/* ─── Batch bar COD (warn tone, ThuHo specific layout) ─────────── */
+.batch-checkbox { margin-right: 0.3rem; cursor: pointer; }
 .batch-bar-cod > span { flex: 1; }
 
-.bnth-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
-  font-size: .75rem;
-  font-weight: 600;
-  color: #166534;
-  background: #dcfce7;
-  border: 1px solid #86efac;
-  border-radius: 4px;
-  padding: 2px 6px;
-  cursor: default;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100px;
-}
+/* ─── Waiting COD label ─────────────────────────────────────────── */
+.waiting-cod-label { font-size: 0.78rem; color: #94a3b8; display: flex; align-items: center; gap: 0.3rem; }
 
-.waiting-cod-label {
-  font-size: .78rem;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: .3rem;
-}
+/* ─── BNTH badge ────────────────────────────────────────────────── */
+.bnth-badge { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #166534; background: #dcfce7; border: 1px solid #86efac; border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.bnth-print-btn { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.3rem; padding: 2px 4px; border-radius: 4px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; cursor: pointer; font-size: 0.72rem; transition: background 0.15s, color 0.15s; }
+.bnth-print-btn:hover { background: #1e40af; color: #fff; }
 
-/* ── Tab Switcher ── */
-.view-switcher-card {
-  padding: .5rem .75rem !important;
-  margin-bottom: .75rem;
-  display: flex;
-  align-items: center;
-}
+/* ─── My turn label (tab Phiếu) ─────────────────────────────────── */
+.my-turn-label { font-size: 0.7rem; color: #7c3aed; font-weight: 600; display: flex; align-items: center; gap: 0.2rem; }
 
-/* Badge đỏ trên tab "Phiếu chuyển COD" */
-.tab-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: #ef4444;
-  color: #fff;
-  border-radius: 999px;
-  font-size: .65rem;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  pointer-events: none;
-  box-shadow: 0 1px 4px rgba(239,68,68,.4);
-}
+/* ─── Phiếu detail dialog ───────────────────────────────────────── */
+.phieu-detail-header { background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.phieu-detail-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.83rem; }
+.phieu-detail-label { font-weight: 600; color: var(--text-muted); min-width: 80px; }
+.route-pill { background: #e0e7ff; color: #3730a3; border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.75rem; font-weight: 700; font-family: var(--font-mono); }
+.route-pill--dest { background: #d1fae5; color: #065f46; }
 
-/* "Bạn gửi / Bạn nhận" label */
-.my-turn-label {
-  font-size: .7rem;
-  color: #7c3aed;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: .2rem;
-}
-
-/* Nút in nhỏ trong badge BNTH */
-.bnth-print-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: .3rem;
-  padding: 2px 4px;
-  border-radius: 4px;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  color: #1e40af;
-  cursor: pointer;
-  font-size: .72rem;
-  transition: background .15s, color .15s;
-}
-.bnth-print-btn:hover {
-  background: #1e40af;
-  color: #fff;
-}
-
-/* Phiếu detail header */
-.phieu-detail-header {
-  background: var(--bg-base);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .75rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
-.phieu-detail-row {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  font-size: .83rem;
-}
-.phieu-detail-label {
-  font-weight: 600;
-  color: var(--text-muted);
-  min-width: 80px;
-}
-
-/* Route pills trong dialog chi tiết */
-.route-pill {
-  background: #e0e7ff;
-  color: #3730a3;
-  border-radius: 999px;
-  padding: .15rem .55rem;
-  font-size: .75rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-}
-.route-pill--dest {
-  background: #d1fae5;
-  color: #065f46;
-}
+/* ─── Row highlight ─────────────────────────────────────────────── */
+:deep(.row-has-cod) { background: #fffbeb !important; border-left: 2px solid #f59e0b; }
+:deep(.row-has-cod:hover td) { background: #fef3c7 !important; }
 </style>

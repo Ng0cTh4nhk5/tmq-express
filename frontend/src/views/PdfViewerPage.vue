@@ -1,4 +1,7 @@
 <script setup>
+// ============================================================================
+// MARK: - IMPORTS & CONFIG
+// ============================================================================
 import { onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../api/client';
@@ -6,6 +9,9 @@ import api from '../api/client';
 const route = useRoute();
 const id = route.params.id;
 
+// ============================================================================
+// MARK: - LIFECYCLE: LOAD PDF PREVIEW
+// ============================================================================
 onMounted(async () => {
   try {
     const { data: res } = await api.get(`/bien-nhan/${id}/pdf-preview`);
@@ -45,6 +51,9 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- ===================================================================== -->
+  <!-- MARK: - LOADING LAYOUT                                                -->
+  <!-- ===================================================================== -->
   <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666;">
     <div style="text-align:center">
       <div style="font-size:2rem;margin-bottom:0.5rem;">⏳</div>
