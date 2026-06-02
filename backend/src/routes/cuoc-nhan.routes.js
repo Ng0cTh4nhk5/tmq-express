@@ -29,6 +29,7 @@ export default async function cuocNhanRoutes(fastify) {
           limit:    { type: 'integer', minimum: 1, maximum: 100 },
           search:   { type: 'string' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {
@@ -49,6 +50,7 @@ export default async function cuocNhanRoutes(fastify) {
           from:    { type: 'string', format: 'date' },
           to:      { type: 'string', format: 'date' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {
@@ -107,6 +109,7 @@ export default async function cuocNhanRoutes(fastify) {
           page:       { type: 'integer', minimum: 1 },
           limit:      { type: 'integer', minimum: 1, maximum: 100 },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {

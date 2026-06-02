@@ -201,11 +201,12 @@ onMounted(async () => {
     <!-- MARK: - STATISTICS CARDS                                              -->
     <!-- ===================================================================== -->
     <!-- Stat cards -->
-    <div v-if="tongHop" class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 1rem;">
+    <div v-if="tongHop" class="stats-grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 1rem;">
         <StatCard icon="pi pi-inbox"               label="Số biên nhận"   :value="fmt(tongHop.so_bn) + ' BN'"                              variant="info" />
         <StatCard icon="pi pi-wallet"              label="Tổng doanh thu" :value="fmt(tongHop.tong_cuoc) + 'đ'"                             variant="gold" />
         <StatCard icon="pi pi-check-circle"        label="Đã thu"         :value="fmt(tongHop.da_thu) + 'đ'"                                variant="success" />
         <StatCard icon="pi pi-exclamation-triangle" label="Chưa thu + Nợ" :value="fmt(tongHop.chua_thu + tongHop.cong_no) + 'đ'"            variant="danger" />
+        <StatCard icon="pi pi-percentage"          label="Tỷ lệ thu hồi" :value="(tongHop.ty_le_thu_hoi ?? 0) + '%'"                       :variant="(tongHop.ty_le_thu_hoi ?? 0) >= 80 ? 'success' : (tongHop.ty_le_thu_hoi ?? 0) >= 50 ? 'gold' : 'danger'" />
       </div>
 
     <!-- ===================================================================== -->
@@ -272,6 +273,14 @@ onMounted(async () => {
         <Column header="Thu hộ" style="width:110px; text-align:right;">
           <template #body="{ data }">
             <span class="text-navy">{{ fmt(data.thu_ho) }}đ</span>
+          </template>
+        </Column>
+
+        <!-- Cột Khác: chỉ hiển thị khi có dữ liệu bất thường -->
+        <Column v-if="chiTiet.some(d => (d.khac || 0) > 0)" header="Khác ⚠️" style="width:100px; text-align:right;">
+          <template #body="{ data }">
+            <span v-if="(data.khac || 0) > 0" style="color: var(--orange-500); font-weight:700;">{{ fmt(data.khac) }}đ</span>
+            <span v-else class="text-muted">—</span>
           </template>
         </Column>
       </DataTable>

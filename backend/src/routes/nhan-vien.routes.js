@@ -11,6 +11,18 @@ export default async function nhanVienRoutes(fastify) {
   // GET /api/nhan-vien
   fastify.get('/', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          van_phong_id: { type: 'integer' },
+          active:       { type: 'string', enum: ['true', 'false'] },
+          page:         { type: 'integer', minimum: 1 },
+          limit:        { type: 'integer', minimum: 1, maximum: 100 },
+        },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const result = await nhanVienService.listNhanVien(request.query);
       return { success: true, ...result };
@@ -108,6 +120,18 @@ export default async function nhanVienRoutes(fastify) {
         data: { tempPassword: result.tempPassword },
         message: 'Đã reset mật khẩu. NV sẽ phải đổi khi đăng nhập.',
       };
+    },
+  });
+
+  // PATCH /api/nhan-vien/:id/unlock — L-07: Mở khóa tài khoản bị lock do brute force
+  fastify.patch('/:id/unlock', {
+    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    schema: {
+      params: paramsIdSchema,
+    },
+    handler: async (request) => {
+      await nhanVienService.unlockAccount(Number(request.params.id));
+      return { success: true, message: 'Đã mở khóa tài khoản thành công.' };
     },
   });
 }

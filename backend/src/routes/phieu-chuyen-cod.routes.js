@@ -22,6 +22,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
           page:       { type: 'integer', minimum: 1 },
           limit:      { type: 'integer', minimum: 1, maximum: 100 },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {

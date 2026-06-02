@@ -34,6 +34,7 @@ export default async function thuHoRoutes(fastify) {
           limit:   { type: 'integer', minimum: 1, maximum: 500 },
           search:  { type: 'string' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {
@@ -54,6 +55,7 @@ export default async function thuHoRoutes(fastify) {
           from:    { type: 'string', format: 'date' },
           to:      { type: 'string', format: 'date' },
         },
+        additionalProperties: false,
       },
     },
     handler: async (request) => {

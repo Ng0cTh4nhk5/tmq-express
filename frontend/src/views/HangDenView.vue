@@ -161,7 +161,7 @@ let isMounted = false;
 // MARK: - COMPUTED STATE
 // ============================================================================
 // ── Computed ───────────────────────────────────────────────────────
-const isAdminOrAccountant = computed(() => auth.isAdmin || auth.isAccountant);
+const isAdminOrAccountant = computed(() => auth.isAdmin);
 
 const vpGuiOptions = computed(() => {
   const map = new Map();
@@ -205,6 +205,9 @@ const displayStats = computed(() => {
     so_co_cod: filteredItems.value.filter(b => Number(b.thu_ho) > 0).length,
   };
 });
+
+// [Fix #hasMore] Banner cảnh báo: backend có nhiều hơn số BN đang hiển thị
+const hasMore = computed(() => items.value.length < (pagination.value?.total ?? 0));
 
 // ============================================================================
 // MARK: - API: FETCH DATA

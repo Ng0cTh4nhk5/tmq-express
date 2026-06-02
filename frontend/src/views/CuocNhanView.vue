@@ -100,6 +100,12 @@ const phieuAction        = ref('');
 const hinhThucPhieu      = ref('tien_mat');
 const confirmingPhieu    = ref(false);
 
+// [Fix #4] Dialog xác nhận thu cước thủ công
+const thuCuocDialogVisible = ref(false);
+const thuCuocTarget        = ref(null);
+const hinhThucThuCuoc      = ref('tien_mat');
+const confirmingThuCuoc    = ref(false);
+
 // ============================================================================
 // MARK: - COMPUTED STATE
 // ============================================================================
@@ -229,11 +235,6 @@ function openLapPhieuBatch() {
   openLapPhieu(daThu);
 }
 
-// Chỉ cho phép chọn row có trang_thai_cuoc_nhan === 'da_thu'
-function isDataSelectable({ data: row }) {
-  return row.trang_thai_cuoc_nhan === 'da_thu';
-}
-
 // Chọn tất cả da_thu trong trang hiện tại
 function selectAllDaThu() {
   const daThu = data.value.filter(r => r.trang_thai_cuoc_nhan === 'da_thu');
@@ -299,13 +300,44 @@ async function xacNhanPhieu() {
   confirmingPhieu.value = false;
 }
 
-// [B3] Thu cước thủ công khi auto-thu đã fail (BN kẹt cho_thu sau khi giao hàng)
-async function thuCuocThuCong(row) {
+// [Fix #4] Thu cước thủ công — mở dialog xác nhận thay vì gọi API ngay
+function openThuCuocDialog(row) {
+  thuCuocTarget.value      = row;
+  hinhThucThuCuoc.value    = 'tien_mat';
+  thuCuocDialogVisible.value = true;
+}
+
+async function xacNhanThuCuoc() {
+  if (!thuCuocTarget.value) return;
+  confirmingThuCuoc.value = true;
   try {
-    const res = await api.post(`/cuoc-nhan/${row.id}/thu`, { hinh_thuc: 'tien_mat' });
+    const res = await api.post(`/cuoc-nhan/${thuCuocTarget.value.id}/thu`, { hinh_thuc: hinhThucThuCuoc.value });
     toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
+    thuCuocDialogVisible.value = false;
     await Promise.all([fetchBN(), fetchTongHop()]);
   } catch (err) { handleApiError(err, toast, 'Lỗi thu cước'); }
+  confirmingThuCuoc.value = false;
+}
+
+// In biên nhận thu cước nhận (sau khi BN đã thu thành công)
+const printingCuoc = ref(false);
+async function printPhieuThuCuoc(row) {
+  const phieuThuId = row.phieu_thu?.[0]?.id;
+  if (!phieuThuId) {
+    toast.add({ severity: 'warn', summary: 'Không có phiếu thu', detail: 'Không tìm thấy phiếu thu liên kết', life: 3000 });
+    return;
+  }
+  printingCuoc.value = true;
+  try {
+    const res   = await api.get(`/phieu-thu/${phieuThuId}/pdf-preview`);
+    const b64   = res.data.data.base64;
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const blob  = new Blob([bytes], { type: 'application/pdf' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (err) {
+    handleApiError(err, toast, 'Lỗi tải PDF phiếu thu cước');
+  }
+  printingCuoc.value = false;
 }
 
 // ============================================================================
@@ -456,14 +488,10 @@ onMounted(async () => {
 
       <!-- ═══ TABLE ═══ -->
       <DataTable
-        v-model:selection="selectedRows"
         :value="data"
         :loading="loading"
         stripedRows size="small"
         scrollable scrollHeight="flex"
-        dataKey="id"
-        :isDataSelectable="isDataSelectable"
-        :rowClass="row => row.trang_thai_cuoc_nhan !== 'da_thu' ? 'row-not-selectable' : ''"
         class="cn-table"
       >
         <template #empty>
@@ -472,8 +500,6 @@ onMounted(async () => {
             <p>Không có biên nhận cước nhận nào</p>
           </div>
         </template>
-
-        <Column selectionMode="multiple" style="width:44px;" :exportable="false" />
 
         <Column header="Mã BN" field="ma_so" frozen style="min-width:130px;">
           <template #body="{ data: row }"><span class="ma-so-cell">{{ row.ma_so }}</span></template>
@@ -528,7 +554,7 @@ onMounted(async () => {
               <template v-if="row.trang_thai_cuoc_nhan === 'cho_thu'">
                 <template v-if="['khach_da_nhan','da_giao_chanh'].includes(row.trang_thai)">
                   <Button label="Thu cước" icon="pi pi-dollar" size="small" severity="warn"
-                    @click="thuCuocThuCong(row)" />
+                    @click="openThuCuocDialog(row)" />
                 </template>
                 <template v-else-if="row.trang_thai === 'da_giao_chanh'">
                   <span class="waiting-label"><i class="pi pi-send"></i> Chờ giao chành</span>
@@ -538,7 +564,17 @@ onMounted(async () => {
                 </template>
               </template>
               <template v-else-if="row.trang_thai_cuoc_nhan === 'da_thu'">
+                <input type="checkbox" class="batch-checkbox"
+                  :checked="selectedRows.some(r => r.id === row.id)"
+                  @change="e => { if(e.target.checked) selectedRows.push(row); else selectedRows = selectedRows.filter(r => r.id !== row.id); }" />
                 <Button label="Lập phiếu" icon="pi pi-send" size="small" severity="help" @click="openLapPhieu(row)" />
+                <Button
+                  v-if="row.phieu_thu?.[0]?.id"
+                  icon="pi pi-print" v-tooltip.top="'In biên nhận thu cước'"
+                  size="small" severity="secondary" text rounded
+                  :loading="printingCuoc"
+                  @click="printPhieuThuCuoc(row)"
+                />
               </template>
               <template v-else-if="row.trang_thai_cuoc_nhan === 'cho_chuyen'">
                 <div style="display:flex;flex-direction:column;gap:0.2rem;">
@@ -892,6 +928,32 @@ onMounted(async () => {
         <Button label="Đóng" severity="secondary" @click="chiTietDialogVisible=false" />
       </template>
     </Dialog>
+
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: THU CƯỚC THỦ CÔNG [Fix #4]                           -->
+    <!-- ===================================================================== -->
+    <Dialog v-model:visible="thuCuocDialogVisible" header="Thu cước thủ công" :modal="true" :style="{ width: '400px' }">
+      <div v-if="thuCuocTarget" class="confirm-info">
+        <div class="confirm-row"><span class="confirm-lbl">Mã BN:</span><strong class="confirm-val">{{ thuCuocTarget.ma_so }}</strong></div>
+        <div class="confirm-row"><span class="confirm-lbl">Người gửi:</span>
+          <span class="confirm-val">{{ thuCuocTarget.don_vi_gui || thuCuocTarget.nguoi_gui || '—' }}</span>
+        </div>
+        <div class="confirm-row" style="background:#fef9c3;border-radius:6px;padding:0.5rem 0.6rem;margin:0.5rem 0;">
+          <span class="confirm-lbl">Số tiền cước:</span>
+          <strong class="confirm-val" style="color:#b45309;font-size:1rem;">{{ fmt(thuCuocTarget.gia_cuoc) }}đ</strong>
+        </div>
+        <div style="margin-top:0.6rem;">
+          <label class="confirm-lbl" style="display:block;margin-bottom:0.3rem;">Hình thức thanh toán</label>
+          <Select v-model="hinhThucThuCuoc" :options="HINH_THUC_OPTIONS" optionLabel="label" optionValue="value" fluid />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" text size="small" @click="thuCuocDialogVisible = false" />
+        <Button label="Xác nhận thu" icon="pi pi-check" severity="warn" size="small"
+          :loading="confirmingThuCuoc" @click="xacNhanThuCuoc" />
+      </template>
+    </Dialog>
+
   </div>
 </template>
 
@@ -927,9 +989,8 @@ onMounted(async () => {
 /* ─── CuocBadge unique color (override global) ───────────────────── */
 .cuoc-badge { display: inline-block; font-weight: 700; color: #b45309; font-size: 0.82rem; }
 
-/* ─── Row not selectable ─────────────────────────────────────────── */
-:deep(.row-not-selectable .p-checkbox) { opacity: 0; pointer-events: none; }
-:deep(.row-not-selectable td:first-child) { pointer-events: none; }
+/* ─── Batch checkbox (inline trong action cell, giống /thu-ho) ──── */
+.batch-checkbox { margin-right: 0.3rem; cursor: pointer; }
 
 /* ─── Waiting label variant ──────────────────────────────────────── */
 .waiting-label .pi { font-size: 0.75rem; }

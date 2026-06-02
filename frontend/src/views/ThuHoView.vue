@@ -157,6 +157,12 @@ const printDialogVisible = ref(false);
 const printTarget        = ref(null); // { bienNhanId, maBNTH, soTien, nguoiNop }
 const printingBNTH       = ref(false);
 
+// [Fix #4] Dialog xác nhận thu COD thủ công
+const thuCODDialogVisible = ref(false);
+const thuCODTarget        = ref(null);
+const hinhThucThuCOD      = ref('tien_mat');
+const confirmingThuCOD    = ref(false);
+
 function openTraLoBatch() {
   if (!selectedDaChuyen.value.length) {
     toast.add({ severity: 'warn', summary: 'Lưu ý', detail: 'Chọn ít nhất 1 biên nhận đã chuyển', life: 3000 });
@@ -304,16 +310,23 @@ async function traLo() {
 const fmt     = formatNumber;
 const fmtDate = formatDate;
 
-// ============================================================================
-// MARK: - ACTIONS: THU COD THỦ CÔNG
-// ============================================================================
-// Khi auto-thu COD đã fail (BN kẹt cho_thu sau khi giao hàng)
-async function thuCODThuCong(row) {
+// [Fix #4] Thu COD thủ công — mở dialog xác nhận thay vì gọi API ngay
+function openThuCODDialog(row) {
+  thuCODTarget.value        = row;
+  hinhThucThuCOD.value      = 'tien_mat';
+  thuCODDialogVisible.value = true;
+}
+
+async function xacNhanThuCOD() {
+  if (!thuCODTarget.value) return;
+  confirmingThuCOD.value = true;
   try {
-    const res = await api.post(`/thu-ho/${row.id}/xac-nhan-thu`, { hinh_thuc: 'tien_mat' });
+    const res = await api.post(`/thu-ho/${thuCODTarget.value.id}/xac-nhan-thu`, { hinh_thuc: hinhThucThuCOD.value });
     toast.add({ severity: 'success', summary: 'Thành công', detail: res.data.message, life: 3000 });
+    thuCODDialogVisible.value = false;
     await Promise.all([fetchData(), fetchTongHop()]);
   } catch (err) { handleApiError(err, toast, 'Lỗi thu COD'); }
+  confirmingThuCOD.value = false;
 }
 
 // ============================================================================
@@ -683,8 +696,8 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
         </Column>
         <Column header="BN Thu hộ" style="min-width:120px;text-align:center;">
           <template #body="{ data: row }">
-            <span v-if="row.bien_nhan_thu_ho?.length" class="bnth-badge">
-              <i class="pi pi-file-check"></i> {{ row.bien_nhan_thu_ho[0].ma_bnth }}
+            <span v-if="row.bien_nhan_thu_ho" class="bnth-badge">
+              <i class="pi pi-file-check"></i> {{ row.bien_nhan_thu_ho.ma_bnth }}
               <button class="bnth-print-btn" title="In phiếu thu hộ" @click.stop="openPrintDialog(row)">
                 <i class="pi pi-print"></i>
               </button>
@@ -715,7 +728,7 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
               <template v-else-if="row.trang_thai_cod === 'cho_thu' && !row.chanh_id">
                 <template v-if="row.trang_thai === 'khach_da_nhan'">
                   <Button label="Thu COD" icon="pi pi-dollar" size="small" severity="warn"
-                    @click="thuCODThuCong(row)" />
+                    @click="openThuCODDialog(row)" />
                 </template>
                 <template v-else>
                   <span class="waiting-cod-label"><i class="pi pi-truck"></i> Chờ giao hàng</span>
@@ -979,7 +992,8 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
       <div style="display:flex;flex-direction:column;gap:.75rem;">
         <div>
           <label class="bk-label">VP Gửi (nhận tiền về)</label>
-          <Select v-model="vpGuiId" :options="vanPhongs" optionLabel="label" optionValue="value"
+          <!-- [Fix #3] Dùng vanPhongsGui (loại trừ VP hiện tại) thay vì vanPhongs -->
+          <Select v-model="vpGuiId" :options="vanPhongsGui" optionLabel="label" optionValue="value"
             style="width:100%;margin-top:.25rem;" placeholder="Chọn VP Gửi..." />
         </div>
         <div>
@@ -1105,6 +1119,32 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
           @click="printBNTH(printTarget.bienNhanId)" />
       </template>
     </Dialog>
+
+    <!-- ===================================================================== -->
+    <!-- MARK: - DIALOG: THU COD THỦ CÔNG [Fix #4]                            -->
+    <!-- ===================================================================== -->
+    <Dialog v-model:visible="thuCODDialogVisible" header="Thu COD thủ công" :modal="true" :style="{ width: '400px' }">
+      <div v-if="thuCODTarget" class="confirm-info">
+        <div class="confirm-row"><span class="confirm-lbl">Mã BN:</span><strong class="confirm-val">{{ thuCODTarget.ma_so }}</strong></div>
+        <div class="confirm-row"><span class="confirm-lbl">Người nhận:</span>
+          <span class="confirm-val">{{ thuCODTarget.don_vi_nhan || thuCODTarget.nguoi_nhan || '—' }}</span>
+        </div>
+        <div class="confirm-row" style="background:#fef2f2;border-radius:6px;padding:0.5rem 0.6rem;margin:0.5rem 0;">
+          <span class="confirm-lbl">Tiền COD:</span>
+          <strong class="confirm-val" style="color:#dc2626;font-size:1rem;">{{ fmt(thuCODTarget.thu_ho) }}đ</strong>
+        </div>
+        <div style="margin-top:0.6rem;">
+          <label class="confirm-lbl" style="display:block;margin-bottom:0.3rem;">Hình thức thanh toán</label>
+          <Select v-model="hinhThucThuCOD" :options="HINH_THUC_OPTIONS" optionLabel="label" optionValue="value" fluid />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" text size="small" @click="thuCODDialogVisible = false" />
+        <Button label="Xác nhận thu COD" icon="pi pi-check" severity="warn" size="small"
+          :loading="confirmingThuCOD" @click="xacNhanThuCOD" />
+      </template>
+    </Dialog>
+
   </div>
 </template>
 

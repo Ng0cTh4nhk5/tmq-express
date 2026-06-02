@@ -178,3 +178,31 @@ export async function resetPassword(id) {
 
   return { tempPassword };
 }
+
+// ── Unlock Account ───────────────────────────────────────────────────────────
+// L-07: Mở khóa tài khoản bị lock do brute force — không reset token_version (user không cần login lại)
+export async function unlockAccount(id) {
+  const existing = await prisma.nhanVien.findUnique({
+    where: { id },
+    select: { id: true, ten: true, locked_until: true, failed_login_count: true },
+  });
+  if (!existing) {
+    throw Object.assign(new Error('Không tìm thấy nhân viên'), { statusCode: 404 });
+  }
+
+  await prisma.nhanVien.update({
+    where: { id },
+    data: {
+      failed_login_count: 0,
+      locked_until: null,
+    },
+  });
+
+  // [Security] Ghi audit log
+  await writeAuditLog({
+    action: 'UPDATE',
+    entityId: id,
+    oldData: { locked_until: existing.locked_until, failed_login_count: existing.failed_login_count },
+    newData: { action: 'unlock_account', locked_until: null, failed_login_count: 0 },
+  });
+}

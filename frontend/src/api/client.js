@@ -10,7 +10,8 @@ const api = axios.create({
 
 // Request: attach JWT token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('tmq_token');
+  // C-01: Đọc từ sessionStorage (đã migrate từ localStorage)
+  const token = sessionStorage.getItem('tmq_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

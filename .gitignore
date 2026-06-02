@@ -26,3 +26,8 @@ backend/prisma/dev.db
 backend/prisma/dev.db-journal
 backend/logs/
 backend/*.log
+
+# --- Test/Debug Output Artifacts ---
+backend/*.pdf
+backend/*.txt
+backend/test-*

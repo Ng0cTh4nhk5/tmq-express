@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import prisma from './config/database.js';
@@ -25,8 +26,10 @@ import thuHoRoutes from './routes/thu-ho.routes.js';
 import phieuChuyenCodRoutes from './routes/phieu-chuyen-cod.routes.js';
 import bienNhanThuHoRoutes from './routes/bien-nhan-thu-ho.routes.js';
 import cuocNhanRoutes from './routes/cuoc-nhan.routes.js';
+import phieuThuRoutes from './routes/phieu-thu.routes.js';
 
 const fastify = Fastify({
+  bodyLimit: 1048576, // L-04: 1 MB — tránh abuse qua payload lớn
   logger: {
     level: env.NODE_ENV === 'development' ? 'info' : 'warn',
     transport:
@@ -37,6 +40,14 @@ const fastify = Fastify({
 });
 
 // ---- Plugins ----
+// L-01: Security headers (X-Frame-Options, X-Content-Type-Options, CSP, etc.)
+await fastify.register(helmet, {
+  // contentSecurityPolicy tắt để không chặn PDF inline viewer của frontend
+  // Nếu API thuần JSON thì có thể bật lại với cấu hình phù hợp
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false, // Cho phép PDF viewer embed cross-origin
+});
+
 await fastify.register(cors, {
   origin: env.CORS_ORIGIN,
   credentials: true,
@@ -58,10 +69,11 @@ await fastify.register(authPlugin);
 await fastify.register(rbacPlugin);
 
 // ---- Routes ----
-fastify.get('/api/health', async () => ({
-  success: true,
-  data: { status: 'ok', timestamp: new Date().toISOString() },
-}));
+// L-06: /health chỉ trả 200 OK (không expose timestamp/details) — dùng cho load balancer ping
+// Authenticated health check có thể dùng /api/auth/me thay thế
+fastify.get('/api/health', async (request, reply) => {
+  reply.status(200).send({ success: true });
+});
 
 await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(vanPhongRoutes, { prefix: '/api/van-phong' });
@@ -78,6 +90,7 @@ await fastify.register(thuHoRoutes, { prefix: '/api/thu-ho' });
 await fastify.register(phieuChuyenCodRoutes, { prefix: '/api/phieu-chuyen-cod' });
 await fastify.register(bienNhanThuHoRoutes, { prefix: '/api/bien-nhan-thu-ho' });
 await fastify.register(cuocNhanRoutes, { prefix: '/api/cuoc-nhan' });
+await fastify.register(phieuThuRoutes, { prefix: '/api/phieu-thu' });
 
 // ---- Graceful Shutdown ----
 const shutdown = async (signal) => {

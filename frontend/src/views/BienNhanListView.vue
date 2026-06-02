@@ -655,15 +655,35 @@ onMounted(async () => {
     <!-- ===================================================================== -->
     <!-- MARK: - CONFIRM DELETE DIALOG                                         -->
     <!-- ===================================================================== -->
-    <Dialog v-model:visible="deleteDialogVisible" header="Xác nhận xóa" :modal="true" :style="{ width: '380px' }">
+    <Dialog v-model:visible="deleteDialogVisible" header="Xác nhận xóa" :modal="true" :style="{ width: '420px' }">
       <p style="font-size:0.85rem;">
         Bạn có chắc muốn xóa biên nhận <strong>{{ selectedBienNhan?.ma_so }}</strong>?
       </p>
+      <!-- [Fix #5] Cảnh báo COD chưa thu -->
+      <div v-if="selectedBienNhan && Number(selectedBienNhan.thu_ho) > 0 && selectedBienNhan.trang_thai_cod !== 'da_tra'"
+        style="display:flex;align-items:flex-start;gap:0.5rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:0.6rem 0.75rem;margin:0.75rem 0;font-size:0.82rem;color:#991b1b;">
+        <i class="pi pi-exclamation-triangle" style="flex-shrink:0;margin-top:1px;"></i>
+        <div>
+          <strong>Cảnh báo:</strong> Biên nhận này có COD <strong>{{ formatCurrency(selectedBienNhan.thu_ho) }}</strong>
+          chưa hoàn tất (trạng thái: {{ selectedBienNhan.trang_thai_cod }}).
+          Xóa sẽ mất dữ liệu thu hộ liên quan.
+        </div>
+      </div>
+      <!-- [Fix #5] Cảnh báo cước chưa thu -->
+      <div v-if="selectedBienNhan && selectedBienNhan.trang_thai_cuoc_nhan === 'cho_thu'"
+        style="display:flex;align-items:flex-start;gap:0.5rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:0.6rem 0.75rem;margin:0.75rem 0;font-size:0.82rem;color:#92400e;">
+        <i class="pi pi-exclamation-circle" style="flex-shrink:0;margin-top:1px;"></i>
+        <div>
+          <strong>Lưu ý:</strong> Biên nhận này có cước nhận <strong>{{ formatCurrency(selectedBienNhan.gia_cuoc) }}</strong>
+          chưa được thu. Xóa sẽ mất dữ liệu cước nhận liên quan.
+        </div>
+      </div>
       <template #footer>
         <Button label="Hủy" severity="secondary" text size="small" @click="deleteDialogVisible = false" />
         <Button label="Xóa" icon="pi pi-trash" severity="danger" size="small" :loading="deleting" @click="confirmDelete" />
       </template>
     </Dialog>
+
 
     <!-- ===================================================================== -->
     <!-- MARK: - IN SỔ BIÊN NHẬN (LOGBOOK) DIALOG                              -->

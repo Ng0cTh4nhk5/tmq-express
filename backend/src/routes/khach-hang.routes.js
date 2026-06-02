@@ -4,6 +4,19 @@ export default async function khachHangRoutes(fastify) {
   // GET /api/khach-hang
   fastify.get('/', {
     preHandler: [fastify.authenticate],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          search:  { type: 'string' },
+          active:  { type: 'string', enum: ['true', 'false'] },
+          loai_kh: { type: 'string', enum: ['doanh_nghiep', 'ca_nhan'] },
+          page:    { type: 'integer', minimum: 1 },
+          limit:   { type: 'integer', minimum: 1, maximum: 100 },
+        },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const { search, active, loai_kh, page, limit } = request.query;
       const result = await listKhachHang({
@@ -20,6 +33,13 @@ export default async function khachHangRoutes(fastify) {
   // GET /api/khach-hang/autocomplete
   fastify.get('/autocomplete', {
     preHandler: [fastify.authenticate],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: { q: { type: 'string' } },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const data = await autocompleteKhachHang(request.query.q);
       return { success: true, data };

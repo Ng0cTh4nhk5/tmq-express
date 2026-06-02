@@ -4,7 +4,8 @@ import api from '../api/client';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null);
-  const token = ref(localStorage.getItem('tmq_token') || null);
+  // C-01: Dùng sessionStorage thay localStorage — tự xóa khi đóng tab, không bị XSS đọc từ tab khác
+  const token = ref(sessionStorage.getItem('tmq_token') || null);
 
   const isLoggedIn = computed(() => !!token.value && !!user.value);
   const isAdmin = computed(() => user.value?.role === 'admin');
@@ -19,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
     const { data: res } = await api.post('/auth/login', { username, password });
     token.value = res.data.token;
     user.value = res.data.user;
-    localStorage.setItem('tmq_token', res.data.token);
+    sessionStorage.setItem('tmq_token', res.data.token);
     return res.data.user;
   }
 
@@ -37,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     user.value = null;
     token.value = null;
-    localStorage.removeItem('tmq_token');
+    sessionStorage.removeItem('tmq_token');
   }
 
   return {

@@ -4,7 +4,8 @@
 // ============================================================================
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth.store';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
 import Button from 'primevue/button';
 import StatCard from '../components/shared/StatCard.vue';
 import StatusBadge from '../components/bien-nhan/StatusBadge.vue';
@@ -16,6 +17,8 @@ import { formatDate, formatNumber } from '../utils/format';
 // ============================================================================
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+const toast = useToast();
 
 const recentBN = ref([]);
 const loading = ref(true);
@@ -117,7 +120,20 @@ async function fetchData() {
 // ============================================================================
 // MARK: - LIFECYCLE HOOKS
 // ============================================================================
-onMounted(fetchData);
+onMounted(() => {
+  // [Fix #7] Kiểm tra query param access_denied từ router guard
+  if (route.query.access_denied === '1') {
+    toast.add({
+      severity: 'warn',
+      summary: 'Không có quyền truy cập',
+      detail: 'Tài khoản của bạn không đủ quyền để truy cập trang đó.',
+      life: 5000,
+    });
+    // Xóa query param khỏi URL để không hiện lại khi refresh
+    router.replace({ query: { ...route.query, access_denied: undefined } });
+  }
+  fetchData();
+});
 </script>
 
 <template>

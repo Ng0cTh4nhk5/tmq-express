@@ -2,13 +2,15 @@
 // ============================================================================
 // MARK: - IMPORTS & CONFIG
 // ============================================================================
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
+import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 import { use }            from 'echarts/core';
 import { CanvasRenderer }  from 'echarts/renderers';
 import { PieChart }        from 'echarts/charts';
@@ -78,6 +80,64 @@ const detailDoiTuong = ref('');
 const detailItems    = ref([]);
 const detailTong     = ref(null);
 const pdfExporting   = ref(false);
+
+// ============================================================================
+// MARK: - STATE & METHODS: THU CÔNG NỢ
+// ============================================================================
+const thuCNVisible    = ref(false);   // dialog xác nhận thu
+const selectedCN      = ref(null);    // công nợ đang chọn
+const hinhThucThuCN   = ref('tien_mat');
+const ghiChuThuCN     = ref('');
+const confirmingThuCN = ref(false);
+const printingCN      = ref(false);
+const HINH_THUC_OPTIONS = [
+  { label: 'Tiền mặt', value: 'tien_mat' },
+  { label: 'Chuyển khoản', value: 'chuyen_khoan' },
+];
+
+function openThuCN(item) {
+  selectedCN.value      = item;
+  hinhThucThuCN.value   = 'tien_mat';
+  ghiChuThuCN.value     = '';
+  thuCNVisible.value    = true;
+}
+
+async function xacNhanThuCN() {
+  confirmingThuCN.value = true;
+  try {
+    await api.post(`/cong-no/${selectedCN.value.id}/xac-nhan-thanh-toan`, {
+      hinh_thuc: hinhThucThuCN.value,
+      ghi_chu:   ghiChuThuCN.value || undefined,
+    });
+    toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã ghi nhận thu công nợ', life: 3000 });
+    thuCNVisible.value = false;
+    // Refresh dữ liệu trong dialog chi tiết
+    await openDetail({ doi_tuong: detailDoiTuong.value, ...detailTong.value });
+    // Refresh bảng chính
+    await fetchBangKeThang();
+  } catch (err) {
+    handleApiError(err, toast, 'Lỗi thu công nợ');
+  }
+  confirmingThuCN.value = false;
+}
+
+async function printPhieuThuCN(item) {
+  if (!item.phieu_thu?.id) {
+    toast.add({ severity: 'warn', summary: 'Không có phiếu thu', detail: 'Công nợ chưa được thu hoặc thiếu liên kết phiếu', life: 3000 });
+    return;
+  }
+  printingCN.value = true;
+  try {
+    const res   = await api.get(`/phieu-thu/${item.phieu_thu.id}/pdf-preview`);
+    const b64   = res.data.data.base64;
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const blob  = new Blob([bytes], { type: 'application/pdf' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch (err) {
+    handleApiError(err, toast, 'Lỗi tải PDF phiếu thu');
+  }
+  printingCN.value = false;
+}
 
 async function openDetail(row) {
   detailDoiTuong.value = row.doi_tuong;
@@ -185,6 +245,12 @@ const doughnutOption = computed(() => {
     }],
   };
 });
+
+// [Fix #6] Auto-load bảng kê khi vào trang — tháng hiện tại
+onMounted(() => {
+  fetchBangKeThang();
+});
+
 </script>
 
 <template>
@@ -402,6 +468,24 @@ const doughnutOption = computed(() => {
             <Tag v-else                              value="Chưa thu" severity="danger" />
           </template>
         </Column>
+        <Column header="Thao tác" style="width:160px; text-align:center;">
+          <template #body="{ data }">
+            <div style="display:flex; gap:4px; justify-content:center;">
+              <Button
+                v-if="data.trang_thai !== 'da_thu'"
+                label="Thu" icon="pi pi-dollar"
+                severity="warn" size="small"
+                @click="openThuCN(data)"
+              />
+              <Button
+                v-if="data.trang_thai === 'da_thu' && data.phieu_thu?.id"
+                icon="pi pi-print" label="In" severity="secondary" size="small"
+                :loading="printingCN"
+                @click="printPhieuThuCN(data)"
+              />
+            </div>
+          </template>
+        </Column>
       </DataTable>
 
       <template #footer>
@@ -411,6 +495,39 @@ const doughnutOption = computed(() => {
             @click="exportBangKe(detailDoiTuong)" />
           <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="detailVisible = false" />
         </div>
+      </template>
+    </Dialog>
+
+    <!-- ══ DIALOG: Xác nhận thu công nợ ══ -->
+    <Dialog v-model:visible="thuCNVisible" header="Xác nhận thu công nợ"
+      :style="{ width: '420px' }" modal>
+      <div v-if="selectedCN" style="margin-bottom:1rem; font-size:.88rem;">
+        <div style="background:#f8fafc; border-radius:8px; padding:.75rem; margin-bottom:1rem;">
+          <p style="margin:0 0 .3rem;"><b>Mã BN:</b> {{ selectedCN.bien_nhan?.ma_so || '—' }}</p>
+          <p style="margin:0 0 .3rem;"><b>Đối tượng:</b> {{ selectedCN.doi_tuong }}</p>
+          <p style="margin:0; font-size:1rem; color:#dc2626; font-weight:700;">
+            Số tiền: {{ fmt(selectedCN.so_tien_no) }}đ
+          </p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:.6rem;">
+          <div>
+            <label style="font-size:.82rem; font-weight:600;">Hình thức thanh toán</label>
+            <Select v-model="hinhThucThuCN" :options="HINH_THUC_OPTIONS"
+              optionLabel="label" optionValue="value"
+              style="width:100%; margin-top:.25rem;" />
+          </div>
+          <div>
+            <label style="font-size:.82rem; font-weight:600;">Ghi chú (không bắt buộc)</label>
+            <InputText v-model="ghiChuThuCN"
+              style="width:100%; margin-top:.25rem;"
+              placeholder="VD: Chuyển khoản ngày 01/06/2026" />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" @click="thuCNVisible=false" />
+        <Button label="Xác nhận thu" severity="warn" icon="pi pi-check"
+          :loading="confirmingThuCN" @click="xacNhanThuCN" />
       </template>
     </Dialog>
   </div>

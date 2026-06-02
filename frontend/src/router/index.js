@@ -91,7 +91,8 @@ router.beforeEach(async (to, from, next) => {
     // Role check
     const routeRole = to.meta.role;
     if (routeRole && !routeRole.includes(authStore.user.role)) {
-      return next('/');
+      // [Fix #7] Đính kèm flag để HomeView hiển thị toast giải thích
+      return next({ path: '/', query: { access_denied: '1' } });
     }
   }
 

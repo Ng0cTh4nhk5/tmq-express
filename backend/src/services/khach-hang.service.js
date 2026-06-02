@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { generateCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
 
 export async function listKhachHang({ search, active, loai_kh, page = 1, limit = 20 }) {
   const p = parseInt(page, 10) || 1;
@@ -58,14 +59,23 @@ export async function getKhachHang(id) {
 
 export async function createKhachHang(data) {
   const ma_kh = await generateCode('khachHang', 'ma_kh', 'KH');
-  return prisma.khachHang.create({ data: { ...data, ma_kh } });
+  const created = await prisma.khachHang.create({ data: { ...data, ma_kh } });
+  // M-01: Audit log
+  writeAuditLog({ action: 'CREATE', entity: 'khach_hang', entityId: created.id, newData: { ma_kh, ten_don_vi: data.ten_don_vi } });
+  return created;
 }
 
 export async function updateKhachHang(id, data) {
   const { ma_kh, ...updateData } = data;
-  return prisma.khachHang.update({ where: { id }, data: updateData });
+  const updated = await prisma.khachHang.update({ where: { id }, data: updateData });
+  // M-01: Audit log
+  writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: updateData });
+  return updated;
 }
 
 export async function toggleKhachHangActive(id, active) {
-  return prisma.khachHang.update({ where: { id }, data: { active } });
+  const updated = await prisma.khachHang.update({ where: { id }, data: { active } });
+  // M-01: Audit log
+  writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: { active } });
+  return updated;
 }

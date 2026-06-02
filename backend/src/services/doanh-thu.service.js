@@ -72,6 +72,7 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
         da_thu:   0,
         chua_thu: 0,
         cong_no:  0,
+        khac:     0,  // bắt BN có trang_thai_thu ngoài 3 giá trị chuẩn
       });
     }
 
@@ -86,6 +87,7 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
     if      (bn.trang_thai_thu === 'da_thu')    g.da_thu   += cuoc;
     else if (bn.trang_thai_thu === 'chua_thu')  g.chua_thu += cuoc;
     else if (bn.trang_thai_thu === 'cong_no')   g.cong_no  += cuoc;
+    else                                         g.khac     += cuoc;  // dữ liệu bất thường
   }
 
   const chi_tiet = Array.from(groupMap.values());
@@ -98,9 +100,15 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
       da_thu:    acc.da_thu    + g.da_thu,
       chua_thu:  acc.chua_thu  + g.chua_thu,
       cong_no:   acc.cong_no   + g.cong_no,
+      khac:      acc.khac      + (g.khac || 0),
     }),
-    { so_bn: 0, tong_cuoc: 0, thu_ho: 0, da_thu: 0, chua_thu: 0, cong_no: 0 },
+    { so_bn: 0, tong_cuoc: 0, thu_ho: 0, da_thu: 0, chua_thu: 0, cong_no: 0, khac: 0 },
   );
+
+  // Tỷ lệ thu hồi = đã thu / tổng cước (0–100)
+  tong_hop.ty_le_thu_hoi = tong_hop.tong_cuoc > 0
+    ? Math.round((tong_hop.da_thu / tong_hop.tong_cuoc) * 100)
+    : 0;
 
   return { chi_tiet, tong_hop };
 }

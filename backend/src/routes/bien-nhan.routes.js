@@ -148,6 +148,24 @@ export default async function bienNhanRoutes(fastify) {
   // GET /api/bien-nhan — Danh sách (filter, pagination)
   fastify.get('/', {
     preHandler: [fastify.authenticate],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          search:    { type: 'string' },
+          trang_thai:{ type: 'string' },
+          vp_gui:    { type: 'integer' },
+          vp_nhan:   { type: 'integer' },
+          from:      { type: 'string', format: 'date' },
+          to:        { type: 'string', format: 'date' },
+          page:      { type: 'integer', minimum: 1 },
+          limit:     { type: 'integer', minimum: 1, maximum: 100 },
+          sortBy:    { type: 'string' },
+          sortOrder: { type: 'string', enum: ['asc', 'desc'] },
+        },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const { search, trang_thai, vp_gui, vp_nhan, from, to, page, limit, sortBy, sortOrder } = request.query;
       const result = await listBienNhan({
@@ -811,9 +829,9 @@ export default async function bienNhanRoutes(fastify) {
   });
 
 
-  // DELETE /api/bien-nhan/:id — Xóa biên nhận
+  // DELETE /api/bien-nhan/:id — Xóa biên nhận (chỉ admin)
   fastify.delete('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin'])], // M-02: Chỉ admin được xóa
     schema: {
       params: {
         type: 'object',

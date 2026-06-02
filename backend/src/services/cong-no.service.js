@@ -5,6 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createWithCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
@@ -119,6 +120,13 @@ export async function xacNhanThanhToan(congNoId, { hinh_thuc, ghi_chu }, user) {
     'phieuThu', 'ma_phieu', 'PT',
   );
 
+  // M-01: Ghi audit log sau khi thu công nợ thành công
+  writeAuditLog({
+    action: 'UPDATE', entity: 'cong_no', entityId: congNoId,
+    oldData: { trang_thai: cn.trang_thai },
+    newData: { trang_thai: 'da_thu', phieu_thu: phieuThu.ma_phieu },
+  });
+
   return { phieu_thu: { id: phieuThu.id, ma_phieu: phieuThu.ma_phieu } };
 }
 
@@ -150,6 +158,7 @@ export async function reportCongNo(doiTuong, fromDate, toDate) {
           don_vi_gui: true, nguoi_gui: true, ngay_bien_nhan: true,
         },
       },
+      phieu_thu: { select: { id: true, ma_phieu: true } },
     },
   });
 
@@ -196,6 +205,21 @@ export async function doiSoatCuoc(doiTuong, thang, nam) {
     select: { id: true, gia_cuoc: true, can_xuat_hddt: true, da_vao_bang_ke: true },
   });
 
+  // Cộng thêm dòng tự kê (Case B — bien_nhan_id = null) trong bảng kê tháng này
+  // Lọc theo nguoi_gui nếu có chỉ định doi_tuong
+  const manualWhereBase = {
+    bien_nhan_id: null,
+    bang_ke: { ngay_xuat: { gte: startDate, lte: endDate } },
+  };
+  if (doiTuong) {
+    manualWhereBase.nguoi_gui = { contains: doiTuong, mode: 'insensitive' };
+  }
+  const manualRows = await prisma.bangKeChiTiet.findMany({
+    where: manualWhereBase,
+    select: { gia_cuoc: true },
+  });
+  const tongCuocTuKe = manualRows.reduce((s, r) => s + Number(r.gia_cuoc), 0);
+
   const tongBN = bienNhans.length;
   const tongCuocThucTe = bienNhans.reduce((s, bn) => s + Number(bn.gia_cuoc), 0);
   const tongCuocHddtDaXuat = bienNhans.filter(bn => bn.da_vao_bang_ke).reduce((s, bn) => s + Number(bn.gia_cuoc), 0);
@@ -206,8 +230,12 @@ export async function doiSoatCuoc(doiTuong, thang, nam) {
     thang: `${String(month).padStart(2, '0')}/${year}`,
     tong_bien_nhan: tongBN,
     tong_cuoc_thuc_te: tongCuocThucTe,
-    tong_cuoc_hddt_da_xuat: tongCuocHddtDaXuat,
+    // HĐDT đã xuất = từ BN thực + dòng tự kê trong bảng kê tháng này
+    tong_cuoc_hddt_da_xuat: tongCuocHddtDaXuat + tongCuocTuKe,
     tong_cuoc_hddt_cho_xuat: tongCuocHddtChoXuat,
+    // Chi tiết
+    tong_cuoc_hddt_bn_thuc: tongCuocHddtDaXuat,
+    tong_cuoc_hddt_tu_ke: tongCuocTuKe,
   };
 }
 
@@ -572,7 +600,7 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     },
   });
 
-  // 2. Lấy tất cả BangKeChiTiet trong tháng (HĐĐT đã xuất)
+  // 2a. Lấy BangKeChiTiet có bien_nhan_id (Case A — HĐDT từ BN thực)
   const bangKeChiTiet = await prisma.bangKeChiTiet.findMany({
     where: {
       bien_nhan_id: { in: bienNhans.map(bn => bn.id) },
@@ -585,12 +613,30 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     hddtMap.set(ct.bien_nhan_id, (hddtMap.get(ct.bien_nhan_id) || 0) + Number(ct.gia_cuoc));
   }
 
+  // 2b. Lấy BangKeChiTiet KHÔNG có bien_nhan_id (Case B — dòng tự kê)
+  //     Lọc theo bảng kê có ngay_xuat trong tháng để đúng kỳ đối soát
+  const manualChiTiet = await prisma.bangKeChiTiet.findMany({
+    where: {
+      bien_nhan_id: null,
+      bang_ke: { ngay_xuat: { gte: start, lte: end } },
+    },
+    select: { nguoi_gui: true, gia_cuoc: true },
+  });
+
+  // Map: tên đối tượng (lowercase) → tổng cước tự kê
+  const manualByName = new Map();
+  for (const ct of manualChiTiet) {
+    const key = (ct.nguoi_gui || '').trim().toLowerCase();
+    if (!key) continue;
+    manualByName.set(key, (manualByName.get(key) || 0) + Number(ct.gia_cuoc));
+  }
+
   // 3. Group theo đối tượng (don_vi_gui || nguoi_gui)
   const doiTuongMap = new Map();
   for (const bn of bienNhans) {
     const key = bn.don_vi_gui || bn.nguoi_gui || 'Không rõ';
     if (!doiTuongMap.has(key)) {
-      doiTuongMap.set(key, { doi_tuong: key, so_bn: 0, cuoc_thuc_te: 0, cuoc_hddt: 0, so_bn_hddt: 0 });
+      doiTuongMap.set(key, { doi_tuong: key, so_bn: 0, cuoc_thuc_te: 0, cuoc_hddt: 0, cuoc_hddt_tu_ke: 0, so_bn_hddt: 0 });
     }
     const g = doiTuongMap.get(key);
     g.so_bn++;
@@ -599,6 +645,36 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     if (hddt > 0) {
       g.cuoc_hddt += hddt;
       g.so_bn_hddt++;
+    }
+  }
+
+  // 3b. Cộng cước tự kê vào đối tượng tương ứng (khớp tên case-insensitive)
+  //     Nếu không khớp với đối tượng nào đã biết → tạo nhóm mới
+  for (const [nameKey, cuocTuKe] of manualByName.entries()) {
+    // Tìm đối tượng có tên khớp (case-insensitive)
+    let matched = null;
+    for (const [mapKey, g] of doiTuongMap.entries()) {
+      if (mapKey.toLowerCase() === nameKey) {
+        matched = g;
+        break;
+      }
+    }
+    if (matched) {
+      matched.cuoc_hddt     += cuocTuKe;
+      matched.cuoc_hddt_tu_ke += cuocTuKe;
+    } else {
+      // Không khớp BN nào → tạo nhóm riêng (chỉ có HĐDT tự kê, không có BN thực)
+      const displayName = manualChiTiet.find(
+        ct => (ct.nguoi_gui || '').trim().toLowerCase() === nameKey,
+      )?.nguoi_gui || nameKey;
+      doiTuongMap.set(`__manual__${nameKey}`, {
+        doi_tuong: displayName,
+        so_bn: 0,
+        cuoc_thuc_te: 0,
+        cuoc_hddt: cuocTuKe,
+        cuoc_hddt_tu_ke: cuocTuKe,
+        so_bn_hddt: 0,
+      });
     }
   }
 
@@ -621,8 +697,9 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     tong_bn:          acc.tong_bn + g.so_bn,
     cuoc_thuc_te:     acc.cuoc_thuc_te + g.cuoc_thuc_te,
     cuoc_hddt:        acc.cuoc_hddt + g.cuoc_hddt,
+    cuoc_hddt_tu_ke:  acc.cuoc_hddt_tu_ke + (g.cuoc_hddt_tu_ke || 0),
     so_bat_thuong:    acc.so_bat_thuong + (g.bat_thuong ? 1 : 0),
-  }), { so_doi_tuong: 0, tong_bn: 0, cuoc_thuc_te: 0, cuoc_hddt: 0, so_bat_thuong: 0 });
+  }), { so_doi_tuong: 0, tong_bn: 0, cuoc_thuc_te: 0, cuoc_hddt: 0, cuoc_hddt_tu_ke: 0, so_bat_thuong: 0 });
 
   return { data: result, tong_hop };
 }

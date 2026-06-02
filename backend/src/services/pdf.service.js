@@ -472,7 +472,8 @@ export async function generatePhieuChiPDF(phieuChiId, { nhan_vien_ten } = {}) {
 
 // ---- Phiếu Thu Hộ COD (BienNhanThuHo) PDF ----
 /**
- * In phiếu thu hộ COD — A5 đứng, 2 liên (NV giữ + giao khách)
+ * In phiếu thu hộ COD — A5 ngang (landscape), 1 liên duy nhất
+ * Layout 2 cột: Trái = header + thông tin BN gốc | Phải = số tiền + chữ ký
  * @param {number} bienNhanId — ID của biên nhận gốc (không phải BNTH id)
  */
 export async function generateBienNhanThuHoPDF(bienNhanId) {
@@ -484,6 +485,8 @@ export async function generateBienNhanThuHoPDF(bienNhanId) {
           ma_so: true, thu_ho: true,
           nguoi_gui: true, don_vi_gui: true, dien_thoai_gui: true,
           nguoi_nhan: true, don_vi_nhan: true, dien_thoai_nhan: true,
+          dia_chi_nhan: true, dia_chi_giao: true,
+          hang_hoa_json: true, ten_hang_hoa: true,
           van_phong_gui: { select: { ma_vp: true, ten: true } },
           van_phong_nhan: { select: { ma_vp: true, ten: true } },
         },
@@ -503,151 +506,200 @@ export async function generateBienNhanThuHoPDF(bienNhanId) {
   const htLabel = bnth.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản';
   const logoDataUrl = getLogoDataUrl();
 
-  // Helper: dòng label + value
-  const infoRow = (label, value) => ({
+  // Helper: dòng label + value hai cột
+  const infoRow = (label, value, labelWidth = 80) => ({
     columns: [
-      { text: label, fontSize: 8.5, color: '#64748b', width: 90, bold: false },
+      { text: label, fontSize: 8, color: '#64748b', width: labelWidth },
       { text: value || '—', fontSize: 8.5, bold: true, color: '#0f172a', width: '*' },
     ],
     margin: [0, 0, 0, 3],
   });
 
-  // Một liên (tái sử dụng 2 lần)
-  const lienContent = (title) => ([
-    // Logo + tiêu đề
-    {
-      columns: [
-        logoDataUrl
-          ? { image: logoDataUrl, width: 80, height: 14.3, margin: [0, 3, 8, 0] }
-          : { text: '', width: 80 },
-        {
-          stack: [
-            { text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG', fontSize: 9, bold: true, color: '#1e40af' },
-            { text: bnth.van_phong?.ten || '', fontSize: 7.5, color: '#475569' },
-          ],
-          width: '*',
-        },
-        {
-          stack: [
-            { text: title, fontSize: 7, color: '#94a3b8', alignment: 'right', italics: true },
-          ],
-          width: 60,
-          alignment: 'right',
-        },
-      ],
-      margin: [0, 0, 0, 4],
-    },
-    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 390, y2: 0, lineWidth: 0.8 }], margin: [0, 0, 0, 6] },
+  // Hàng hóa
+  const hangItems = Array.isArray(bn.hang_hoa_json)
+    ? bn.hang_hoa_json.filter(i => Number(i.so_luong) > 0)
+    : [];
+  const hangStr = hangItems.length > 0
+    ? hangItems.map(i => `${i.so_luong} ${i.don_vi}${i.ghi_chu ? ` (${i.ghi_chu})` : ''}`).join(', ')
+    : (bn.ten_hang_hoa || '—');
 
-    // Tiêu đề phiếu
-    { text: 'BIÊN NHẬN THU HỘ (COD)', fontSize: 13, bold: true, alignment: 'center', color: '#1e40af', margin: [0, 0, 0, 2] },
-    {
-      columns: [
-        { text: `Số: ${bnth.ma_bnth}`, fontSize: 9, bold: true, color: '#334155', alignment: 'center' },
-        { text: `${gioStr} — ${ngayStr}`, fontSize: 9, color: '#64748b', alignment: 'center' },
-      ],
-      margin: [0, 0, 0, 8],
-    },
+  const tuyen = `${bn.van_phong_gui?.ma_vp || '?'} → ${bn.van_phong_nhan?.ma_vp || '?'}`;
+  const nguoiGui = bn.don_vi_gui || bn.nguoi_gui || '—';
+  const nguoiNhan = bn.don_vi_nhan || bn.nguoi_nhan || '—';
+  const diaChiNhan = bn.dia_chi_nhan || bn.dia_chi_giao || '—';
 
-    // Thông tin biên nhận gốc
-    {
-      table: {
-        widths: ['*'],
-        body: [[{
-          stack: [
-            { text: 'THÔNG TIN BIÊN NHẬN', fontSize: 7.5, bold: true, color: '#64748b', margin: [0, 0, 0, 4] },
-            infoRow('Mã biên nhận:', bn.ma_so),
-            infoRow('Tuyến:', `${bn.van_phong_gui?.ma_vp || '?'} → ${bn.van_phong_nhan?.ma_vp || '?'}`),
-            infoRow('Người gửi:', bn.don_vi_gui || bn.nguoi_gui),
-            infoRow('Người nhận:', bn.don_vi_nhan || bn.nguoi_nhan),
-          ],
-          border: [false, false, false, false],
-          fillColor: '#f8fafc',
-          margin: [8, 6, 8, 6],
-          borderRadius: 4,
-        }]],
-      },
-      layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-      margin: [0, 0, 0, 8],
-    },
-
-    // Số tiền nổi bật
-    {
-      table: {
-        widths: ['*'],
-        body: [[{
-          stack: [
-            { text: 'SỐ TIỀN THU HỘ', fontSize: 7.5, bold: true, color: '#64748b', alignment: 'center', margin: [0, 0, 0, 2] },
-            { text: `${fmt(bnth.so_tien)} đ`, fontSize: 20, bold: true, color: '#dc2626', alignment: 'center', margin: [0, 0, 0, 2] },
-            { text: htLabel + (bnth.la_qua_chanh ? ' • Qua chành' : ''), fontSize: 8, color: '#64748b', alignment: 'center' },
-          ],
-          border: [true, true, true, true],
-          fillColor: '#fff7ed',
-          margin: [0, 6, 0, 6],
-        }]],
-      },
-      layout: {
-        hLineColor: () => '#fed7aa',
-        vLineColor: () => '#fed7aa',
-        hLineWidth: () => 1,
-        vLineWidth: () => 1,
-        paddingLeft: () => 8,
-        paddingRight: () => 8,
-        paddingTop: () => 0,
-        paddingBottom: () => 0,
-      },
-      margin: [0, 0, 0, 8],
-    },
-
-    // Người nộp + ghi chú
-    infoRow('Người nộp tiền:', bnth.nguoi_nop),
-    ...(bnth.ghi_chu ? [infoRow('Ghi chú:', bnth.ghi_chu)] : []),
-
-    // Chữ ký
-    {
-      columns: [
-        {
-          stack: [
-            { text: 'NGƯỜI NỘP TIỀN', fontSize: 8, bold: true, alignment: 'center' },
-            { text: '(Ký, ghi rõ họ tên)', fontSize: 7, color: '#94a3b8', alignment: 'center' },
-            { text: '\n\n\n', fontSize: 8 },
-            { text: '___________________', alignment: 'center', color: '#94a3b8' },
-          ],
-          width: '*',
-        },
-        {
-          stack: [
-            { text: 'NHÂN VIÊN THU', fontSize: 8, bold: true, alignment: 'center' },
-            { text: '(Ký, ghi rõ họ tên)', fontSize: 7, color: '#94a3b8', alignment: 'center' },
-            { text: '\n\n\n', fontSize: 8 },
-            { text: bnth.nhan_vien?.ten || '', fontSize: 8, alignment: 'center', color: '#334155' },
-            { text: '___________________', alignment: 'center', color: '#94a3b8' },
-          ],
-          width: '*',
-        },
-      ],
-      margin: [0, 10, 0, 0],
-    },
-  ]);
+  // A5 landscape: width ~595pt, height ~421pt (pdfmake points at 72dpi)
+  // Usable width after margins [16,12,16,12]: ~563pt
+  const PAGE_W = 563;
+  const LEFT_W = Math.round(PAGE_W * 0.57);  // ~321
+  const RIGHT_W = PAGE_W - LEFT_W - 12;       // ~230 (gap 12)
 
   const docDefinition = {
     pageSize: 'A5',
-    pageOrientation: 'portrait',
-    pageMargins: [20, 16, 20, 16],
+    pageOrientation: 'landscape',
+    pageMargins: [16, 12, 16, 12],
+
     content: [
-      // Liên 1: Khách giữ
-      ...lienContent('Liên 1 — Khách giữ'),
-      // Đường cắt
+      // ══ HEADER FULL-WIDTH: Logo + Tên công ty + VP + Divider ══
       {
-        canvas: [
-          { type: 'line', x1: 0, y1: 8, x2: 390, y2: 8, lineWidth: 0.5, dash: { length: 4, space: 3 }, lineColor: '#cbd5e1' },
-        ],
-        margin: [0, 6, 0, 6],
+        table: {
+          widths: ['auto', '*'],
+          body: [[
+            logoDataUrl
+              ? { image: logoDataUrl, width: 104, height: 18.66, border: [false, false, false, false], margin: [0, 0, 3, 0] }
+              : { text: '', border: [false, false, false, false] },
+            {
+              border: [false, false, false, false],
+              verticalAlignment: 'middle',
+              text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG',
+              bold: true, fontSize: 14, color: '#1e40af',
+            },
+          ]],
+        },
+        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 4 },
+        margin: [0, 0, 0, 0],
       },
-      { text: '✂  Đường cắt', fontSize: 7, color: '#94a3b8', alignment: 'center', margin: [0, 0, 0, 6] },
-      // Liên 2: VP giữ
-      ...lienContent('Liên 2 — VP lưu'),
+      { text: bnth.van_phong?.ten || '', fontSize: 7.5, color: '#475569', margin: [0, 0, 0, 1] },
+      { text: bnth.van_phong?.dia_chi || '', fontSize: 7, color: '#94a3b8', margin: [0, 0, 0, 3] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: PAGE_W, y2: 0, lineWidth: 0.8, lineColor: '#1e40af' }], margin: [0, 0, 0, 6] },
+
+      // ══ NỘI DUNG 2 CỘT ══
+      {
+        columns: [
+          // ══ CỘT TRÁI ══
+          {
+            width: LEFT_W,
+            stack: [
+              // -- Tiêu đề + Số phiếu + Ngày --
+              { text: 'BIÊN NHẬN THU HỘ', fontSize: 12, bold: true, color: '#1e40af', margin: [0, 0, 0, 1] },
+              {
+                columns: [
+                  { text: `Số: ${bnth.ma_bnth}`, fontSize: 9, bold: true, color: '#334155' },
+                  { text: `${gioStr} — ${ngayStr}`, fontSize: 8.5, color: '#64748b', alignment: 'right' },
+                ],
+                margin: [0, 0, 0, 6],
+              },
+
+              // -- Thông tin biên nhận gốc --
+              {
+                table: {
+                  widths: ['*'],
+                  body: [[{
+                    stack: [
+                      { text: 'THÔNG TIN BIÊN NHẬN', fontSize: 7, bold: true, color: '#64748b', letterSpacing: 0.5, margin: [0, 0, 0, 4] },
+                      infoRow('Mã biên nhận:', bn.ma_so),
+                      infoRow('Tuyến:', tuyen),
+                    ],
+                    border: [false, false, false, false],
+                    fillColor: '#f1f5f9',
+                    margin: [6, 4, 6, 4],
+                  }]],
+                },
+                layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                margin: [0, 0, 0, 5],
+              },
+
+              // -- Người gửi --
+              { text: 'NGƯỜI GỬI', fontSize: 7.5, bold: true, color: '#475569', decoration: 'underline', margin: [0, 0, 0, 2] },
+              infoRow('Họ tên / Đơn vị:', nguoiGui),
+              infoRow('Điện thoại:', bn.dien_thoai_gui),
+
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: LEFT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 4, 0, 4] },
+
+              // -- Người nhận --
+              { text: 'NGƯỜI NHẬN', fontSize: 7.5, bold: true, color: '#475569', decoration: 'underline', margin: [0, 0, 0, 2] },
+              infoRow('Họ tên / Đơn vị:', nguoiNhan),
+              infoRow('Điện thoại:', bn.dien_thoai_nhan),
+              infoRow('Địa chỉ giao:', diaChiNhan),
+
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: LEFT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 4, 0, 4] },
+
+              // -- Hàng hóa --
+              infoRow('Hàng hóa:', hangStr),
+              ...(bnth.ghi_chu ? [infoRow('Ghi chú:', bnth.ghi_chu)] : []),
+            ],
+          },
+
+          // ══ GAP ══
+          { width: 12, text: '' },
+
+          // ══ CỘT PHẢI ══
+          {
+            width: RIGHT_W,
+            stack: [
+              // -- Box số tiền nổi bật --
+              {
+                table: {
+                  widths: ['*'],
+                  body: [[{
+                    stack: [
+                      { text: 'SỐ TIỀN THU HỘ', fontSize: 7.5, bold: true, color: '#92400e', alignment: 'center', margin: [0, 0, 0, 4] },
+                      { text: `${fmt(bnth.so_tien)} đ`, fontSize: 22, bold: true, color: '#dc2626', alignment: 'center', margin: [0, 0, 0, 4] },
+                      {
+                        table: {
+                          widths: ['*', '*'],
+                          body: [[
+                            { text: htLabel, fontSize: 8, bold: true, alignment: 'center', border: [false, false, true, false], color: '#374151' },
+                            { text: bnth.la_qua_chanh ? 'Qua chành' : 'Trực tiếp', fontSize: 8, bold: true, alignment: 'center', border: [false, false, false, false], color: '#374151' },
+                          ]],
+                        },
+                        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                      },
+                    ],
+                    border: [true, true, true, true],
+                    fillColor: '#fff7ed',
+                    margin: [6, 8, 6, 8],
+                  }]],
+                },
+                layout: {
+                  hLineColor: () => '#f97316',
+                  vLineColor: () => '#f97316',
+                  hLineWidth: () => 1.5,
+                  vLineWidth: () => 1.5,
+                  paddingLeft: () => 0,
+                  paddingRight: () => 0,
+                  paddingTop: () => 0,
+                  paddingBottom: () => 0,
+                },
+                margin: [0, 0, 0, 8],
+              },
+
+              // -- Người nộp --
+              infoRow('Người nộp:', bnth.nguoi_nop, 65),
+
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: RIGHT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 6, 0, 8] },
+
+              // -- Chữ ký 2 cột --
+              {
+                columns: [
+                  {
+                    stack: [
+                      { text: 'NGƯỜI GIAO / NỘP', fontSize: 7.5, bold: true, alignment: 'center', color: '#374151' },
+                      { text: '(Ký, ghi rõ họ tên)', fontSize: 6.5, color: '#94a3b8', alignment: 'center', margin: [0, 1, 0, 0] },
+                      { text: '\n\n\n', fontSize: 8 },
+                      { text: '________________', alignment: 'center', color: '#94a3b8', fontSize: 9 },
+                    ],
+                    width: '*',
+                  },
+                  {
+                    stack: [
+                      { text: 'NHÂN VIÊN THU', fontSize: 7.5, bold: true, alignment: 'center', color: '#374151' },
+                      { text: '(Ký, ghi rõ họ tên)', fontSize: 6.5, color: '#94a3b8', alignment: 'center', margin: [0, 1, 0, 0] },
+                      { text: '\n\n\n', fontSize: 8 },
+                      { text: bnth.nhan_vien?.ten || '', fontSize: 7.5, alignment: 'center', color: '#1e40af', bold: true },
+                      { text: '________________', alignment: 'center', color: '#94a3b8', fontSize: 9 },
+                    ],
+                    width: '*',
+                  },
+                ],
+                margin: [0, 0, 0, 0],
+              },
+            ],
+          },
+        ],
+      },
     ],
+
     defaultStyle: { font: 'Roboto' },
   };
 

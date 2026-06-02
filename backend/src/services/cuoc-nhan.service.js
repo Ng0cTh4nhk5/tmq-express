@@ -54,6 +54,7 @@ export async function listBNCuocNhan(
         van_phong_gui:  { select: { ma_vp: true, ten: true } },
         van_phong_nhan: { select: { ma_vp: true, ten: true } },
         nhan_vien_nhap: { select: { ten: true } },
+        phieu_thu:      { select: { id: true, ma_phieu: true }, take: 1, orderBy: { created_at: 'desc' } },
       },
     }),
     prisma.bienNhan.aggregate({ where, _sum: { gia_cuoc: true }, _count: true }),

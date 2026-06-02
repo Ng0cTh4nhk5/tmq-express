@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import ExcelJS from 'exceljs';
 import { generateCode } from '../utils/ma-so-generator.js';
+import { writeAuditLog } from '../plugins/audit-log.js';
 
 /** VAT 8% — gia_cuoc trên BN là SAU thuế */
 const VAT_RATE = 1.08;
@@ -154,6 +155,8 @@ export async function createBangKe({ bien_so_xe, items }) {
   });
 
   const buffer = await buildExcel(ma_bang_ke, bangKe.ngay_xuat, bien_so_xe, chiTietData, tong_cuoc);
+  // M-01: Ghi audit log tạo bảng kê
+  writeAuditLog({ action: 'CREATE', entity: 'bang_ke', entityId: bangKe.id, newData: { ma_bang_ke, so_bien_nhan: chiTietData.length, tong_cuoc } });
   return { bangKe, buffer, ten_file };
 }
 

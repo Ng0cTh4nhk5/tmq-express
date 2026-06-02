@@ -545,8 +545,20 @@ export async function deleteBienNhan(id, userId, userRole) {
     throw Object.assign(new Error('Biên nhận đã vào bảng kê, không thể xóa'), { statusCode: 400 });
   }
 
+  // M-06: Không cho xóa BN đã có Biên nhận thu hộ (BNTH) — tránh orphan records
+  const bnth = await prisma.bienNhanThuHo.findUnique({
+    where: { bien_nhan_id: id },
+    select: { id: true, ma_bnth: true },
+  });
+  if (bnth) {
+    throw Object.assign(
+      new Error(`Biên nhận đã có biên nhận thu hộ (${bnth.ma_bnth}), không thể xóa. Liên hệ Admin.`),
+      { statusCode: 400 },
+    );
+  }
+
   // Không cho xóa BN có COD đang xử lý (đã thu/đã chuyển có PhieuThu/PhieuChi liên quan)
-  if (['da_thu', 'da_chuyen', 'da_tra'].includes(existing.trang_thai_cod)) {
+  if (['da_thu', 'da_chuyen', 'da_tra', 'da_thu_chanh'].includes(existing.trang_thai_cod)) {
     throw Object.assign(
       new Error('Biên nhận có COD đang xử lý hoặc đã hoàn tất, không thể xóa. Liên hệ Admin.'),
       { statusCode: 400 },
