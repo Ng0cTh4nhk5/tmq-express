@@ -90,6 +90,9 @@ const hinhThucThuCN   = ref('tien_mat');
 const ghiChuThuCN     = ref('');
 const confirmingThuCN = ref(false);
 const printingCN      = ref(false);
+// [Fix #6] Select All / Batch thu công nợ
+const selectedCNItems = ref([]);
+const batchThuCNing   = ref(false);
 const HINH_THUC_OPTIONS = [
   { label: 'Tiền mặt', value: 'tien_mat' },
   { label: 'Chuyển khoản', value: 'chuyen_khoan' },
@@ -119,6 +122,44 @@ async function xacNhanThuCN() {
     handleApiError(err, toast, 'Lỗi thu công nợ');
   }
   confirmingThuCN.value = false;
+}
+
+// [Fix #6] Select All chưa thu
+function selectAllChuaThu() {
+  selectedCNItems.value = detailItems.value.filter(i => i.trang_thai !== 'da_thu');
+}
+function deselectAllCN() {
+  selectedCNItems.value = [];
+}
+
+// [Fix #6] Thu hàng loạt
+async function batchThuCN() {
+  const items = selectedCNItems.value.filter(i => i.trang_thai !== 'da_thu');
+  if (!items.length) return;
+  batchThuCNing.value = true;
+  let ok = 0, fail = 0;
+  for (const cn of items) {
+    try {
+      await api.post(`/cong-no/${cn.id}/xac-nhan-thanh-toan`, {
+        hinh_thuc: hinhThucThuCN.value,
+        ghi_chu: `Thu hàng loạt — ${detailDoiTuong.value}`,
+      });
+      ok++;
+    } catch {
+      fail++;
+    }
+  }
+  toast.add({
+    severity: fail ? 'warn' : 'success',
+    summary: `Đã thu ${ok}/${items.length} khoản`,
+    detail: fail ? `${fail} khoản bị lỗi` : 'Hoàn tất',
+    life: 4000,
+  });
+  selectedCNItems.value = [];
+  // Refresh
+  await openDetail({ doi_tuong: detailDoiTuong.value, ...detailTong.value });
+  await fetchBangKeThang();
+  batchThuCNing.value = false;
 }
 
 async function printPhieuThuCN(item) {
@@ -292,7 +333,7 @@ onMounted(() => {
         <template #empty>
           <div style="text-align:center; padding:2rem; color:var(--text-muted);">
             <i class="pi pi-inbox" style="font-size:1.5rem; opacity:.3;"></i>
-            <p style="font-size:0.85rem;">Chọn tháng/năm rồi bấm "Xem" để tải bảng kê</p>
+            <p style="font-size:0.85rem;">Không có công nợ trong tháng này</p>
           </div>
         </template>
 
@@ -444,7 +485,20 @@ onMounted(() => {
         <span class="text-danger">Còn nợ: {{ fmt(detailTong.con_no) }}đ</span>
       </div>
 
-      <DataTable :value="detailItems" size="small" stripedRows>
+      <!-- [Fix #6] Select All toolbar -->
+      <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+        <Button label="Chọn tất cả chưa thu" icon="pi pi-check-square" severity="info" size="small" outlined @click="selectAllChuaThu" />
+        <Button v-if="selectedCNItems.length" label="Bỏ chọn" icon="pi pi-times" severity="secondary" size="small" text @click="deselectAllCN" />
+        <span v-if="selectedCNItems.length" style="font-size:0.82rem; color:var(--text-muted);">
+          Đã chọn <strong>{{ selectedCNItems.length }}</strong> khoản
+          · {{ fmt(selectedCNItems.reduce((s,i) => s + Number(i.so_tien_no), 0)) }}đ
+        </span>
+        <Button v-if="selectedCNItems.length" :label="`Thu ${selectedCNItems.length} khoản`" icon="pi pi-dollar"
+          severity="warn" size="small" style="margin-left:auto;" :loading="batchThuCNing" @click="batchThuCN" />
+      </div>
+
+      <DataTable :value="detailItems" v-model:selection="selectedCNItems" dataKey="id" size="small" stripedRows>
+        <Column selectionMode="multiple" headerStyle="width: 3rem" />
         <Column header="STT" style="width:45px; text-align:center;">
           <template #body="{ index }">{{ index + 1 }}</template>
         </Column>

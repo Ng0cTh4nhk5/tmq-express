@@ -115,6 +115,13 @@ export async function xacNhanThanhToan(congNoId, { hinh_thuc, ghi_chu }, user) {
         },
       });
 
+      // [Fix #5] Cập nhật trang_thai_thu của BienNhan → 'da_thu'
+      // Để doanh thu tính đúng: công nợ đã thu = đã thu cước
+      await tx.bienNhan.update({
+        where: { id: cn.bien_nhan_id },
+        data: { trang_thai_thu: 'da_thu' },
+      });
+
       return pt;
     }),
     'phieuThu', 'ma_phieu', 'PT',

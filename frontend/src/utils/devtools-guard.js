@@ -234,6 +234,12 @@ export function initDevToolsGuard(options = {}) {
     return;
   }
 
+  // [Fix #1] Không chạy trên trang /scan — public, khách hàng tra cứu QR
+  if (window.location.pathname.startsWith('/scan')) {
+    console.log('[DevTools Guard] Skipped on public /scan page');
+    return;
+  }
+
   console.log(`[DevTools Guard] Initialized — level: ${level}`);
 
   // ── LIGHT: Chỉ chặn phím tắt và right-click ──

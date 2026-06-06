@@ -153,10 +153,11 @@ const chartOption = computed(() => {
 // MARK: - LIFECYCLE
 // ============================================================================
 onMounted(async () => {
-  await fetchVanPhong();
-  // Staff: tự động scope về VP của mình, không cho chọn VP khác
+  // [Fix #4] Staff: scope về VP của mình ngay — không cần chọn VP
   if (auth.isStaff && auth.userVanPhong) {
     vpId.value = String(auth.userVanPhong.id);
+  } else {
+    await fetchVanPhong();
   }
   await fetchReport();
 });

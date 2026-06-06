@@ -98,7 +98,9 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
   if (!bn) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
 
   // Fix 2.5: Dùng APP_PUBLIC_URL riêng cho QR — không dùng CORS_ORIGIN vốn là biến CORS config
-  const qrUrl = `${process.env.APP_PUBLIC_URL || process.env.CORS_ORIGIN || 'http://localhost:5173'}/scan/${bn.ma_so}`;
+  // Fix 3.0: Dùng bn.id thay vì bn.ma_so — ma_so không unique độc lập (@@unique([ma_so, ngay_bien_nhan]))
+  // → cùng ma_so có thể xuất hiện nhiều ngày khác nhau, chỉ id mới đảm bảo định danh duy nhất tuyệt đối
+  const qrUrl = `${process.env.APP_PUBLIC_URL || process.env.CORS_ORIGIN || 'http://localhost:5173'}/scan/${bn.id}`;
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 100, margin: 1 });
 
   // Fix 2.4: Dùng cached logo thay vì readFileSync mỗi lần
@@ -523,7 +525,7 @@ export async function generateBienNhanThuHoPDF(bienNhanId) {
     ? hangItems.map(i => `${i.so_luong} ${i.don_vi}${i.ghi_chu ? ` (${i.ghi_chu})` : ''}`).join(', ')
     : (bn.ten_hang_hoa || '—');
 
-  const tuyen = `${bn.van_phong_gui?.ma_vp || '?'} → ${bn.van_phong_nhan?.ma_vp || '?'}`;
+  const tuyen = `${bn.van_phong_gui?.ma_vp || '?'} - ${bn.van_phong_nhan?.ma_vp || '?'}`;
   const nguoiGui = bn.don_vi_gui || bn.nguoi_gui || '—';
   const nguoiNhan = bn.don_vi_nhan || bn.nguoi_nhan || '—';
   const diaChiNhan = bn.dia_chi_nhan || bn.dia_chi_giao || '—';

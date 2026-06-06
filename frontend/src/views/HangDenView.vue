@@ -79,6 +79,8 @@ const selectedVpNhan = ref(null);
 const searchText = ref('');
 const filterVpGui = ref(null);
 const filterChanh = ref(null);
+// [Fix #7] Ẩn BN đã hoàn thành vòng đời trong tab da_giao_chanh — mặc định BẬT
+const hideCompleted = ref(true);
 
 // [NT-01] Nhận diện đơn nội thành: VP gửi = VP nhận
 function isNoiThanhBN(bn) {
@@ -192,11 +194,22 @@ const filteredItems = computed(() => {
         .some(f => f?.toLowerCase().includes(q))
     );
   }
+  // [Fix #7] Ẩn BN đã xong vòng đời trong tab da_giao_chanh
+  // BN "đã xong" = không còn khoản nào cần thu/xử lý:
+  //   COD: không có (thu_ho=0) HOẶC đã hoàn tất (không phải cho_thu, không phải da_thu_chanh)
+  //   Cước nhận: không phải cho_thu
+  if (hideCompleted.value && activeTab.value === 'da_giao_chanh') {
+    result = result.filter(b => {
+      const codPending = Number(b.thu_ho) > 0 && (b.trang_thai_cod === 'cho_thu' || b.trang_thai_cod === 'da_thu_chanh');
+      const cuocPending = b.trang_thai_cuoc_nhan === 'cho_thu';
+      return codPending || cuocPending; // Chỉ giữ lại BN còn pending
+    });
+  }
   return result;
 });
 
 // [Bonus] displayStats — phản ánh đúng filter đang active
-const isFiltered = computed(() => filterVpGui.value || filterChanh.value || searchText.value.trim());
+const isFiltered = computed(() => filterVpGui.value || filterChanh.value || searchText.value.trim() || hideCompleted.value);
 const displayStats = computed(() => {
   if (!isFiltered.value) return stats.value;
   return {
@@ -205,6 +218,14 @@ const displayStats = computed(() => {
     so_co_cod: filteredItems.value.filter(b => Number(b.thu_ho) > 0).length,
   };
 });
+
+// [Fix #7] Badge tab: khi ẩn BN hoàn tất, badge da_giao_chanh hiện số pending thực tế
+function getTabBadge(tabKey) {
+  if (tabKey === 'da_giao_chanh' && hideCompleted.value && activeTab.value === 'da_giao_chanh') {
+    return filteredItems.value.length;
+  }
+  return tabCounts.value[tabKey] || 0;
+}
 
 // [Fix #hasMore] Banner cảnh báo: backend có nhiều hơn số BN đang hiển thị
 const hasMore = computed(() => items.value.length < (pagination.value?.total ?? 0));
@@ -428,8 +449,8 @@ watch([filterVpGui, filterChanh, searchText], () => {
         @click="switchTab(tab.key)">
         <i :class="tab.icon"></i>
         <span>{{ tab.label }}</span>
-        <span v-if="tabCounts[tab.key] > 0" class="tab-badge" :class="tab.key">
-          {{ tabCounts[tab.key] }}
+        <span v-if="getTabBadge(tab.key) > 0" class="tab-badge" :class="tab.key">
+          {{ getTabBadge(tab.key) }}
         </span>
       </button>
     </div>
@@ -488,7 +509,15 @@ watch([filterVpGui, filterChanh, searchText], () => {
             :label="`${currentTab?.action} ${batchSelected.length} BN`"
             icon="pi pi-check-circle" :severity="currentTab?.severity" size="small"
             @click="openBatchConfirm" />
-
+          <!-- [Fix #7] Toggle ẩn BN đã xong trong tab Đã giao Chành -->
+          <Button v-if="activeTab === 'da_giao_chanh'"
+            :label="hideCompleted ? 'Hiện tất cả' : 'Ẩn đã hoàn tất'"
+            :icon="hideCompleted ? 'pi pi-eye' : 'pi pi-eye-slash'"
+            :severity="hideCompleted ? 'info' : 'secondary'"
+            :outlined="!hideCompleted"
+            size="small"
+            @click="hideCompleted = !hideCompleted"
+          />
         </div>
         <div v-if="filterVpGui || filterChanh" class="filter-active-hint">
           <i class="pi pi-filter-fill"></i>

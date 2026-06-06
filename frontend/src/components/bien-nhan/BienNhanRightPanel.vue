@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useToast } from 'primevue/usetoast'; // [H-02]
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
@@ -57,7 +57,7 @@ function createEmptyForm() {
     van_phong_nhan_id: null,
     chanh_id: null,
     gia_cuoc: 0,
-    trang_thai_thu: 'da_thu',
+    trang_thai_thu: null,  // [Fix #3] Không mặc định — bắt buộc chọn
     don_vi_gui: '',
     nguoi_gui: '',
     dien_thoai_gui: '',
@@ -317,7 +317,11 @@ function validate() {
   if (!coHang)
     e.hang_hoa = 'Vui lòng nhập ít nhất một mặt hàng và số lượng';
 
-  // Fix 3.2: Chỉ bắt buộc hiọm thức giao khi tạo mới — khi sửa BN cũ có thể NULL
+  // [Fix #3] Bắt buộc chọn trạng thái thu khi tạo mới
+  if (props.mode === 'create' && !f.trang_thai_thu)
+    e.trang_thai_thu = 'Vui lòng chọn trạng thái thu (Đã thu / Chưa thu / Công nợ)';
+
+  // Fix 3.2: Chỉ bắt buộc hình thức giao khi tạo mới — khi sửa BN cũ có thể NULL
   if (props.mode === 'create' && !f.hinh_thuc_giao)
     e.hinh_thuc_giao = 'Vui lòng chọn hình thức giao hàng';
 
@@ -519,14 +523,15 @@ defineExpose({ buildPayload, validate });
               <span class="input-addon-suffix">đ</span>
             </div>
           </div>
-          <div class="info-field radio-group">
+          <div class="info-field radio-group" :class="{ 'field-error': errors.trang_thai_thu }">
             <template v-if="isEditable">
-              <RadioButton v-model="form.trang_thai_thu" value="da_thu" inputId="tt_da" />
+              <RadioButton v-model="form.trang_thai_thu" value="da_thu" inputId="tt_da" @change="delete errors.trang_thai_thu" />
               <label for="tt_da" class="radio-lbl">Đã thu</label>
-              <RadioButton v-model="form.trang_thai_thu" value="chua_thu" inputId="tt_ct" />
+              <RadioButton v-model="form.trang_thai_thu" value="chua_thu" inputId="tt_ct" @change="delete errors.trang_thai_thu" />
               <label for="tt_ct" class="radio-lbl">Chưa thu</label>
-              <RadioButton v-model="form.trang_thai_thu" value="cong_no" inputId="tt_cn" />
+              <RadioButton v-model="form.trang_thai_thu" value="cong_no" inputId="tt_cn" @change="delete errors.trang_thai_thu" />
               <label for="tt_cn" class="radio-lbl">Công nợ</label>
+              <span v-if="errors.trang_thai_thu" class="error-msg" style="display:block;width:100%;margin-top:2px;">{{ errors.trang_thai_thu }}</span>
             </template>
             <template v-else>
               <StatusBadge :value="bienNhan?.trang_thai_thu" type="thu" />

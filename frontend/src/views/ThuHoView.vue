@@ -629,11 +629,26 @@ onMounted(() => { fetchData(); fetchTongHop(); loadVanPhongs(); fetchPhieu(); })
         <Button label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaChuyen=[]" />
       </div>
 
-      <!-- Batch gom lô lập phiếu bar -->
-      <div v-if="selectedDaThu.length" class="batch-bar-cod" style="border-color:var(--info-border);background:var(--info-light);">
-        <span><i class="pi pi-check-square"></i> Đã chọn <b>{{ selectedDaThu.length }}</b> BN đã thu · Tổng: <b class="text-danger">{{ fmt(tongTienSelected) }}đ</b></span>
-        <Button label="Lập phiếu chuyển (gom lô)" icon="pi pi-send" severity="help" size="small" @click="openLapPhieuBatch" />
-        <Button label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaThu=[]" />
+      <!-- [Fix #6] Select All nút — giống CuocNhanView -->
+      <div v-if="daThuCount > 0 || selectedDaThu.length" class="batch-bar-cod" style="border-color:var(--info-border);background:var(--info-light);">
+        <span>
+          <template v-if="selectedDaThu.length">
+            <i class="pi pi-check-square"></i> Đã chọn <b>{{ selectedDaThu.length }}</b> BN đã thu · Tổng: <b class="text-danger">{{ fmt(tongTienSelected) }}đ</b>
+          </template>
+          <template v-else>
+            <i class="pi pi-info-circle"></i>
+            Có <b>{{ daThuCount }}</b> BN đã thu COD có thể lập phiếu — tick ☑ để chọn
+          </template>
+        </span>
+        <Button
+          v-if="daThuCount > 0"
+          :label="allDaThuSelected ? 'Bỏ chọn tất cả' : `Chọn tất cả (${daThuCount})`"
+          :icon="allDaThuSelected ? 'pi pi-times' : 'pi pi-check-square'"
+          severity="secondary" text size="small"
+          @click="selectAllDaThu"
+        />
+        <Button v-if="selectedDaThu.length" label="Lập phiếu chuyển (gom lô)" icon="pi pi-send" severity="help" size="small" @click="openLapPhieuBatch" />
+        <Button v-if="selectedDaThu.length" label="Bỏ chọn" severity="secondary" text size="small" @click="selectedDaThu=[]" />
       </div>
 
       <!-- ═══ TABLE ═══ -->
