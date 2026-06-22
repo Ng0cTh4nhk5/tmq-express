@@ -133,6 +133,16 @@ export async function changePassword(userId, currentPassword, newPassword) {
   });
 }
 
+/**
+ * [M-SEC-06] Đăng xuất — increment token_version để invalidate tất cả token cũ
+ */
+export async function logout(userId) {
+  await prisma.nhanVien.update({
+    where: { id: userId },
+    data: { token_version: { increment: 1 } },
+  });
+}
+
 function formatUser(user) {
   return {
     id: user.id,

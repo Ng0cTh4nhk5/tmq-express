@@ -1,4 +1,4 @@
-import { login, getProfile, changePassword } from '../services/auth.service.js';
+import { login, logout, getProfile, changePassword } from '../services/auth.service.js';
 
 export default async function authRoutes(fastify) {
   // POST /api/auth/login — Đăng nhập (rate limited: 5 req/min)
@@ -68,7 +68,7 @@ export default async function authRoutes(fastify) {
     handler: async (request) => {
       const user = await getProfile(request.user.id);
       if (!user) {
-        return { success: false, error: { code: 'NOT_FOUND', message: 'User not found' } };
+        return { success: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy người dùng' } };
       }
       return { success: true, data: user };
     },
@@ -83,7 +83,14 @@ export default async function authRoutes(fastify) {
         required: ['current_password', 'new_password'],
         properties: {
           current_password: { type: 'string', minLength: 1 },
-          new_password: { type: 'string', minLength: 6 },
+          // [M-SEC-01] Password policy: tối thiểu 8 ký tự, ít nhất 1 chữ cái và 1 chữ số
+          new_password: {
+            type: 'string',
+            minLength: 8,
+            maxLength: 128,
+            pattern: '^(?=.*[A-Za-z])(?=.*\\d).{8,}$',
+            errorMessage: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm cả chữ cái và chữ số',
+          },
         },
         additionalProperties: false,
       },
@@ -92,6 +99,15 @@ export default async function authRoutes(fastify) {
       const { current_password, new_password } = request.body;
       await changePassword(request.user.id, current_password, new_password);
       return { success: true, message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.' };
+    },
+  });
+
+  // POST /api/auth/logout — [M-SEC-06] Invalidate token bằng cách increment token_version
+  fastify.post('/logout', {
+    preHandler: [fastify.authenticate],
+    handler: async (request) => {
+      await logout(request.user.id);
+      return { success: true, message: 'Đăng xuất thành công.' };
     },
   });
 }

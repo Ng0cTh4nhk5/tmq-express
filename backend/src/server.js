@@ -27,9 +27,14 @@ import phieuChuyenCodRoutes from './routes/phieu-chuyen-cod.routes.js';
 import bienNhanThuHoRoutes from './routes/bien-nhan-thu-ho.routes.js';
 import cuocNhanRoutes from './routes/cuoc-nhan.routes.js';
 import phieuThuRoutes from './routes/phieu-thu.routes.js';
+import doanhNghiepRoutes from './routes/doanh-nghiep.routes.js';
+import baoCaoRoutes from './routes/bao-cao.routes.js';
 
 const fastify = Fastify({
   bodyLimit: 1048576, // L-04: 1 MB — tránh abuse qua payload lớn
+  // [M-SEC-02] trustProxy: true để ghi IP thực khi chạy sau Nginx/LB
+  // Nếu không có proxy đứng trước, set = false (hoặc xoá dòng này)
+  trustProxy: true,
   logger: {
     level: env.NODE_ENV === 'development' ? 'info' : 'warn',
     transport:
@@ -72,8 +77,26 @@ await fastify.register(rbacPlugin);
 // L-06: /health chỉ trả 200 OK (không expose timestamp/details) — dùng cho load balancer ping
 // Authenticated health check có thể dùng /api/auth/me thay thế
 fastify.get('/api/health', async (request, reply) => {
-  reply.status(200).send({ success: true });
+  // [Phase3] Ping DB để xác nhận kết nối còn sống
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    reply.status(200).send({ success: true, db: 'ok' });
+  } catch (err) {
+    fastify.log.error({ err }, 'Health check DB ping failed');
+    reply.status(503).send({ success: false, db: 'error' });
+  }
 });
+
+fastify.setNotFoundHandler((request, reply) => {
+  reply.status(404).send({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: 'Không tìm thấy dữ liệu hoặc đường dẫn',
+    },
+  });
+});
+
 
 await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(vanPhongRoutes, { prefix: '/api/van-phong' });
@@ -91,6 +114,8 @@ await fastify.register(phieuChuyenCodRoutes, { prefix: '/api/phieu-chuyen-cod' }
 await fastify.register(bienNhanThuHoRoutes, { prefix: '/api/bien-nhan-thu-ho' });
 await fastify.register(cuocNhanRoutes, { prefix: '/api/cuoc-nhan' });
 await fastify.register(phieuThuRoutes, { prefix: '/api/phieu-thu' });
+await fastify.register(doanhNghiepRoutes, { prefix: '/api/doanh-nghiep' });
+await fastify.register(baoCaoRoutes, { prefix: '/api/bao-cao' });
 
 // ---- Graceful Shutdown ----
 const shutdown = async (signal) => {

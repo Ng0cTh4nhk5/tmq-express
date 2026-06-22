@@ -1,9 +1,26 @@
 import { getBienNhanCho, createBangKe, listBangKe, downloadBangKe } from '../services/bang-ke.service.js';
 
+// [H-SEC-04] Date pattern: YYYY-MM-DD — bắt buộc để tránh dump toàn bộ lịch sử
+const DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
+
 export default async function bangKeRoutes(fastify) {
   // GET /api/bang-ke/bien-nhan-cho?ngay=YYYY-MM-DD
   fastify.get('/bien-nhan-cho', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    schema: {
+      querystring: {
+        type: 'object',
+        required: ['ngay'],
+        properties: {
+          ngay: { type: 'string', pattern: DATE_PATTERN },
+          vp_gui: { type: 'integer' },
+          vp_nhan: { type: 'integer' },
+          page: { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+        },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const data = await getBienNhanCho(request.query);
       return { success: true, data };
@@ -57,8 +74,22 @@ export default async function bangKeRoutes(fastify) {
   });
 
   // GET /api/bang-ke — Lịch sử
+  // [H-SEC-04] Thêm date guard bắt buộc để tránh load toàn bộ lịch sử
   fastify.get('/', {
     preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    schema: {
+      querystring: {
+        type: 'object',
+        required: ['from', 'to'],
+        properties: {
+          from: { type: 'string', pattern: DATE_PATTERN },
+          to:   { type: 'string', pattern: DATE_PATTERN },
+          page:  { type: 'integer', minimum: 1, default: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        },
+        additionalProperties: false,
+      },
+    },
     handler: async (request) => {
       const result = await listBangKe(request.query);
       return { success: true, ...result };

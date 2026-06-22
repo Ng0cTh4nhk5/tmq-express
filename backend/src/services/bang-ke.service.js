@@ -1,6 +1,6 @@
 import prisma from '../config/database.js';
 import ExcelJS from 'exceljs';
-import { generateCode } from '../utils/ma-so-generator.js';
+import { createWithCode } from '../utils/ma-so-generator.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
 
 /** VAT 8% — gia_cuoc trên BN là SAU thuế */
@@ -21,29 +21,95 @@ function fmtDate(dt) {
 }
 
 /**
- * DS biên nhận có HĐĐT & chưa vào bảng kê
- * @param {string} ngay - ISO date string (YYYY-MM-DD), optional
+ * Xác định người trả cước cho một biên nhận.
+ *
+ * Quy tắc:
+ *  - trang_thai_thu = 'da_thu'   → Người gửi đã trả trước → hóa đơn cho người GỬI
+ *  - trang_thai_thu = 'chua_thu' → Người nhận trả tại đích → hóa đơn cho người NHẬN
+ *  - trang_thai_thu = 'cong_no'  → Tra bảng CongNo.vai_tro:
+ *      vai_tro = 'nguoi_nhan'    → hóa đơn cho người NHẬN
+ *      vai_tro = 'nguoi_gui'     → hóa đơn cho người GỬI (default)
+ *
+ * @param {object} bn  - BienNhan record (scalar fields đầy đủ)
+ * @param {Map}    congNoMap - Map<bien_nhan_id, { vai_tro: string }> cho BN loại cong_no
+ * @returns {{ ten: string, dia_chi: string, vai_tro: 'nguoi_gui'|'nguoi_nhan' }}
  */
-export async function getBienNhanCho({ ngay } = {}) {
+function resolvePayer(bn, congNoMap) {
+  if (bn.trang_thai_thu === 'cong_no') {
+    const cn = congNoMap.get(bn.id);
+    if (cn?.vai_tro === 'nguoi_nhan') {
+      return {
+        ten:     bn.don_vi_nhan || bn.nguoi_nhan || '',
+        dia_chi: bn.dia_chi_nhan || '',
+        vai_tro: 'nguoi_nhan',
+      };
+    }
+    // Default công nợ → người gửi
+    return {
+      ten:     bn.don_vi_gui || bn.nguoi_gui || '',
+      dia_chi: bn.dia_chi_gui || '',
+      vai_tro: 'nguoi_gui',
+    };
+  }
+
+  if (bn.trang_thai_thu === 'chua_thu') {
+    return {
+      ten:     bn.don_vi_nhan || bn.nguoi_nhan || '',
+      dia_chi: bn.dia_chi_nhan || '',
+      vai_tro: 'nguoi_nhan',
+    };
+  }
+
+  // 'da_thu' hoặc mọi trường hợp còn lại → người gửi
+  return {
+    ten:     bn.don_vi_gui || bn.nguoi_gui || '',
+    dia_chi: bn.dia_chi_gui || '',
+    vai_tro: 'nguoi_gui',
+  };
+}
+
+/**
+ * DS biên nhận có HĐĐT & chưa vào bảng kê.
+ * [H-02 FIX] Thêm pagination để tránh trả về hàng nghìn BN cùng lúc.
+ *
+ * @param {string}  ngay  - ISO date string (YYYY-MM-DD), optional — lọc theo ngày
+ * @param {number}  page  - Trang hiện tại (mặc định 1)
+ * @param {number}  limit - Số bản ghi/trang (mặc định 100, tối đa 500)
+ */
+export async function getBienNhanCho({ ngay, page = 1, limit = 100 } = {}) {
+  const _page  = Math.max(1, Number(page)  || 1);
+  const _limit = Math.min(500, Math.max(1, Number(limit) || 100));
+
   const where = {
     can_xuat_hddt: true,
     da_vao_bang_ke: false,
   };
   if (ngay) {
-    const start = new Date(ngay);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(ngay);
-    end.setHours(23, 59, 59, 999);
-    where.ngay_bien_nhan = { gte: start, lte: end };  // Fix: ngay_nhan → ngay_bien_nhan
+    // [SVC-TZ] Dùng +07:00 để boundary chính xác kể cả khi server chạy UTC
+    where.ngay_bien_nhan = {
+      gte: new Date(ngay + 'T00:00:00.000+07:00'),
+      lte: new Date(ngay + 'T23:59:59.999+07:00'),
+    };
   }
-  return prisma.bienNhan.findMany({
-    where,
-    orderBy: { ngay_bien_nhan: 'asc' },  // Fix: field name
-    include: {
-      van_phong_gui:  { select: { ma_vp: true, ten: true } },
-      van_phong_nhan: { select: { ma_vp: true, ten: true } },
-    },
-  });
+
+  const [data, total] = await Promise.all([
+    prisma.bienNhan.findMany({
+      where,
+      skip: (_page - 1) * _limit,
+      take: _limit,
+      orderBy: { ngay_bien_nhan: 'asc' },
+      include: {
+        van_phong_gui:  { select: { ma_vp: true, ten: true } },
+        van_phong_nhan: { select: { ma_vp: true, ten: true } },
+      },
+    }),
+    prisma.bienNhan.count({ where }),
+  ]);
+
+  return {
+    data,
+    pagination: { page: _page, limit: _limit, total, totalPages: Math.ceil(total / _limit) },
+  };
 }
 
 /**
@@ -92,23 +158,47 @@ export async function createBangKe({ bien_so_xe, items }) {
     }
   }
 
+  // ── Tải CongNo cho các BN có trang_thai_thu = 'cong_no' ────────────────────
+  // Cần biết vai_tro (nguoi_gui | nguoi_nhan) để xác định ai là người trả cước
+  const congNoBnIds = bienNhans
+    .filter(bn => bn.trang_thai_thu === 'cong_no')
+    .map(bn => bn.id);
+
+  const congNoMap = new Map();
+  if (congNoBnIds.length) {
+    const congNos = await prisma.congNo.findMany({
+      where: { bien_nhan_id: { in: congNoBnIds } },
+      orderBy: { created_at: 'desc' },
+      select: { bien_nhan_id: true, vai_tro: true },
+    });
+    // Lấy bản ghi CongNo mới nhất cho mỗi BN
+    for (const cn of congNos) {
+      if (!congNoMap.has(cn.bien_nhan_id)) {
+        congNoMap.set(cn.bien_nhan_id, cn);
+      }
+    }
+  }
+
   // Build snapshot chi tiết
   const chiTietData = items.map((item, idx) => {
     if (item.bien_nhan_id != null) {
-      // Case A: từ BN
+      // Case A: từ BN — xác định người trả cước
       const bn = bienNhans.find(b => b.id === Number(item.bien_nhan_id));
+      const payer = resolvePayer(bn, congNoMap);
       return {
         bien_nhan_id: bn.id,
-        stt: idx + 1,
-        ngay: bn.ngay_bien_nhan,
-        tuyen: `${bn.van_phong_gui.ma_vp}→${bn.van_phong_nhan.ma_vp}`,
-        nguoi_gui: bn.don_vi_gui || bn.nguoi_gui || '',
-        dia_chi_gui: bn.dia_chi_gui || '',
-        hang_hoa: item.hang_hoa ?? bn.ten_hang_hoa ?? '',
-        gia_cuoc: item.gia_cuoc != null ? Number(item.gia_cuoc) : Number(bn.gia_cuoc),
+        stt:          idx + 1,
+        ngay:         bn.ngay_bien_nhan,
+        tuyen:        `${bn.van_phong_gui.ma_vp}→${bn.van_phong_nhan.ma_vp}`,
+        // nguoi_gui / dia_chi_gui lưu thông tin người TRẢ CƯỚC (có thể là người gửi hoặc nhận)
+        nguoi_gui:    payer.ten,
+        dia_chi_gui:  payer.dia_chi,
+        hang_hoa:     item.hang_hoa ?? bn.ten_hang_hoa ?? '',
+        gia_cuoc:     item.gia_cuoc != null ? Number(item.gia_cuoc) : Number(bn.gia_cuoc),
+        vai_tro_tra:  payer.vai_tro,
       };
     } else {
-      // Case B: tự kê
+      // Case B: tự kê — mặc định ghi thông tin người gửi
       if (!item.nguoi_gui || item.gia_cuoc == null) {
         throw Object.assign(
           new Error(`Dòng tự kê ${idx + 1}: thiếu người gửi hoặc giá cước`),
@@ -117,62 +207,84 @@ export async function createBangKe({ bien_so_xe, items }) {
       }
       return {
         bien_nhan_id: null,
-        stt: idx + 1,
-        ngay: new Date(item.ngay || new Date()),
-        tuyen: item.tuyen || '',
-        nguoi_gui: item.nguoi_gui || '',
-        dia_chi_gui: item.dia_chi_gui || '',
-        hang_hoa: item.hang_hoa || '',
-        gia_cuoc: Number(item.gia_cuoc),
+        stt:          idx + 1,
+        ngay:         new Date(item.ngay || new Date()),
+        tuyen:        item.tuyen || '',
+        nguoi_gui:    item.nguoi_gui || '',
+        dia_chi_gui:  item.dia_chi_gui || '',
+        hang_hoa:     item.hang_hoa || '',
+        gia_cuoc:     Number(item.gia_cuoc),
+        vai_tro_tra:  'nguoi_gui',   // Case B luôn là người gửi
       };
     }
   });
 
   const tong_cuoc = chiTietData.reduce((s, i) => s + Number(i.gia_cuoc), 0);
-  const ma_bang_ke = await generateCode('bangKe', 'ma_bang_ke', 'BK');
-  const ten_file = `${ma_bang_ke}_${Date.now()}.xlsx`;
 
-  // Transaction: tạo BangKe + chi tiết + đánh dấu BN
-  const bangKe = await prisma.$transaction(async (tx) => {
-    const bk = await tx.bangKe.create({
-      data: {
-        ma_bang_ke,
-        so_bien_nhan: chiTietData.length,
-        tong_cuoc,
-        bien_so_xe: bien_so_xe?.trim() || null,
-        ten_file,
-        chi_tiet: { create: chiTietData },
-      },
-    });
+  // [RC] Dùng createWithCode để atomic retry on unique violation — tránh race condition
+  // khi 2 user tạo bảng kê cùng lúc và gặp cùng ma_bang_ke
+  let bangKe;
+  let ten_file;
+  const buffer = await createWithCode(
+    async (ma_bang_ke) => {
+      ten_file = `${ma_bang_ke}_${Date.now()}.xlsx`;
+      bangKe = await prisma.$transaction(async (tx) => {
+        const bk = await tx.bangKe.create({
+          data: {
+            ma_bang_ke,
+            so_bien_nhan: chiTietData.length,
+            tong_cuoc,
+            bien_so_xe: bien_so_xe?.trim() || null,
+            ten_file,
+            chi_tiet: { create: chiTietData },
+          },
+        });
 
-    if (bnIds.length) {
-      await tx.bienNhan.updateMany({
-        where: { id: { in: bnIds } },
-        data: { da_vao_bang_ke: true },
+        if (bnIds.length) {
+          await tx.bienNhan.updateMany({
+            where: { id: { in: bnIds } },
+            data: { da_vao_bang_ke: true },
+          });
+        }
+        return bk;
       });
-    }
-    return bk;
-  });
 
-  const buffer = await buildExcel(ma_bang_ke, bangKe.ngay_xuat, bien_so_xe, chiTietData, tong_cuoc);
+      return await buildExcel(ma_bang_ke, bangKe.ngay_xuat, bien_so_xe, chiTietData, tong_cuoc);
+    },
+    'bangKe', 'ma_bang_ke', 'BK',
+  );
+
   // M-01: Ghi audit log tạo bảng kê
-  writeAuditLog({ action: 'CREATE', entity: 'bang_ke', entityId: bangKe.id, newData: { ma_bang_ke, so_bien_nhan: chiTietData.length, tong_cuoc } });
+  writeAuditLog({ action: 'CREATE', entity: 'bang_ke', entityId: bangKe.id, newData: { ma_bang_ke: bangKe.ma_bang_ke, so_bien_nhan: chiTietData.length, tong_cuoc } });
   return { bangKe, buffer, ten_file };
 }
 
 /**
  * Lịch sử bảng kê
  */
-export async function listBangKe({ page = 1, limit = 20 } = {}) {
+export async function listBangKe({ from, to, page = 1, limit = 20 } = {}) {
   const p = parseInt(page, 10) || 1;
   const l = Math.min(parseInt(limit, 10) || 20, 100);
+
+  // [H-SEC-04] Bắt buộc date range để tránh dump toàn bộ lịch sử bảng kê
+  if (!from || !to) {
+    throw Object.assign(new Error('Thiếu tham số from/to (YYYY-MM-DD)'), { statusCode: 400 });
+  }
+  const where = {
+    ngay_xuat: {
+      gte: new Date(from + 'T00:00:00.000+07:00'),
+      lte: new Date(to   + 'T23:59:59.999+07:00'),
+    },
+  };
+
   const [data, total] = await Promise.all([
     prisma.bangKe.findMany({
+      where,
       skip: (p - 1) * l,
       take: l,
       orderBy: { ngay_xuat: 'desc' },
     }),
-    prisma.bangKe.count(),
+    prisma.bangKe.count({ where }),
   ]);
   return { data, pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) } };
 }
@@ -197,7 +309,10 @@ export async function downloadBangKe(bangKeId) {
 }
 
 /**
- * Xây dựng file Excel theo layout chuẩn
+ * Xây dựng file Excel theo layout chuẩn.
+ *
+ * Cột "Đơn vị trả cước" phản ánh người thực sự chịu cước (người gửi HOẶC người nhận),
+ * không nhất thiết là người gửi hàng.
  */
 async function buildExcel(maBangKe, ngayXuat, bienSoXe, items, tongCuoc) {
   const wb = new ExcelJS.Workbook();
@@ -227,19 +342,19 @@ async function buildExcel(maBangKe, ngayXuat, bienSoXe, items, tongCuoc) {
   bsxCell.alignment = { horizontal: 'left' };
   ws.getRow(3).height = 18;
 
-  // ── Column widths (set trước addRow để không bị override) ──
+  // ── Column widths ──
   ws.getColumn(1).width = 5;    // STT
   ws.getColumn(2).width = 11;   // Ngày
   ws.getColumn(3).width = 10;   // Tuyến
-  ws.getColumn(4).width = 26;   // Người gửi
-  ws.getColumn(5).width = 30;   // ĐC gửi
+  ws.getColumn(4).width = 26;   // Đơn vị trả cước
+  ws.getColumn(5).width = 30;   // Địa chỉ
   ws.getColumn(6).width = 22;   // Hàng hoá
   ws.getColumn(7).width = 16;   // Trước thuế
   ws.getColumn(8).width = 16;   // Sau thuế
 
   // ── Header row ──
   const headerRow = ws.addRow([
-    'STT', 'Ngày', 'Tuyến', 'Người gửi', 'Địa chỉ gửi', 'Hàng hoá',
+    'STT', 'Ngày', 'Tuyến', 'Đơn vị trả cước', 'Địa chỉ', 'Hàng hoá',
     'Cước trước thuế', 'Cước sau thuế',
   ]);
   headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -260,11 +375,17 @@ async function buildExcel(maBangKe, ngayXuat, bienSoXe, items, tongCuoc) {
     const sauThue = Number(item.gia_cuoc);
     const tt = truocThue(sauThue);
     sumTruocThue += tt;
+
+    // Hiển thị chú thích vai trò nếu là người nhận (để NV biết)
+    const tenHienThi = item.vai_tro_tra === 'nguoi_nhan'
+      ? `${item.nguoi_gui || ''} (NR)`
+      : (item.nguoi_gui || '');
+
     const row = ws.addRow([
       i + 1,
       fmtDate(item.ngay),
       item.tuyen || '',
-      item.nguoi_gui || '',
+      tenHienThi,
       item.dia_chi_gui || '',
       item.hang_hoa || '',
       tt,
@@ -287,6 +408,13 @@ async function buildExcel(maBangKe, ngayXuat, bienSoXe, items, tongCuoc) {
       };
     });
   });
+
+  // ── Ghi chú vai trò ──
+  const hasNguoiNhan = items.some(i => i.vai_tro_tra === 'nguoi_nhan');
+  if (hasNguoiNhan) {
+    const noteRow = ws.addRow(['', '', '', '* (NR) = Người nhận trả cước', '', '', '', '']);
+    noteRow.getCell(4).font = { italic: true, color: { argb: 'FF888888' }, size: 9 };
+  }
 
   // ── Total row ──
   const totalRow = ws.addRow([

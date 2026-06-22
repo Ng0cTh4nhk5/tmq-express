@@ -1,5 +1,7 @@
 import { listBienNhan, getBienNhan, getNextMaSo, createBienNhan, updateBienNhan, deleteBienNhan } from '../services/bien-nhan.service.js';
 import { generateBienNhanPDF, generateSoBienNhan, generateSoBienNhanExcel } from '../services/pdf.service.js';
+import { xacNhanThuCODAuto } from '../services/thu-ho.service.js';
+import { xacNhanThuCuocNhanAuto } from '../services/cuoc-nhan.service.js';
 import prisma from '../config/database.js';
 
 // Luồng trạng thái cho phép (phân nhánh theo context)
@@ -276,11 +278,22 @@ export default async function bienNhanRoutes(fastify) {
 
       // count_all=true: chỉ đếm tổng cho badge sidebar
       if (request.query.count_all === 'true') {
-        const counts = await Promise.all(
-          ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { ...vpFilter, trang_thai: tt } }))
-        );
+        const [counts, chanhPendingCount] = await Promise.all([
+          Promise.all(ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { ...vpFilter, trang_thai: tt } }))),
+          // [Fix #7] Chỉ đếm BN da_giao_chanh còn tiền chưa xử lý
+          prisma.bienNhan.count({
+            where: {
+              ...vpFilter,
+              trang_thai: 'da_giao_chanh',
+              OR: [
+                { trang_thai_cod: { in: ['cho_thu', 'da_thu_chanh'] }, thu_ho: { gt: 0 } },
+                { trang_thai_cuoc_nhan: 'cho_thu' },
+              ],
+            },
+          }),
+        ]);
         const tab_counts = Object.fromEntries(ALLOWED_TABS.map((tt, i) => [tt, counts[i]]));
-        return { success: true, tab_counts, total: counts.reduce((s, c) => s + c, 0) };
+        return { success: true, tab_counts, da_giao_chanh_pending: chanhPendingCount, total: counts.reduce((s, c) => s + c, 0) };
       }
 
       const page  = Number(request.query.page)  || 1;
@@ -290,7 +303,8 @@ export default async function bienNhanRoutes(fastify) {
       const where = { ...vpFilter, trang_thai: trangThai };
 
       // [HD-01] Query data tab hiện tại + count chính xác + counts tất cả tab song song
-      const [data, totalCount, ...tabCountResults] = await Promise.all([
+      // [Fix #7] Thêm da_giao_chanh_pending: count BN da_giao_chanh còn tiền chưa xử lý
+      const [data, totalCount, chanhPendingCount, ...tabCountResults] = await Promise.all([
         prisma.bienNhan.findMany({
           where,
           orderBy: [{ ngay_bien_nhan: 'asc' }, { id: 'asc' }],
@@ -305,6 +319,19 @@ export default async function bienNhanRoutes(fastify) {
         }),
 
         prisma.bienNhan.count({ where }),
+
+        // BN da_giao_chanh còn COD chờ thu (cho_thu | da_thu_chanh) HOẶC còn cước nhận chờ thu
+        prisma.bienNhan.count({
+          where: {
+            ...vpFilter,
+            trang_thai: 'da_giao_chanh',
+            OR: [
+              { trang_thai_cod: { in: ['cho_thu', 'da_thu_chanh'] }, thu_ho: { gt: 0 } },
+              { trang_thai_cuoc_nhan: 'cho_thu' },
+            ],
+          },
+        }),
+
         ...ALLOWED_TABS.map(tt => prisma.bienNhan.count({ where: { ...vpFilter, trang_thai: tt } })),
       ]);
 
@@ -317,7 +344,7 @@ export default async function bienNhanRoutes(fastify) {
 
       const pagination = { page, limit, total: totalCount, totalPages: Math.ceil(totalCount / limit) };
 
-      return { success: true, data, stats, tab_counts, pagination };
+      return { success: true, data, stats, tab_counts, da_giao_chanh_pending: chanhPendingCount, pagination };
     },
   });
 
@@ -424,25 +451,26 @@ export default async function bienNhanRoutes(fastify) {
         properties: {
           van_phong_gui_id: { type: 'integer' },
           van_phong_nhan_id: { type: 'integer' },
-          ma_so_custom: { type: 'string' },
+          ma_so_custom: { type: 'string', maxLength: 30 },
           ngay_bien_nhan: { type: 'string', format: 'date' },
-          don_vi_gui: { type: 'string' },
-          nguoi_gui: { type: 'string' },
-          dien_thoai_gui: { type: 'string' },
-          so_cccd_gui: { type: 'string' },
-          don_vi_nhan: { type: 'string' },
-          nguoi_nhan: { type: 'string' },
-          dien_thoai_nhan: { type: 'string' },
-          so_cccd_nhan: { type: 'string' },
+          // [M-SEC-05] maxLength trên tất cả free-text fields
+          don_vi_gui:     { type: 'string', maxLength: 300 },
+          nguoi_gui:      { type: 'string', maxLength: 200 },
+          dien_thoai_gui: { type: 'string', maxLength: 20  },
+          so_cccd_gui:    { type: 'string', maxLength: 20  },
+          don_vi_nhan:    { type: 'string', maxLength: 300 },
+          nguoi_nhan:     { type: 'string', maxLength: 200 },
+          dien_thoai_nhan:{ type: 'string', maxLength: 20  },
+          so_cccd_nhan:   { type: 'string', maxLength: 20  },
           hang_hoa_json: {
             type: 'array',
             items: {
               type: 'object',
               required: ['don_vi', 'so_luong'],
               properties: {
-                don_vi: { type: 'string' },
+                don_vi:   { type: 'string', maxLength: 200 },
                 so_luong: { type: 'number', minimum: 0 },
-                ghi_chu: { type: 'string' },
+                ghi_chu:  { type: 'string', maxLength: 500 },
               },
             },
           },
@@ -451,14 +479,14 @@ export default async function bienNhanRoutes(fastify) {
           thu_ho:       { type: 'number', minimum: 0 },
           gia_cuoc:     { type: 'number', minimum: 0 },
           trang_thai_thu: { type: 'string', enum: ['da_thu', 'chua_thu', 'cong_no'] },
-          can_xuat_hddt: { type: 'boolean' },
-          hang_hu_khong_den: { type: 'boolean' },
+          can_xuat_hddt:    { type: 'boolean' },
+          hang_hu_khong_den:{ type: 'boolean' },
           hinh_thuc_giao: { type: 'string', enum: ['tan_noi', 'goi_dien', 'tu_toi'] },
-          chanh_id: { type: 'integer' },
-          dia_chi_giao: { type: 'string' },
-          gio_tao: { type: 'string' },
-          dia_chi_gui: { type: 'string' },
-          dia_chi_nhan: { type: 'string' },
+          chanh_id:    { type: 'integer' },
+          dia_chi_giao:{ type: 'string', maxLength: 500 },
+          gio_tao:     { type: 'string', maxLength: 10  },
+          dia_chi_gui: { type: 'string', maxLength: 500 },
+          dia_chi_nhan:{ type: 'string', maxLength: 500 },
         },
         additionalProperties: false,
       },
@@ -480,39 +508,40 @@ export default async function bienNhanRoutes(fastify) {
       body: {
         type: 'object',
         properties: {
-          don_vi_gui: { type: 'string' },
-          nguoi_gui: { type: 'string' },
-          dien_thoai_gui: { type: 'string' },
-          so_cccd_gui: { type: 'string' },
-          don_vi_nhan: { type: 'string' },
-          nguoi_nhan: { type: 'string' },
-          dien_thoai_nhan: { type: 'string' },
-          so_cccd_nhan: { type: 'string' },
+          // [M-SEC-05] maxLength trên tất cả free-text fields của PUT
+          don_vi_gui:     { type: 'string', maxLength: 300 },
+          nguoi_gui:      { type: 'string', maxLength: 200 },
+          dien_thoai_gui: { type: 'string', maxLength: 20  },
+          so_cccd_gui:    { type: 'string', maxLength: 20  },
+          don_vi_nhan:    { type: 'string', maxLength: 300 },
+          nguoi_nhan:     { type: 'string', maxLength: 200 },
+          dien_thoai_nhan:{ type: 'string', maxLength: 20  },
+          so_cccd_nhan:   { type: 'string', maxLength: 20  },
           hang_hoa_json: {
             type: 'array',
             items: {
               type: 'object',
               required: ['don_vi', 'so_luong'],
               properties: {
-                don_vi: { type: 'string' },
+                don_vi:   { type: 'string', maxLength: 200 },
                 so_luong: { type: 'number', minimum: 0 },
-                ghi_chu: { type: 'string' },
+                ghi_chu:  { type: 'string', maxLength: 500 },
               },
             },
           },
           gia_tri_hang: { type: 'number' },
-          trong_luong: { type: 'number' },
-          thu_ho: { type: 'number' },
-          gia_cuoc: { type: 'number' },
-          trang_thai_thu: { type: 'string', enum: ['da_thu', 'chua_thu', 'cong_no'] },
-          can_xuat_hddt: { type: 'boolean' },
-          hang_hu_khong_den: { type: 'boolean' },
+          trong_luong:  { type: 'number' },
+          thu_ho:       { type: 'number' },
+          gia_cuoc:     { type: 'number' },
+          trang_thai_thu:   { type: 'string', enum: ['da_thu', 'chua_thu', 'cong_no'] },
+          can_xuat_hddt:    { type: 'boolean' },
+          hang_hu_khong_den:{ type: 'boolean' },
           hinh_thuc_giao: { type: 'string', enum: ['tan_noi', 'goi_dien', 'tu_toi'] },
-          chanh_id: { type: ['integer', 'null'] },
-          dia_chi_giao: { type: 'string' },
-          gio_tao: { type: 'string' },
-          dia_chi_gui: { type: 'string' },
-          dia_chi_nhan: { type: 'string' },
+          chanh_id:    { type: ['integer', 'null'] },
+          dia_chi_giao:{ type: 'string', maxLength: 500 },
+          gio_tao:     { type: 'string', maxLength: 10  },
+          dia_chi_gui: { type: 'string', maxLength: 500 },
+          dia_chi_nhan:{ type: 'string', maxLength: 500 },
         },
         additionalProperties: false,
       },
@@ -523,6 +552,7 @@ export default async function bienNhanRoutes(fastify) {
         request.body,
         request.user.id,
         request.user.role,
+        request.user.van_phong_id, // [H-SEC-01] IDOR: VP-level check
       );
       return { success: true, data, message: 'Cập nhật thành công' };
     },
@@ -628,7 +658,6 @@ export default async function bienNhanRoutes(fastify) {
         // (Nếu BN có chanh_id: tiền COD đang ở chành, phải dùng luồng "chành đã thu" thủ công)
         if (Number(existing.thu_ho) > 0 && existing.trang_thai_cod === 'cho_thu' && !existing.chanh_id) {
           try {
-            const { xacNhanThuCODAuto } = await import('../services/thu-ho.service.js');
             const codResult = await xacNhanThuCODAuto(id, request.user);
             autoCodResult = { phieu_thu: codResult.phieu_thu };
           } catch (err) {
@@ -648,7 +677,6 @@ export default async function bienNhanRoutes(fastify) {
             console.warn(`[Auto-Cuớc] BN ${existing.ma_so}: gia_cuoc=0, cleared trang_thai_cuoc_nhan`);
           } else {
             try {
-              const { xacNhanThuCuocNhanAuto } = await import('../services/cuoc-nhan.service.js');
               const cuocResult = await xacNhanThuCuocNhanAuto(id, request.user);
               autoCuocResult = { phieu_thu: cuocResult.phieu_thu };
             } catch (err) {
@@ -765,10 +793,6 @@ export default async function bienNhanRoutes(fastify) {
       const batchCuocWarnings = []; // [B1] collect warnings từng BN
 
       if (trang_thai === 'khach_da_nhan') {
-        const { xacNhanThuCODAuto } = await import('../services/thu-ho.service.js');
-        const { xacNhanThuCuocNhanAuto } = await import('../services/cuoc-nhan.service.js');
-
-        // Auto-thu COD: chỉ thu khi không qua chành
         const codBNs  = existingBNs.filter(bn => Number(bn.thu_ho) > 0 && bn.trang_thai_cod === 'cho_thu' && !bn.chanh_id);
 
         // [B1] Phân nhóm BN cần thu cước:
@@ -841,7 +865,12 @@ export default async function bienNhanRoutes(fastify) {
     }, // [N-M02] Validate params.id là integer — tránh NaN khi id='abc'
     handler: async (request) => {
       const id = Number(request.params.id);
-      await deleteBienNhan(id, request.user.id, request.user.role);
+      await deleteBienNhan(
+        id,
+        request.user.id,
+        request.user.role,
+        request.user.van_phong_id, // [H-SEC-01] IDOR: VP-level check
+      );
       return { success: true, message: 'Đã xóa biên nhận' };
     },
   });
