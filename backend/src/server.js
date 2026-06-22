@@ -47,10 +47,24 @@ const fastify = Fastify({
 // ---- Plugins ----
 // L-01: Security headers (X-Frame-Options, X-Content-Type-Options, CSP, etc.)
 await fastify.register(helmet, {
-  // contentSecurityPolicy tắt để không chặn PDF inline viewer của frontend
-  // Nếu API thuần JSON thì có thể bật lại với cấu hình phù hợp
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false, // Cho phép PDF viewer embed cross-origin
+  // [M-SEC-03] CSP cho pure JSON API backend:
+  // Cho phép 'none' cho tất cả — API không phục vụ HTML/JS/CSS/images.
+  // Frontend ribiệt không bị ảnh hưởng vì CORS đã tách biệt origin.
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc:  ["'none'"],
+      scriptSrc:   ["'none'"],
+      styleSrc:    ["'none'"],
+      imgSrc:      ["'none'"],
+      connectSrc:  ["'none'"],
+      fontSrc:     ["'none'"],
+      objectSrc:   ["'none'"],
+      mediaSrc:    ["'none'"],
+      frameSrc:    ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Giữ cho tương thích nếu có file download
 });
 
 await fastify.register(cors, {
@@ -76,6 +90,15 @@ await fastify.register(rbacPlugin);
 // ---- Routes ----
 // L-06: /health chỉ trả 200 OK (không expose timestamp/details) — dùng cho load balancer ping
 // Authenticated health check có thể dùng /api/auth/me thay thế
+// [Phase3] Global request timeout: 30s — chống slow-request DoS
+fastify.addHook('onRequest', async (request, reply) => {
+  request.raw.setTimeout(30_000, () => {
+    if (!reply.sent) {
+      reply.status(408).send({ success: false, error: { code: 'REQUEST_TIMEOUT', message: 'Yêu cầu vượt quá thời gian cho phép' } });
+    }
+  });
+});
+
 fastify.get('/api/health', async (request, reply) => {
   // [Phase3] Ping DB để xác nhận kết nối còn sống
   try {
