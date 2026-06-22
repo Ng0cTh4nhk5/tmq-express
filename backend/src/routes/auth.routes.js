@@ -89,7 +89,6 @@ export default async function authRoutes(fastify) {
             minLength: 8,
             maxLength: 128,
             pattern: '^(?=.*[A-Za-z])(?=.*\\d).{8,}$',
-            errorMessage: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm cả chữ cái và chữ số',
           },
         },
         additionalProperties: false,
