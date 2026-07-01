@@ -198,7 +198,12 @@ export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop 
     return { bn: updatedBN, phieu_thu: phieuThu, bien_nhan_thu_ho: bnth };
   });
 
-  writeAuditLog({ action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId, newData: { trang_thai_cod: 'da_thu' } });
+  // [H-SEC-03] Audit log: ghi userId để biết ai thực hiện thu COD
+  writeAuditLog({
+    action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId,
+    userId: user.id,
+    newData: { trang_thai_cod: 'da_thu', phieu_thu_id: result.phieu_thu?.id },
+  });
   return result;
 }
 

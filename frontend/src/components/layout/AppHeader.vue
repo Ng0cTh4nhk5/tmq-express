@@ -26,6 +26,10 @@ function handleLogout() {
   auth.logout();
   router.push('/login');
 }
+
+function openDocs() {
+  window.open('https://docs.tmq-express.io.vn', '_blank');
+}
 </script>
 
 <template>
@@ -49,6 +53,16 @@ function handleLogout() {
         {{ auth.user?.ten }}
         <span class="header-role">({{ auth.user?.role }})</span>
       </span>
+      <Button
+        icon="pi pi-question-circle"
+        severity="secondary"
+        text
+        rounded
+        size="small"
+        @click="openDocs"
+        v-tooltip.bottom="'Hướng dẫn sử dụng'"
+        id="btn-help-docs"
+      />
       <Button
         icon="pi pi-sign-out"
         severity="secondary"

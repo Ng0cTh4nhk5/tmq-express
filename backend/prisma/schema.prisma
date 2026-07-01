@@ -86,6 +86,11 @@ enum LoaiKH {
   ca_nhan
 }
 
+enum VaiTroCongNo {
+  nguoi_gui
+  nguoi_nhan
+}
+
 // ============================================================
 // TABLES
 // ============================================================
@@ -148,23 +153,52 @@ model NhanVien {
   @@map("nhan_vien")
 }
 
+/// Doanh nghiệp — nhóm nhiều KhachHang thành viên (NV-3b)
+model DoanhNghiep {
+  id            Int          @id @default(autoincrement())
+  ten           String       @db.VarChar(300)
+  ma_so_thue    String?      @db.VarChar(20)
+  dia_chi       String?      @db.VarChar(500)
+  dien_thoai    String?      @db.VarChar(20)
+  ghi_chu       String?      @db.Text
+  active        Boolean      @default(true)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  thanh_vien    KhachHang[]  // Các cá nhân/đầu mối thuộc DN
+  cong_no       CongNo[]     // Công nợ gắn với DN (thay vì cá nhân)
+
+  @@index([active])
+  @@map("doanh_nghiep")
+}
+
 /// Khách hàng (NV-3)
 model KhachHang {
-  id           Int      @id @default(autoincrement())
-  ma_kh        String   @unique @db.VarChar(20)
-  loai_kh      LoaiKH   @default(ca_nhan)
-  ten_don_vi   String   @db.VarChar(300)
-  nguoi_lien_he String? @db.VarChar(200)
-  dien_thoai   String?  @db.VarChar(20)
-  email        String?  @db.VarChar(200)
-  ma_so_thue   String?  @db.VarChar(20)
-  so_cccd      String?  @db.VarChar(20)
-  dia_chi      String?  @db.VarChar(500)
-  ghi_chu      String?  @db.Text
-  active       Boolean  @default(true)
-  created_at   DateTime @default(now())
+  id               Int           @id @default(autoincrement())
+  ma_kh            String        @unique @db.VarChar(20)
+  loai_kh          LoaiKH        @default(ca_nhan)
+  ten_don_vi       String        @db.VarChar(300)
+  nguoi_lien_he    String?       @db.VarChar(200)
+  dien_thoai       String?       @db.VarChar(20)
+  email            String?       @db.VarChar(200)
+  ma_so_thue       String?       @db.VarChar(20)
+  so_cccd          String?       @db.VarChar(20)
+  dia_chi          String?       @db.VarChar(500)
+  ghi_chu          String?       @db.Text
+  active           Boolean       @default(true)
+  created_at       DateTime      @default(now())
+
+  // [NV-3b] Liên kết tùy chọn về Doanh nghiệp cha
+  doanh_nghiep_id  Int?          // nullable — cá nhân không thuộc DN nào
+  doanh_nghiep     DoanhNghiep?  @relation(fields: [doanh_nghiep_id], references: [id])
+
+  // Back-ref từ BienNhan
+  bien_nhan_gui    BienNhan[]    @relation("KH_Gui")
+  bien_nhan_nhan   BienNhan[]    @relation("KH_Nhan")
+  cong_no          CongNo[]      // Công nợ gắn với KH cá nhân
 
   @@index([dien_thoai])
+  @@index([doanh_nghiep_id])
   @@map("khach_hang")
 }
 
@@ -207,6 +241,10 @@ model BienNhan {
   trang_thai_cuoc_nhan TrangThaiCuocNhan? // null khi da_thu hoặc cong_no; cho_thu..da_nhan khi chua_thu
   hang_hu_khong_den    Boolean            @default(false)
   can_xuat_hddt        Boolean            @default(false)
+
+  // [NV-3b] Liên kết KH tùy chọn — không bắt buộc, NV có thể nhập tay
+  kh_gui_id            Int?               // FK → KhachHang người gửi
+  kh_nhan_id           Int?               // FK → KhachHang người nhận
   da_vao_bang_ke       Boolean            @default(false)
   hinh_thuc_giao       HinhThucGiao       @default(tan_noi)
   chanh_id             Int?
@@ -217,6 +255,8 @@ model BienNhan {
 
   van_phong_gui              VanPhong                   @relation("VP_Gui", fields: [van_phong_gui_id], references: [id])
   van_phong_nhan             VanPhong                   @relation("VP_Nhan", fields: [van_phong_nhan_id], references: [id])
+  kh_gui                     KhachHang?                 @relation("KH_Gui", fields: [kh_gui_id], references: [id])
+  kh_nhan                    KhachHang?                 @relation("KH_Nhan", fields: [kh_nhan_id], references: [id])
   nhan_vien_nhap             NhanVien                   @relation("NV_Nhap", fields: [nhan_vien_nhap_id], references: [id])
   chanh                      Chanh?                     @relation(fields: [chanh_id], references: [id])
   lich_su_trang_thai         LichSuTrangThai[]
@@ -428,10 +468,14 @@ model BangKeChiTiet {
 
   ngay           DateTime
   tuyen          String?  @db.VarChar(30)
+  /// Tên người/đơn vị trả cước (snapshot) — có thể là người gửi HOẶC người nhận
   nguoi_gui      String?  @db.VarChar(300)
+  /// Địa chỉ người/đơn vị trả cước
   dia_chi_gui    String?  @db.VarChar(500)
   hang_hoa       String?  @db.VarChar(300)
   gia_cuoc       Decimal  @default(0) @db.Decimal(15, 0)
+  /// 'nguoi_gui' | 'nguoi_nhan' — ai là người trả cước (phục vụ audit & hiển thị)
+  vai_tro_tra    String?  @db.VarChar(20)
 
   bang_ke        BangKe    @relation(fields: [bang_ke_id], references: [id], onDelete: Cascade)
   bien_nhan      BienNhan? @relation(fields: [bien_nhan_id], references: [id])
@@ -511,7 +555,7 @@ model PhieuChi {
 model CongNo {
   id                Int               @id @default(autoincrement())
   bien_nhan_id      Int
-  doi_tuong         String            @db.VarChar(300)
+  doi_tuong         String            @db.VarChar(300)  // Giữ lại để backward-compat
   so_tien_no        Decimal           @db.Decimal(15, 0)
   ngay_phat_sinh    DateTime          @default(now())
   trang_thai        TrangThaiCongNo   @default(chua_thu)
@@ -519,11 +563,20 @@ model CongNo {
   phieu_thu_id      Int?
   created_at        DateTime          @default(now())
 
+  // [NV-3b] Liên kết tường minh — ưu tiên hơn doi_tuong string
+  khach_hang_id     Int?              // FK → KhachHang (cá nhân chịu nợ)
+  doanh_nghiep_id   Int?              // FK → DoanhNghiep (nếu KH thuộc DN)
+  vai_tro           VaiTroCongNo      @default(nguoi_gui)  // Ai là người nợ
+
   bien_nhan         BienNhan          @relation(fields: [bien_nhan_id], references: [id])
   phieu_thu         PhieuThu?         @relation(fields: [phieu_thu_id], references: [id])
+  khach_hang        KhachHang?        @relation(fields: [khach_hang_id], references: [id])
+  doanh_nghiep      DoanhNghiep?      @relation(fields: [doanh_nghiep_id], references: [id])
 
   @@index([trang_thai])
   @@index([ngay_phat_sinh])
+  @@index([khach_hang_id])
+  @@index([doanh_nghiep_id])
   @@map("cong_no")
 }
 

@@ -35,16 +35,49 @@ function getGroupKey(dateRaw, nhom) {
 }
 
 /**
- * Báo cáo doanh thu nhóm theo ngày / tuần / tháng / năm
+ * Báo cáo doanh thu nhóm theo ngày / tuần / tháng / năm.
+ *
+ * [C-02 FIX] Bắt buộc phải có ít nhất `from` hoặc `to` để tránh query
+ * toàn bộ bảng. Mặc định tối đa 1 năm nếu chỉ truyền một đầu.
+ *
+ * Dữ liệu aggregation vẫn tính trong JS (nhom tuần/ngày không làm được
+ * hoàn toàn trong SQL một cách portable), nhưng giờ đã có date range
+ * bắt buộc → số bản ghi được giới hạn hợp lý.
  */
 export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) {
+  // [C-02] Guard: phải có ít nhất from hoặc to
+  if (!from && !to) {
+    throw Object.assign(
+      new Error('Bắt buộc phải truyền ít nhất tham số "from" hoặc "to"'),
+      { statusCode: 400 },
+    );
+  }
+
+  // [C-02] Nếu chỉ có 1 đầu → mặc định range tối đa 366 ngày
+  const MAX_RANGE_DAYS = 366;
+  let fromDate = from ? new Date(from + 'T00:00:00.000+07:00') : null;
+  let toDate   = to   ? new Date(to   + 'T23:59:59.999+07:00') : null;
+
+  if (fromDate && !toDate) {
+    // Chỉ có from → to = from + MAX_RANGE_DAYS
+    toDate = new Date(fromDate.getTime() + MAX_RANGE_DAYS * 86400 * 1000);
+  } else if (toDate && !fromDate) {
+    // Chỉ có to → from = to - MAX_RANGE_DAYS
+    fromDate = new Date(toDate.getTime() - MAX_RANGE_DAYS * 86400 * 1000);
+  } else {
+    // Cả 2 đều có → kiểm tra range không vượt quá MAX
+    const rangeDays = (toDate - fromDate) / (86400 * 1000);
+    if (rangeDays > MAX_RANGE_DAYS) {
+      throw Object.assign(
+        new Error(`Khoảng thời gian tối đa là ${MAX_RANGE_DAYS} ngày`),
+        { statusCode: 400 },
+      );
+    }
+  }
+
   const where = {};
   if (van_phong_id) where.van_phong_gui_id = Number(van_phong_id);
-  if (from || to) {
-    where.ngay_bien_nhan = {};
-    if (from) where.ngay_bien_nhan.gte = new Date(from);
-    if (to)   where.ngay_bien_nhan.lte = new Date(to + 'T23:59:59');
-  }
+  where.ngay_bien_nhan = { gte: fromDate, lte: toDate };
 
   const bienNhans = await prisma.bienNhan.findMany({
     where,
@@ -57,7 +90,7 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
     orderBy: { ngay_bien_nhan: 'asc' },
   });
 
-  // Group trong JS
+  // Group trong JS (giữ nguyên logic, nay an toàn vì date range bị giới hạn)
   const groupMap = new Map();
 
   for (const bn of bienNhans) {
@@ -66,28 +99,28 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         key,
-        so_bn:    0,
+        so_bn:     0,
         tong_cuoc: 0,
-        thu_ho:   0,
-        da_thu:   0,
-        chua_thu: 0,
-        cong_no:  0,
-        khac:     0,  // bắt BN có trang_thai_thu ngoài 3 giá trị chuẩn
+        thu_ho:    0,
+        da_thu:    0,
+        chua_thu:  0,
+        cong_no:   0,
+        khac:      0,
       });
     }
 
-    const g = groupMap.get(key);
-    const cuoc  = Number(bn.gia_cuoc || 0);
-    const ho    = Number(bn.thu_ho || 0);
+    const g    = groupMap.get(key);
+    const cuoc = Number(bn.gia_cuoc || 0);
+    const ho   = Number(bn.thu_ho || 0);
 
     g.so_bn++;
     g.tong_cuoc += cuoc;
     g.thu_ho    += ho;
 
-    if      (bn.trang_thai_thu === 'da_thu')    g.da_thu   += cuoc;
-    else if (bn.trang_thai_thu === 'chua_thu')  g.chua_thu += cuoc;
-    else if (bn.trang_thai_thu === 'cong_no')   g.cong_no  += cuoc;
-    else                                         g.khac     += cuoc;  // dữ liệu bất thường
+    if      (bn.trang_thai_thu === 'da_thu')   g.da_thu   += cuoc;
+    else if (bn.trang_thai_thu === 'chua_thu') g.chua_thu += cuoc;
+    else if (bn.trang_thai_thu === 'cong_no')  g.cong_no  += cuoc;
+    else                                        g.khac     += cuoc;
   }
 
   const chi_tiet = Array.from(groupMap.values());

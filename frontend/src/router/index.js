@@ -29,9 +29,11 @@ const routes = [
       { path: 'bang-ke-hddt', name: 'BangKe', component: () => import('../views/BangKeView.vue'), meta: { title: 'Bảng kê HĐĐT', role: ['admin'] } },
       { path: 'cong-no', name: 'CongNo', component: () => import('../views/CongNoView.vue'), meta: { title: 'Bảng kê công nợ', role: ['admin'] } },
       { path: 'doanh-thu', name: 'DoanhThu', component: () => import('../views/DoanhThuView.vue'), meta: { title: 'Báo cáo doanh thu', role: ['admin', 'staff'] } },
+      { path: 'bao-cao', name: 'BaoCao', component: () => import('../views/BaoCaoView.vue'), meta: { title: 'Báo cáo tuyến & chành', role: ['admin'] } },
       { path: 'van-phong', name: 'VanPhong', component: () => import('../views/VanPhongView.vue'), meta: { title: 'Văn phòng', role: ['admin'] } },
       { path: 'nhan-vien', name: 'NhanVien', component: () => import('../views/NhanVienView.vue'), meta: { title: 'Nhân viên', role: ['admin'] } },
       { path: 'chanh', name: 'Chanh', component: () => import('../views/ChanhView.vue'), meta: { title: 'Chành', role: ['admin'] } },
+      { path: 'doanh-nghiep', name: 'DoanhNghiep', component: () => import('../views/DoanhNghiepView.vue'), meta: { title: 'Doanh nghiệp', role: ['admin'] } },
       { path: 'thu-ho', name: 'ThuHo', component: () => import('../views/ThuHoView.vue'), meta: { title: 'Thu hộ (COD)', role: ['admin', 'staff'] } },
       { path: 'cuoc-nhan', name: 'CuocNhan', component: () => import('../views/CuocNhanView.vue'), meta: { title: 'Cước nhận', role: ['admin', 'staff'] } },
     ],
@@ -53,6 +55,13 @@ const routes = [
     name: 'PdfViewer',
     component: () => import('../views/PdfViewerPage.vue'),
     meta: { requiresAuth: true },
+  },
+  // Catch-all: tất cả đường dẫn không khớp → trang 404
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFoundView.vue'),
+    meta: { public: true },
   },
 ];
 

@@ -319,26 +319,7 @@ async function xacNhanThuCuoc() {
   confirmingThuCuoc.value = false;
 }
 
-// In biên nhận thu cước nhận (sau khi BN đã thu thành công)
-const printingCuoc = ref(false);
-async function printPhieuThuCuoc(row) {
-  const phieuThuId = row.phieu_thu?.[0]?.id;
-  if (!phieuThuId) {
-    toast.add({ severity: 'warn', summary: 'Không có phiếu thu', detail: 'Không tìm thấy phiếu thu liên kết', life: 3000 });
-    return;
-  }
-  printingCuoc.value = true;
-  try {
-    const res   = await api.get(`/phieu-thu/${phieuThuId}/pdf-preview`);
-    const b64   = res.data.data.base64;
-    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    const blob  = new Blob([bytes], { type: 'application/pdf' });
-    window.open(URL.createObjectURL(blob), '_blank');
-  } catch (err) {
-    handleApiError(err, toast, 'Lỗi tải PDF phiếu thu cước');
-  }
-  printingCuoc.value = false;
-}
+
 
 // ============================================================================
 // MARK: - LIFECYCLE
@@ -568,13 +549,6 @@ onMounted(async () => {
                   :checked="selectedRows.some(r => r.id === row.id)"
                   @change="e => { if(e.target.checked) selectedRows.push(row); else selectedRows = selectedRows.filter(r => r.id !== row.id); }" />
                 <Button label="Lập phiếu" icon="pi pi-send" size="small" severity="help" @click="openLapPhieu(row)" />
-                <Button
-                  v-if="row.phieu_thu?.[0]?.id"
-                  icon="pi pi-print" v-tooltip.top="'In biên nhận thu cước'"
-                  size="small" severity="secondary" text rounded
-                  :loading="printingCuoc"
-                  @click="printPhieuThuCuoc(row)"
-                />
               </template>
               <template v-else-if="row.trang_thai_cuoc_nhan === 'cho_chuyen'">
                 <div style="display:flex;flex-direction:column;gap:0.2rem;">

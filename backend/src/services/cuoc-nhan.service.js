@@ -180,9 +180,11 @@ export async function xacNhanThuCuocNhan(
     return { bn: updatedBN, phieu_thu: phieuThu };
   });
 
+  // [H-SEC-03] Audit log: ghi userId để biết ai thực hiện thu cước
   writeAuditLog({
     action: 'UPDATE', entity: 'bien_nhan', entityId: bienNhanId,
-    newData: { trang_thai_cuoc_nhan: 'da_thu' },
+    userId: user.id,
+    newData: { trang_thai_cuoc_nhan: 'da_thu', phieu_thu_id: result.phieu_thu?.id },
   });
   return result;
 }

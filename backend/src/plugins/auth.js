@@ -36,7 +36,7 @@ async function authPlugin(fastify) {
       // Attach ten (name) for PDF watermark and audit log
       request.user.ten = dbUser.ten;
     } catch (err) {
-      reply.status(401).send({
+      return reply.status(401).send({
         success: false,
         error: {
           code: 'UNAUTHORIZED',

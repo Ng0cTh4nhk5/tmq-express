@@ -339,9 +339,20 @@ onMounted(() => {
 
         <Column header="Đối tượng">
           <template #body="{ data }">
-            <span class="dt-link" @click="openDetail(data)" :title="`Xem chi tiết ${data.doi_tuong}`">
-              {{ data.doi_tuong }}
-            </span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <!-- [NV-3b] Badge loại -->
+              <span
+                v-if="data.loai === 'doanh_nghiep'"
+                style="font-size:0.65rem; background:#dbeafe; color:#1d4ed8; border-radius:4px; padding:1px 5px; font-weight:700; white-space:nowrap; flex-shrink:0;"
+              >DN</span>
+              <span
+                v-else-if="data.loai === 'ca_nhan'"
+                style="font-size:0.65rem; background:#f0fdf4; color:#15803d; border-radius:4px; padding:1px 5px; font-weight:700; white-space:nowrap; flex-shrink:0;"
+              >KH</span>
+              <span class="dt-link" @click="openDetail(data)" :title="`Xem chi tiết ${data.doi_tuong}`">
+                {{ data.doi_tuong }}
+              </span>
+            </div>
           </template>
         </Column>
 
@@ -378,6 +389,7 @@ onMounted(() => {
           </template>
         </Column>
       </DataTable>
+
 
       <div v-if="bkTong && bkData.length" class="summary-footer">
         <span>Tổng: {{ fmt(bkTong.tong) }}đ</span>

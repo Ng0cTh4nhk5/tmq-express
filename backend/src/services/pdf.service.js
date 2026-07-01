@@ -299,12 +299,12 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
           {
             width: '60%',
             stack: [
-              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 8, color: '#444' }, { text: hangStr, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
-              { text: [{ text: 'Thu hộ (COD): ', fontSize: 8, color: '#444' }, { text: `${fmtCurrency(bn.thu_ho)} đ`, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Tên hàng / Số lượng: ', fontSize: 8, bold: true, color: '#111' }, { text: hangStr, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
+              { text: [{ text: 'Thu hộ (COD): ', fontSize: 8, bold: true, color: '#111' }, { text: `${fmtCurrency(bn.thu_ho)} đ`, fontSize: 8.5, bold: true }], margin: [0, 0, 0, 2] },
               {
                 columns: [
-                  { text: [{ text: 'Trọng lượng: ', fontSize: 8, color: '#444' }, { text: bn.trong_luong ? `${bn.trong_luong} kg` : '—', fontSize: 8.5 }], width: '*' },
-                  { text: [{ text: 'Giá trị hàng: ', fontSize: 8, color: '#444' }, { text: bn.gia_tri_hang ? `${fmtCurrency(bn.gia_tri_hang)} đ` : '—', fontSize: 8.5 }], width: '*' },
+                  { text: [{ text: 'Trọng lượng: ', fontSize: 8, bold: true, color: '#111' }, { text: bn.trong_luong ? `${bn.trong_luong} kg` : '—', fontSize: 8.5, bold: true }], width: '*' },
+                  { text: [{ text: 'Giá trị hàng: ', fontSize: 8, bold: true, color: '#111' }, { text: bn.gia_tri_hang ? `${fmtCurrency(bn.gia_tri_hang)} đ` : '—', fontSize: 8.5, bold: true }], width: '*' },
                 ],
                 margin: [0, 0, 0, 2],
               },

@@ -2,24 +2,11 @@ import prisma from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
-import { requestContext } from '../plugins/request-context.js';
+import { writeAuditLog as _writeAuditLogBase } from '../plugins/audit-log.js';
 
-// ── Audit Log helper ────────────────────────────────────────────────────────
+// ── Audit Log helper — thin wrapper cố định entity = 'nhan_vien' ─────────────
 async function writeAuditLog({ action, entityId, oldData, newData }) {
-  const ctx = requestContext.getStore();
-  if (!ctx?.userId) return; // Không log nếu không có context (e.g. seed)
-  await prisma.auditLog.create({
-    data: {
-      nhan_vien_id: ctx.userId,
-      action,
-      entity: 'nhan_vien',
-      entity_id: entityId ?? null,
-      old_data: oldData ?? null,
-      new_data: newData ?? null,
-      ip_address: ctx.ip ?? null,
-      user_agent: ctx.userAgent ?? null,
-    },
-  }).catch(() => {}); // Không block main flow nếu audit lỗi
+  return _writeAuditLogBase({ action, entity: 'nhan_vien', entityId, oldData, newData });
 }
 
 // ── List ────────────────────────────────────────────────────────────────────
@@ -50,27 +37,30 @@ export async function listNhanVien({ van_phong_id, active, page = 1, limit = 20 
 
 // ── Create ──────────────────────────────────────────────────────────────────
 export async function createNhanVien(data) {
-  const exists = await prisma.nhanVien.findFirst({
-    where: { OR: [{ username: data.username }, { ma_nv: data.ma_nv }] },
-  });
-  if (exists) {
-    throw Object.assign(new Error('Mã NV hoặc Username đã tồn tại'), { statusCode: 409 });
-  }
-
+  // [SVC-TOCTOU] Không dùng findFirst+create (race condition) — dựa vào DB unique constraint
+  // và catch P2002 để handle duplicate atomically.
   const password_hash = await bcrypt.hash(data.password, 10);
-  const created = await prisma.nhanVien.create({
-    data: {
-      ma_nv: data.ma_nv,
-      ten: data.ten,
-      username: data.username,
-      password_hash,
-      role: data.role || 'staff',
-      van_phong_id: data.van_phong_id,
-      // [SVC-01] Đọc giá trị từ client, fallback true nếu không truyền
-      require_password_change: data.require_password_change ?? true,
-    },
-    select: { id: true, ma_nv: true, ten: true, username: true, role: true },
-  });
+  let created;
+  try {
+    created = await prisma.nhanVien.create({
+      data: {
+        ma_nv: data.ma_nv,
+        ten: data.ten,
+        username: data.username,
+        password_hash,
+        role: data.role || 'staff',
+        van_phong_id: data.van_phong_id,
+        // [SVC-01] Đọc giá trị từ client, fallback true nếu không truyền
+        require_password_change: data.require_password_change ?? true,
+      },
+      select: { id: true, ma_nv: true, ten: true, username: true, role: true },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw Object.assign(new Error('Mã NV hoặc Username đã tồn tại'), { statusCode: 409 });
+    }
+    throw e;
+  }
 
   // [Security] Ghi audit log
   await writeAuditLog({

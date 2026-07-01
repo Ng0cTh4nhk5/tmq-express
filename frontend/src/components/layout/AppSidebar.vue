@@ -39,6 +39,7 @@ const menuGroups = computed(() => {
       { label: 'Thu hộ (COD)', icon: 'pi pi-money-bill', to: '/thu-ho', show: true },
       { label: 'Cước nhận', icon: 'pi pi-wallet', to: '/cuoc-nhan', show: auth.hasRole('admin', 'staff') },
       { label: 'Báo cáo doanh thu', icon: 'pi pi-chart-line', to: '/doanh-thu', show: true },
+      { label: 'Báo cáo tuyến/chành', icon: 'pi pi-map', to: '/bao-cao', show: auth.isAdmin },
     ].filter(i => i.show),
   };
   if (taiChinh.items.length) groups.push(taiChinh);
@@ -48,9 +49,10 @@ const menuGroups = computed(() => {
     groups.push({
       label: 'Quản trị',
       items: [
-        { label: 'Văn phòng', icon: 'pi pi-building', to: '/van-phong', show: true },
-        { label: 'Nhân viên', icon: 'pi pi-id-card', to: '/nhan-vien', show: true },
-        { label: 'Chành', icon: 'pi pi-map-marker', to: '/chanh', show: true },
+        { label: 'Văn phòng',    icon: 'pi pi-building',    to: '/van-phong',    show: true },
+        { label: 'Nhân viên',    icon: 'pi pi-id-card',     to: '/nhan-vien',    show: true },
+        { label: 'Chành',        icon: 'pi pi-map-marker',  to: '/chanh',        show: true },
+        { label: 'Doanh nghiệp', icon: 'pi pi-briefcase',   to: '/doanh-nghiep', show: true },
       ],
     });
   }

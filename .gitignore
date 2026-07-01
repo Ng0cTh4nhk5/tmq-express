@@ -5,6 +5,7 @@
 !/.gitignore
 !/frontend/
 !/backend/
+!/docs/
 
 # --- Frontend Ignores ---
 frontend/node_modules/

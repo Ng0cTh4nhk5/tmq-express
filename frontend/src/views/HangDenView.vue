@@ -79,8 +79,12 @@ const selectedVpNhan = ref(null);
 const searchText = ref('');
 const filterVpGui = ref(null);
 const filterChanh = ref(null);
+// [HD-HT] Lọc theo hình thức giao — chỉ dùng cho tab da_den_kho
+const filterHinhThucGiao = ref(null);
 // [Fix #7] Ẩn BN đã hoàn thành vòng đời trong tab da_giao_chanh — mặc định BẬT
 const hideCompleted = ref(true);
+// [Fix #7] Count BN da_giao_chanh còn pending từ server (dùng cho badge khi ở tab khác)
+const chanhPendingCount = ref(0);
 
 // [NT-01] Nhận diện đơn nội thành: VP gửi = VP nhận
 function isNoiThanhBN(bn) {
@@ -186,6 +190,14 @@ const filteredItems = computed(() => {
   let result = items.value;
   if (filterVpGui.value) result = result.filter(b => b.van_phong_gui?.ma_vp === filterVpGui.value);
   if (filterChanh.value) result = result.filter(b => b.chanh?.id === filterChanh.value);
+  // [HD-HT] Lọc hình thức giao — chỉ áp dụng trong tab da_den_kho
+  if (filterHinhThucGiao.value && activeTab.value === 'da_den_kho') {
+    if (filterHinhThucGiao.value === 'chanh') {
+      result = result.filter(b => !!b.chanh_id);
+    } else {
+      result = result.filter(b => !b.chanh_id && b.hinh_thuc_giao === filterHinhThucGiao.value);
+    }
+  }
   if (searchText.value.trim()) {
     const q = searchText.value.toLowerCase();
     result = result.filter(b =>
@@ -209,7 +221,7 @@ const filteredItems = computed(() => {
 });
 
 // [Bonus] displayStats — phản ánh đúng filter đang active
-const isFiltered = computed(() => filterVpGui.value || filterChanh.value || searchText.value.trim() || hideCompleted.value);
+const isFiltered = computed(() => filterVpGui.value || filterChanh.value || filterHinhThucGiao.value || searchText.value.trim() || hideCompleted.value);
 const displayStats = computed(() => {
   if (!isFiltered.value) return stats.value;
   return {
@@ -219,10 +231,12 @@ const displayStats = computed(() => {
   };
 });
 
-// [Fix #7] Badge tab: khi ẩn BN hoàn tất, badge da_giao_chanh hiện số pending thực tế
+// [Fix #7] Badge tab da_giao_chanh:
+// - Khi hideCompleted=true: dùng chanhPendingCount từ server (luôn đúng bất kể tab nào)
+// - Khi hideCompleted=false: dùng total count từ server
 function getTabBadge(tabKey) {
-  if (tabKey === 'da_giao_chanh' && hideCompleted.value && activeTab.value === 'da_giao_chanh') {
-    return filteredItems.value.length;
+  if (tabKey === 'da_giao_chanh' && hideCompleted.value) {
+    return chanhPendingCount.value;
   }
   return tabCounts.value[tabKey] || 0;
 }
@@ -259,7 +273,12 @@ async function loadData() {
     pagination.value = res.pagination ?? { page: 1, limit: 50, total: res.stats?.total ?? 0, totalPages: 1 }; // [B8]
     if (res.tab_counts) {
       tabCounts.value = res.tab_counts;
-      hangDenStore.setFromTabCounts(res.tab_counts);
+      // [Fix #7] Truyền pending vào store để sidebar badge tính đúng
+      hangDenStore.setFromTabCounts(res.tab_counts, res.da_giao_chanh_pending);
+    }
+    // [Fix #7] Cập nhật pending count cho badge tab da_giao_chanh
+    if (res.da_giao_chanh_pending !== undefined) {
+      chanhPendingCount.value = res.da_giao_chanh_pending;
     }
   } catch (err) {
     if (isMounted) handleApiError(err, toast, 'Không thể tải danh sách');
@@ -280,6 +299,9 @@ async function switchTab(tabKey) {
   batchSelected.value = [];
   filterVpGui.value = null;
   filterChanh.value = null;
+  filterHinhThucGiao.value = null; // [HD-HT] Reset filter HT giao khi đổi tab
+  // [Fix #7] Khi vào tab da_giao_chanh, luôn reset về trạng thái ẩn BN đã hoàn tất
+  if (tabKey === 'da_giao_chanh') hideCompleted.value = true;
   syncTabToUrl(tabKey);
   await loadData();
 }
@@ -404,7 +426,7 @@ onUnmounted(() => {
 });
 
 // [Fix N2] Cleanup batchSelected khi filter thay đổi — tránh confirm BN không còn visible
-watch([filterVpGui, filterChanh, searchText], () => {
+watch([filterVpGui, filterChanh, filterHinhThucGiao, searchText], () => {
   const visibleIds = new Set(filteredItems.value.map(b => b.id));
   batchSelected.value = batchSelected.value.filter(b => visibleIds.has(b.id));
 });
@@ -505,6 +527,19 @@ watch([filterVpGui, filterChanh, searchText], () => {
             class="filter-select" placeholder="Lọc VP gửi..." />
           <Select v-model="filterChanh" :options="chanhOptions" optionLabel="label" optionValue="value"
             class="filter-select filter-chanh" placeholder="Lọc chành..." />
+          <!-- [HD-HT] Lọc Hình thức giao — chỉ hiện trong tab Tại kho -->
+          <Select v-if="activeTab === 'da_den_kho'"
+            v-model="filterHinhThucGiao"
+            :options="[
+              { label: 'Tất cả hình thức', value: null },
+              { label: '🚚 Chành', value: 'chanh' },
+              { label: '🏠 Tận nơi', value: 'tan_noi' },
+              { label: '🧍 Tự tới', value: 'tu_toi' },
+              { label: '📞 Gọi điện', value: 'goi_dien' },
+            ]"
+            optionLabel="label" optionValue="value"
+            class="filter-select filter-ht-giao"
+            placeholder="Lọc hình thức giao..." />
           <Button v-if="batchSelected.length > 0 && currentTab?.allowBatch"
             :label="`${currentTab?.action} ${batchSelected.length} BN`"
             icon="pi pi-check-circle" :severity="currentTab?.severity" size="small"
@@ -519,13 +554,15 @@ watch([filterVpGui, filterChanh, searchText], () => {
             @click="hideCompleted = !hideCompleted"
           />
         </div>
-        <div v-if="filterVpGui || filterChanh" class="filter-active-hint">
+        <div v-if="filterVpGui || filterChanh || filterHinhThucGiao" class="filter-active-hint">
           <i class="pi pi-filter-fill"></i>
           <span v-if="filterVpGui">CN gửi: <strong>{{ filterVpGui }}</strong></span>
           <span v-if="filterChanh && filterVpGui"> · </span>
           <span v-if="filterChanh">Chành: <strong>{{ chanhOptions.find(c=>c.value===filterChanh)?.label }}</strong></span>
+          <span v-if="filterHinhThucGiao && (filterVpGui || filterChanh)"> · </span>
+          <span v-if="filterHinhThucGiao">HT Giao: <strong>{{ { chanh: 'Chành', tan_noi: 'Tận nơi', tu_toi: 'Tự tới', goi_dien: 'Gọi điện' }[filterHinhThucGiao] }}</strong></span>
           — {{ filteredItems.length }} / {{ items.length }} biên nhận
-          <button class="clear-filter" @click="filterVpGui=null; filterChanh=null">✕ Bỏ lọc</button>
+          <button class="clear-filter" @click="filterVpGui=null; filterChanh=null; filterHinhThucGiao=null">✕ Bỏ lọc</button>
         </div>
       </div>
 

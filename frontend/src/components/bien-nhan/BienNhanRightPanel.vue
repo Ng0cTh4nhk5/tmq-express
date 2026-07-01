@@ -35,7 +35,7 @@ const props = defineProps({
 const emit = defineEmits(['save', 'save-continue', 'delete', 'cancel', 'edit', 'print', 'status-updated']);
 
 // ── Hàng hoá đơn vị cố định ──────────────────────────────────────
-const HANG_HOA_UNITS = ['Kiện', 'Bao', 'Thùng', 'Cuộn', 'Pallet', 'Cái', 'Bộ'];
+const HANG_HOA_UNITS = ['Kiện', 'Bao', 'Thùng', 'Gói', 'Bọc', 'Cuộn'];
 
 function makeEmptyHangHoa() {
   return HANG_HOA_UNITS.map(don_vi => ({ don_vi, so_luong: null, ghi_chu: '' }));
@@ -76,6 +76,10 @@ function createEmptyForm() {
     hinh_thuc_giao: null,     // Nhân viên phải chọn thủ công
     thu_ho: 0,
     can_xuat_hddt: false,
+    // [NV-3b] Liên kết KH tùy chọn
+    kh_gui_id: null,
+    kh_nhan_id: null,
+    vai_tro_cong_no: 'nguoi_gui', // mặc định: người gửi nợ cước
   };
 }
 
@@ -111,6 +115,7 @@ function onSelectGui(event) {
   form.value.dien_thoai_gui = applyPhoneFormat(kh.dien_thoai);
   form.value.so_cccd_gui    = kh.so_cccd      || '';
   form.value.dia_chi_gui    = kh.dia_chi      || '';
+  form.value.kh_gui_id      = kh.id           || null;  // [NV-3b]
   // Xóa lỗi các trường vừa điền
   delete errors.value.don_vi_gui;
   delete errors.value.dien_thoai_gui;
@@ -123,6 +128,7 @@ function onSelectNhan(event) {
   form.value.dien_thoai_nhan = applyPhoneFormat(kh.dien_thoai);
   form.value.so_cccd_nhan    = kh.so_cccd      || '';
   form.value.dia_chi_nhan    = kh.dia_chi      || '';
+  form.value.kh_nhan_id      = kh.id           || null;  // [NV-3b]
   delete errors.value.don_vi_nhan;
   delete errors.value.dien_thoai_nhan;
 }
@@ -169,6 +175,10 @@ watch(() => props.bienNhan, (bn) => {
       hinh_thuc_giao: bn.hinh_thuc_giao || 'goi_dien',
       thu_ho: Number(bn.thu_ho) || 0,
       can_xuat_hddt: bn.can_xuat_hddt || false,
+      // [NV-3b] Load liên kết KH
+      kh_gui_id: bn.kh_gui_id || null,
+      kh_nhan_id: bn.kh_nhan_id || null,
+      vai_tro_cong_no: 'nguoi_gui',
     };
   }
 }, { immediate: true });
@@ -279,6 +289,11 @@ function buildPayload() {
   // Strip khoảng trắng trong SĐT trước khi gửi lên server
   if (p.dien_thoai_gui) p.dien_thoai_gui = p.dien_thoai_gui.replace(/\s/g, '');
   if (p.dien_thoai_nhan) p.dien_thoai_nhan = p.dien_thoai_nhan.replace(/\s/g, '');
+  // [NV-3b] Gửi liên kết KH + vai trò nợ
+  if (!p.kh_gui_id)  delete p.kh_gui_id;   // Bỏ null để tránh Prisma error
+  if (!p.kh_nhan_id) delete p.kh_nhan_id;
+  // Chỉ gửi vai_tro_cong_no khi chọn công nợ
+  if (p.trang_thai_thu !== 'cong_no') delete p.vai_tro_cong_no;
   // Giữ ma_so_custom nếu đang tạo mới (người dùng có thể sửa mã)
   if (props.mode !== 'create' || !p.ma_so_custom?.trim()) {
     delete p.ma_so_custom;
@@ -533,8 +548,38 @@ defineExpose({ buildPayload, validate });
               <label for="tt_cn" class="radio-lbl">Công nợ</label>
               <span v-if="errors.trang_thai_thu" class="error-msg" style="display:block;width:100%;margin-top:2px;">{{ errors.trang_thai_thu }}</span>
             </template>
+            <!-- [NV-3b] Nợ bên nào — chỉ hiện khi chọn Công nợ -->
+            <template v-if="isEditable && form.trang_thai_thu === 'cong_no'">
+              <div class="radio-row vai-tro-row" style="margin-top:4px; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; padding:4px 8px; width:100%; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <span class="field-lbl" style="font-size:0.75rem; color:#92400e; white-space:nowrap;">Nợ bên:</span>
+                <RadioButton v-model="form.vai_tro_cong_no" value="nguoi_gui" inputId="vt_gui" />
+                <label for="vt_gui" class="radio-lbl" style="color:#78350f;">Người gửi</label>
+                <RadioButton v-model="form.vai_tro_cong_no" value="nguoi_nhan" inputId="vt_nhan" />
+                <label for="vt_nhan" class="radio-lbl" style="color:#78350f;">Người nhận</label>
+              </div>
+            </template>
             <template v-else>
               <StatusBadge :value="bienNhan?.trang_thai_thu" type="thu" />
+              <!-- [View] Công nợ tính vào bên nào — chỉ hiện khi trang_thai_thu = cong_no -->
+              <template v-if="bienNhan?.trang_thai_thu === 'cong_no' && bienNhan?.cong_no?.[0]">
+                <div class="cong-no-info">
+                  <i class="pi pi-user"></i>
+                  <span class="cong-no-label">Nợ bên:</span>
+                  <span class="cong-no-party">
+                    {{ bienNhan.cong_no[0].vai_tro === 'nguoi_nhan' ? 'Người nhận' : 'Người gửi' }}
+                    <span class="cong-no-name">
+                      ({{ bienNhan.cong_no[0].doi_tuong || '—' }})
+                    </span>
+                  </span>
+                  <span
+                    class="cong-no-status"
+                    :class="bienNhan.cong_no[0].trang_thai === 'da_thu' ? 'cn-paid' : 'cn-unpaid'"
+                  >
+                    {{ bienNhan.cong_no[0].trang_thai === 'da_thu' ? '✓ Đã thanh toán' : '⏳ Chưa thanh toán' }}
+                  </span>
+                </div>
+              </template>
+
             </template>
           </div>
         </div>
@@ -1539,5 +1584,57 @@ defineExpose({ buildPayload, validate });
   font-weight: 400;
   color: var(--text-muted, #6b7280);
   margin-left: 0.25rem;
+}
+/*
+ * Chip hiển thị thông tin công nợ trong view mode.
+ * Nền vàng amber để nổi bật, tách biệt với badge trạng thái thu.
+ */
+.cong-no-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  background: #fef9c3;
+  border: 1px solid #fde047;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  width: 100%;
+}
+.cong-no-info .pi {
+  font-size: 0.75rem;
+  color: #a16207;
+}
+.cong-no-label {
+  font-weight: 600;
+  color: #92400e;
+  white-space: nowrap;
+}
+.cong-no-party {
+  font-weight: 700;
+  color: #78350f;
+}
+.cong-no-name {
+  font-weight: 400;
+  color: #a16207;
+}
+.cong-no-status {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cong-no-status.cn-paid {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.cong-no-status.cn-unpaid {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
 }
 </style>

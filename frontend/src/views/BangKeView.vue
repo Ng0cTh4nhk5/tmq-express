@@ -18,6 +18,31 @@ import PageHeader from '../components/shared/PageHeader.vue';
 import api from '../api/client';
 import { handleApiError } from '../utils/error-handler';
 import { formatDate, formatNumber, truocThue, toISODate } from '../utils/format';
+
+// ── Helper: xác định tên người trả cước để hiển thị ──────────────
+function getPayerDisplay(bn) {
+  if (bn.trang_thai_thu === 'chua_thu') {
+    return {
+      ten:     bn.don_vi_nhan || bn.nguoi_nhan || '—',
+      label:   'Người nhận',
+      severity: 'warn',
+    };
+  }
+  if (bn.trang_thai_thu === 'cong_no') {
+    // Với công nợ, hiện tên người gửi (backend sẽ kiểm tra vai_tro CongNo khi xuất)
+    return {
+      ten:     bn.don_vi_gui || bn.nguoi_gui || '—',
+      label:   'Công nợ',
+      severity: 'danger',
+    };
+  }
+  // da_thu — người gửi trả
+  return {
+    ten:     bn.don_vi_gui || bn.nguoi_gui || '—',
+    label:   'Người gửi',
+    severity: 'success',
+  };
+}
 import { downloadBase64File } from '../utils/file';
 
 const toast = useToast();
@@ -26,7 +51,7 @@ const toast = useToast();
 // MARK: - STATE & CONSTANTS
 // ============================================================================
 // ── Đơn vị hàng hoá ──────────────────────────────────────────
-const UNITS = ['Kiện', 'Bao', 'Thùng', 'Cuộn', 'Pallet', 'Cái', 'Bộ', 'Khác'];
+const UNITS = ['Kiện', 'Bao', 'Thùng', 'Gói', 'Bọc', 'Cuộn', 'Cái', 'Bộ', 'Khác'];
 
 // ── State chính ───────────────────────────────────────────────
 const tab = ref('pending');
@@ -473,18 +498,19 @@ onMounted(async () => {
         <Column header="Tuyến" style="width: 74px;">
           <template #body="{ data }">{{ data.van_phong_gui?.ma_vp }}→{{ data.van_phong_nhan?.ma_vp }}</template>
         </Column>
-        <Column field="don_vi_gui" header="Người gửi" style="min-width: 120px;">
+        <Column header="Người trả cước" style="min-width: 160px;">
           <template #body="{ data }">
-            <span class="text-truncate" style="max-width:130px; display:inline-block;">
-              {{ data.don_vi_gui || data.nguoi_gui || '—' }}
-            </span>
-          </template>
-        </Column>
-        <Column header="Địa chỉ gửi" style="min-width: 110px;">
-          <template #body="{ data }">
-            <span class="text-truncate" style="max-width:120px; display:inline-block;">
-              {{ data.dia_chi_gui || '—' }}
-            </span>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <div style="display:flex; align-items:center; gap:5px;">
+                <Tag :value="getPayerDisplay(data).label"
+                  :severity="getPayerDisplay(data).severity"
+                  style="font-size:0.68rem; padding:1px 5px; line-height:1.4;"
+                />
+                <span class="text-truncate" style="max-width:115px; display:inline-block; font-size:0.82rem;">
+                  {{ getPayerDisplay(data).ten }}
+                </span>
+              </div>
+            </div>
           </template>
         </Column>
 

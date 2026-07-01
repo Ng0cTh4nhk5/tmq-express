@@ -114,11 +114,12 @@ export default async function nhanVienRoutes(fastify) {
       params: paramsIdSchema,
     },
     handler: async (request) => {
-      const result = await nhanVienService.resetPassword(Number(request.params.id));
+      await nhanVienService.resetPassword(Number(request.params.id));
+      // [H-SEC-02] Không trả tempPassword qua API — plain-text password trong network log là rui ro bảo mật.
+      // NV sẽ được yêu cầu đặt mật khẩu mới khi đăng nhập (require_password_change = true).
       return {
         success: true,
-        data: { tempPassword: result.tempPassword },
-        message: 'Đã reset mật khẩu. NV sẽ phải đổi khi đăng nhập.',
+        message: 'Đã reset mật khẩu. Nhân viên sẽ được yêu cầu đặt mật khẩu mới khi đăng nhập lần tiếp theo.',
       };
     },
   });

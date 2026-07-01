@@ -13,6 +13,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'thu_ho', 'gia_cuoc', 'trang_thai_thu', 'can_xuat_hddt',
   'hinh_thuc_giao', 'chanh_id', 'dia_chi_giao', // chanh_id handled specially below
   'hang_hu_khong_den', 'gio_tao',
+  'kh_gui_id', 'kh_nhan_id', // [NV-3b] liên kết KH tùy chọn
 ];
 
 /**
@@ -135,7 +136,15 @@ export async function getBienNhan(id) {
       chanh: { select: { id: true, ten: true, dia_chi: true, dien_thoai: true } },
       lich_su_trang_thai: {
         orderBy: { created_at: 'desc' },
+        // [M-02 FIX] Giới hạn 20 bản ghi lịch sử gần nhất để tránh load
+        // quá nhiều dữ liệu cho BN lâu năm qua nhiều tay
+        take: 20,
         include: { nhan_vien: { select: { ten: true } } },
+      },
+      // [View] Trả về thông tin công nợ để hiển thị "nợ bên nào"
+      cong_no: {
+        select: { id: true, vai_tro: true, doi_tuong: true, trang_thai: true, so_tien_no: true },
+        take: 1,
       },
     },
   });
@@ -149,11 +158,13 @@ export async function getBienNhan(id) {
  * @param {Date}   date    — ngày biên nhận
  */
 async function _countBNByPrefixAndDate(client, prefix, date) {
-  // [C-02] Dùng +07:00 để boundary chính xác kể cả khi server chạy UTC
+  // [C-02] Extract ngày theo VN timezone (+07:00) — tránh sai 1 ngày khi server chạy UTC
+  // VD: BN tạo lúc 17:30 UTC = 00:30 VN ngày hôm sau → phải tính là ngày hôm sau VN
   const d = date instanceof Date ? date : new Date(date);
-  const ymd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const startOfDay = new Date(`${ymd}T00:00:00.000+07:00`);
-  const endOfDay   = new Date(`${ymd}T23:59:59.999+07:00`);
+  // Lấy date string theo giờ VN bằng cách dùng toLocaleDateString với timeZone
+  const vnDateStr = d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }); // "YYYY-MM-DD"
+  const startOfDay = new Date(`${vnDateStr}T00:00:00.000+07:00`);
+  const endOfDay   = new Date(`${vnDateStr}T23:59:59.999+07:00`);
   return client.bienNhan.count({
     where: {
       ma_so: { startsWith: `${prefix}-` },
@@ -272,6 +283,9 @@ function _buildBienNhanFields(ma_so, ngayBN, data, userId, noiThanh = false) {
     dia_chi_giao: data.dia_chi_giao || null,
     // [NT-01] Đơn nội thành: bỏ qua giai đoạn xe liên tỉnh, tiếp nhận thẳng vào kho
     ...(noiThanh ? { trang_thai: 'da_den_kho' } : {}),
+    // [NV-3b] Liên kết KH tùy chọn
+    ...(data.kh_gui_id  ? { kh_gui:  { connect: { id: Number(data.kh_gui_id)  } } } : {}),
+    ...(data.kh_nhan_id ? { kh_nhan: { connect: { id: Number(data.kh_nhan_id) } } } : {}),
   };
 }
 
@@ -293,49 +307,47 @@ export async function createBienNhan(data, userId) {
     ? `NT${vpGui.ma_vp}`
     : `${vpGui.ma_vp}${vpNhan.ma_vp}`;
 
-  // Nếu có mã custom → validate unique (composite: mã + ngày) rồi dùng
+  // Nếu có mã custom → nhúng create vào transaction, catch P2002 thay vì check-then-act (TOCTOU fix)
   if (data.ma_so_custom?.trim()) {
     const customCode = data.ma_so_custom.trim();
-    // Kiểm tra trùng theo composite key: cùng mã + cùng ngày
-    // [C-02] Dùng +07:00 boundary thay vì setHours()
-    const ymdCustom = `${ngayBN.getFullYear()}-${String(ngayBN.getMonth()+1).padStart(2,'0')}-${String(ngayBN.getDate()).padStart(2,'0')}`;
-    const ngayStart = new Date(`${ymdCustom}T00:00:00.000+07:00`);
-    const ngayEnd   = new Date(`${ymdCustom}T23:59:59.999+07:00`);
-    const existing = await prisma.bienNhan.findFirst({
-      where: {
-        ma_so: customCode,
-        ngay_bien_nhan: { gte: ngayStart, lte: ngayEnd },
-      },
-    });
-    if (existing) {
-      throw Object.assign(new Error(`Mã biên nhận "${customCode}" đã tồn tại trong ngày này`), { statusCode: 409 });
+    // [RC-01] TOCTOU fix: bỏ findFirst + tạo, thay bằng try-create-catch-P2002
+    // DB constraint bien_nhan_ma_so_date_uidx đảm bảo duy nhất tại DB level
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(customCode, ngayBN, data, userId, noiThanh) });
+        await _createBienNhanSideEffects(tx, bn, data, userId, noiThanh);
+        return { bn, autoCreated: await _autoCreateKH(tx, data) };
+      });
+      writeAuditLog({ action: 'CREATE', entity: 'bien_nhan', entityId: result.bn.id, newData: result.bn });
+      return result;
+    } catch (err) {
+      if (err.code === 'P2002') {
+        throw Object.assign(
+          new Error(`Mã biên nhận "${customCode}" đã tồn tại trong ngày này`),
+          { statusCode: 409 },
+        );
+      }
+      throw err;
     }
-    // Tạo trực tiếp với mã custom
-    const result = await prisma.$transaction(async (tx) => {
-      const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(customCode, ngayBN, data, userId, noiThanh) });
-      await _createBienNhanSideEffects(tx, bn, data, userId, noiThanh);
-      return { bn, autoCreated: await _autoCreateKH(tx, data) };
-    });
-    writeAuditLog({ action: 'CREATE', entity: 'bien_nhan', entityId: result.bn.id, newData: result.bn });
-    return result;
   }
 
-  // Auto-gen mã: retry loop reset theo ngày (mỗi ngày bắt đầu lại từ 0001)
+  // [RC-02] Auto-gen mã: retry loop — mỗi attempt re-count để lấy số mới nhất
+  // Lý do: count bên ngoài transaction có thể stale khi có concurrent request
   const MAX_RETRIES = 10;
   let result;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    // Dùng helper chung — cùng logic với getNextMaSo
-    const count = await _countBNByPrefixAndDate(prisma, prefix, ngayBN);
-    const ma_so = `${prefix}-${String(count + 1 + attempt).padStart(4, '0')}`;
-
     try {
       result = await prisma.$transaction(async (tx) => {
+        // Re-count bên trong transaction → snapshot mới nhất tại thời điểm lock
+        const count = await _countBNByPrefixAndDate(tx, prefix, ngayBN);
+        const ma_so = `${prefix}-${String(count + 1).padStart(4, '0')}`;
         const bn = await tx.bienNhan.create({ data: _buildBienNhanFields(ma_so, ngayBN, data, userId, noiThanh) });
         await _createBienNhanSideEffects(tx, bn, data, userId, noiThanh);
         return { bn, autoCreated: await _autoCreateKH(tx, data) };
       });
       break; // Tạo thành công
     } catch (err) {
+      // P2002 = unique constraint violation từ DB (bien_nhan_ma_so_date_uidx)
       if (err.code === 'P2002' && attempt < MAX_RETRIES - 1) continue; // Retry
       throw err;
     }
@@ -368,12 +380,34 @@ async function _createBienNhanSideEffects(tx, bn, data, userId, noiThanh = false
   });
   // Tự tạo công nợ nếu cần
   if (data.trang_thai_thu === 'cong_no') {
+    // [NV-3b] Resolve khach_hang_id & doanh_nghiep_id từ vai trò người nợ
+    const vaiTro = data.vai_tro_cong_no === 'nguoi_nhan' ? 'nguoi_nhan' : 'nguoi_gui';
+    const linkedKhId = vaiTro === 'nguoi_nhan' ? (data.kh_nhan_id || null) : (data.kh_gui_id || null);
+
+    // Nếu có KH liên kết → lookup doanh_nghiep_id từ KhachHang
+    let linkedDnId = null;
+    if (linkedKhId) {
+      const kh = await tx.khachHang.findUnique({
+        where: { id: Number(linkedKhId) },
+        select: { doanh_nghiep_id: true },
+      });
+      linkedDnId = kh?.doanh_nghiep_id || null;
+    }
+
+    // doi_tuong: ưu tiên tên đơn vị theo vai trò
+    const doiTuong = vaiTro === 'nguoi_nhan'
+      ? (data.don_vi_nhan || data.nguoi_nhan || 'N/A')
+      : (data.don_vi_gui  || data.nguoi_gui  || 'N/A');
+
     await tx.congNo.create({
       data: {
-        bien_nhan_id: bn.id,
-        doi_tuong: data.don_vi_gui || data.nguoi_gui || 'N/A',
-        so_tien_no: data.gia_cuoc || 0,
-        trang_thai: 'chua_thu',
+        bien_nhan_id:     bn.id,
+        doi_tuong:        doiTuong,
+        so_tien_no:       data.gia_cuoc || 0,
+        trang_thai:       'chua_thu',
+        vai_tro:          vaiTro,
+        khach_hang_id:    linkedKhId  ? Number(linkedKhId)  : undefined,
+        doanh_nghiep_id:  linkedDnId  ? Number(linkedDnId)  : undefined,
       },
     });
   }
@@ -420,13 +454,27 @@ async function _autoCreateKH(tx, data) {
  * S-07: Staff chỉ sửa trong 24h
  * Staff: chỉ sửa BN do mình tạo
  */
-export async function updateBienNhan(id, data, userId, userRole) {
+export async function updateBienNhan(id, data, userId, userRole, userVpId) {
   const existing = await prisma.bienNhan.findUnique({ where: { id } });
   if (!existing) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
 
-  // Staff chỉ sửa BN mình tạo
-  if (userRole === 'staff' && existing.nhan_vien_nhap_id !== userId) {
-    throw Object.assign(new Error('Bạn chỉ được sửa biên nhận do mình tạo'), { statusCode: 403 });
+  // [H-SEC-01] IDOR: Staff chỉ sửa BN thuộc VP của mình (gửi hoặc nhận)
+  // Đây là VP-level check — mạnh hơn chỉ check người tạo
+  if (userRole === 'staff' && userVpId) {
+    const belongsToVp = (
+      existing.van_phong_gui_id === userVpId ||
+      existing.van_phong_nhan_id === userVpId
+    );
+    if (!belongsToVp) {
+      throw Object.assign(
+        new Error('Bạn không có quyền sửa biên nhận này'),
+        { statusCode: 403 },
+      );
+    }
+    // Trong phạm vi VP: chỉ sửa BN mình tạo
+    if (existing.nhan_vien_nhap_id !== userId) {
+      throw Object.assign(new Error('Bạn chỉ được sửa biên nhận do mình tạo'), { statusCode: 403 });
+    }
   }
 
   // S-07: Staff chỉ sửa trong 24h
@@ -506,11 +554,12 @@ export async function updateBienNhan(id, data, userId, userRole) {
 
   const updated = await prisma.bienNhan.update({ where: { id }, data: updateData });
 
-  // Audit log: UPDATE
+  // [H-SEC-03] Audit log: UPDATE — ghi userId để có đầy đủ trail
   writeAuditLog({
     action: 'UPDATE',
     entity: 'bien_nhan',
     entityId: id,
+    userId,
     oldData: existing,
     newData: updateData,
   });
@@ -523,13 +572,23 @@ export async function updateBienNhan(id, data, userId, userRole) {
  * Staff: chỉ xóa BN mình tạo + trong 24h
  * Admin: xóa bất kỳ
  */
-export async function deleteBienNhan(id, userId, userRole) {
+export async function deleteBienNhan(id, userId, userRole, userVpId) {
   const existing = await prisma.bienNhan.findUnique({ where: { id } });
   if (!existing) throw Object.assign(new Error('Không tìm thấy biên nhận'), { statusCode: 404 });
 
-  // Staff: chỉ xóa BN mình tạo
-  if (userRole === 'staff' && existing.nhan_vien_nhap_id !== userId) {
-    throw Object.assign(new Error('Bạn chỉ được xóa biên nhận do mình tạo'), { statusCode: 403 });
+  // [H-SEC-01] IDOR: Staff chỉ xóa BN thuộc VP của mình
+  // DELETE chỉ dành cho admin (preHandler đã enforce), nhưng phòng khi logic thay đổi
+  if (userRole === 'staff' && userVpId) {
+    const belongsToVp = (
+      existing.van_phong_gui_id === userVpId ||
+      existing.van_phong_nhan_id === userVpId
+    );
+    if (!belongsToVp) {
+      throw Object.assign(new Error('Bạn không có quyền xóa biên nhận này'), { statusCode: 403 });
+    }
+    if (existing.nhan_vien_nhap_id !== userId) {
+      throw Object.assign(new Error('Bạn chỉ được xóa biên nhận do mình tạo'), { statusCode: 403 });
+    }
   }
 
   // Staff: chỉ xóa trong 24h
@@ -576,5 +635,6 @@ export async function deleteBienNhan(id, userId, userRole) {
     await tx.bienNhan.delete({ where: { id } });
   });
 
-  writeAuditLog({ action: 'DELETE', entity: 'bien_nhan', entityId: id, oldData: existing });
+  // [H-SEC-03] Audit log DELETE — ghi userId để có đầy đủ trail
+  writeAuditLog({ action: 'DELETE', entity: 'bien_nhan', entityId: id, userId, oldData: existing });
 }

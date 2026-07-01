@@ -44,6 +44,8 @@ export async function generateCode(model, field, prefix, padLength = 4, client =
 export async function createWithCode(createFn, model, field, prefix, padLength = 4, client) {
   const db = client || prisma;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // Re-query bên trong mỗi attempt — lấy số mới nhất để tránh stale count
+    // khi có concurrent request cùng tạo code với prefix giống nhau
     const last = await db[model].findFirst({
       where: { [field]: { startsWith: `${prefix}-` } },
       orderBy: { [field]: 'desc' },
@@ -57,14 +59,15 @@ export async function createWithCode(createFn, model, field, prefix, padLength =
       if (!isNaN(num)) nextNum = num + 1;
     }
 
-    const code = `${prefix}-${String(nextNum + attempt).padStart(padLength, '0')}`;
+    // Dùng nextNum trực tiếp (không cộng attempt) vì đã re-query mỗi lần
+    const code = `${prefix}-${String(nextNum).padStart(padLength, '0')}`;
 
     try {
       return await createFn(code);
     } catch (err) {
       // P2002 = Unique constraint violation (Prisma error code)
       if (err.code === 'P2002' && attempt < MAX_RETRIES - 1) {
-        continue; // Retry with next number
+        continue; // Retry — re-query sẽ lấy nextNum mới
       }
       throw err;
     }

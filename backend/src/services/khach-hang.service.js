@@ -1,10 +1,11 @@
 import prisma from '../config/database.js';
-import { generateCode } from '../utils/ma-so-generator.js';
+import { createWithCode } from '../utils/ma-so-generator.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
 
 export async function listKhachHang({ search, active, loai_kh, page = 1, limit = 20 }) {
   const p = parseInt(page, 10) || 1;
-  const l = parseInt(limit, 10) || 20;
+  // [M-01 FIX] Cap limit tối đa 500 để tránh dump toàn bộ KH
+  const l = Math.min(parseInt(limit, 10) || 20, 500);
   const where = {};
   if (active !== undefined) where.active = active;
   if (loai_kh) where.loai_kh = loai_kh;
@@ -58,10 +59,15 @@ export async function getKhachHang(id) {
 }
 
 export async function createKhachHang(data) {
-  const ma_kh = await generateCode('khachHang', 'ma_kh', 'KH');
-  const created = await prisma.khachHang.create({ data: { ...data, ma_kh } });
+  // [H-01 FIX] Dùng createWithCode thay vì generateCode để đảm bảo atomic:
+  // generateCode() là read-then-write không có transaction → race condition khi 2 request cùng lúc.
+  // createWithCode() retry on P2002 unique violation → an toàn khi concurrent.
+  const created = await createWithCode(
+    (ma_kh) => prisma.khachHang.create({ data: { ...data, ma_kh } }),
+    'khachHang', 'ma_kh', 'KH',
+  );
   // M-01: Audit log
-  writeAuditLog({ action: 'CREATE', entity: 'khach_hang', entityId: created.id, newData: { ma_kh, ten_don_vi: data.ten_don_vi } });
+  void writeAuditLog({ action: 'CREATE', entity: 'khach_hang', entityId: created.id, newData: { ma_kh: created.ma_kh, ten_don_vi: data.ten_don_vi } });
   return created;
 }
 
@@ -69,13 +75,13 @@ export async function updateKhachHang(id, data) {
   const { ma_kh, ...updateData } = data;
   const updated = await prisma.khachHang.update({ where: { id }, data: updateData });
   // M-01: Audit log
-  writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: updateData });
+  void writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: updateData });
   return updated;
 }
 
 export async function toggleKhachHangActive(id, active) {
   const updated = await prisma.khachHang.update({ where: { id }, data: { active } });
   // M-01: Audit log
-  writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: { active } });
+  void writeAuditLog({ action: 'UPDATE', entity: 'khach_hang', entityId: id, newData: { active } });
   return updated;
 }

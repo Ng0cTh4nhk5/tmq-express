@@ -138,49 +138,73 @@ export async function xacNhanThanhToan(congNoId, { hinh_thuc, ghi_chu }, user) {
 }
 
 /**
- * Báo cáo công nợ chi tiết theo đối tượng + khoảng thời gian
+ * Báo cáo công nợ chi tiết theo đối tượng + khoảng thời gian.
+ *
+ * [C-03 FIX] Thêm pagination (page/limit) và bắt buộc phải có ít nhất
+ * fromDate hoặc toDate để tránh full-table scan.
+ * Summary (tổng nợ, đã thu) vẫn tính trên TOÀN BỘ records khớp filter
+ * bằng aggregate query riêng — không load vào RAM.
  */
-export async function reportCongNo(doiTuong, fromDate, toDate) {
+export async function reportCongNo(doiTuong, fromDate, toDate, { page = 1, limit = 50 } = {}) {
+  // Guard: phải có ít nhất 1 date filter hoặc doiTuong
+  if (!doiTuong && !fromDate && !toDate) {
+    throw Object.assign(
+      new Error('Bắt buộc phải truyền ít nhất đối tượng, fromDate hoặc toDate'),
+      { statusCode: 400 },
+    );
+  }
+
+  const _page  = Math.max(1, Number(page)  || 1);
+  const _limit = Math.min(100, Math.max(1, Number(limit) || 50));
+
   const where = {};
   if (doiTuong) {
     where.doi_tuong = { contains: doiTuong, mode: 'insensitive' };
   }
   if (fromDate || toDate) {
     where.ngay_phat_sinh = {};
-    if (fromDate) where.ngay_phat_sinh.gte = new Date(fromDate);
-    if (toDate) {
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-      where.ngay_phat_sinh.lte = end;
-    }
+    // [SVC-TZ] Dùng +07:00 để boundary chính xác
+    if (fromDate) where.ngay_phat_sinh.gte = new Date(fromDate + 'T00:00:00.000+07:00');
+    if (toDate)   where.ngay_phat_sinh.lte = new Date(toDate   + 'T23:59:59.999+07:00');
   }
 
-  const data = await prisma.congNo.findMany({
-    where,
-    orderBy: { ngay_phat_sinh: 'asc' },
-    include: {
-      bien_nhan: {
-        select: {
-          ma_so: true, ten_hang_hoa: true, gia_cuoc: true,
-          don_vi_gui: true, nguoi_gui: true, ngay_bien_nhan: true,
+  const [data, total, agg] = await Promise.all([
+    prisma.congNo.findMany({
+      where,
+      skip: (_page - 1) * _limit,
+      take: _limit,
+      orderBy: { ngay_phat_sinh: 'asc' },
+      include: {
+        bien_nhan: {
+          select: {
+            ma_so: true, ten_hang_hoa: true, gia_cuoc: true,
+            don_vi_gui: true, nguoi_gui: true, ngay_bien_nhan: true,
+          },
         },
+        phieu_thu: { select: { id: true, ma_phieu: true } },
       },
-      phieu_thu: { select: { id: true, ma_phieu: true } },
-    },
-  });
+    }),
+    prisma.congNo.count({ where }),
+    // Tính tổng trên toàn bộ records khớp (không paginate) bằng 2 aggregate
+    Promise.all([
+      prisma.congNo.aggregate({ where: { ...where, trang_thai: { not: 'da_thu' } }, _sum: { so_tien_no: true } }),
+      prisma.congNo.aggregate({ where: { ...where, trang_thai: 'da_thu' }, _sum: { so_tien_no: true } }),
+    ]),
+  ]);
 
-  const tongNo = data.filter(cn => cn.trang_thai !== 'da_thu').reduce((sum, cn) => sum + Number(cn.so_tien_no), 0);
-  const tongDaThu = data.filter(cn => cn.trang_thai === 'da_thu').reduce((sum, cn) => sum + Number(cn.so_tien_no), 0);
-  const tongTatCa = data.reduce((sum, cn) => sum + Number(cn.so_tien_no), 0);
+  const [aggConNo, aggDaThu] = agg;
+  const tongNo    = Number(aggConNo._sum.so_tien_no || 0);
+  const tongDaThu = Number(aggDaThu._sum.so_tien_no || 0);
 
   return {
     data,
     summary: {
-      tong_tat_ca: tongTatCa,
+      tong_tat_ca: tongNo + tongDaThu,
       tong_da_thu: tongDaThu,
       tong_con_no: tongNo,
-      so_cong_no: data.length,
+      so_cong_no: total,
     },
+    pagination: { page: _page, limit: _limit, total, totalPages: Math.ceil(total / _limit) },
   };
 }
 
@@ -248,6 +272,7 @@ export async function doiSoatCuoc(doiTuong, thang, nam) {
 
 /**
  * Group công nợ theo đối tượng trong 1 tháng
+ * [NV-3b] Ưu tiên group theo DoanhNghiep → KhachHang → fallback doi_tuong string
  * @param {number} thang - 1..12
  * @param {number} nam
  */
@@ -258,8 +283,12 @@ export async function bangKeCongNoTheoThang(thang, nam) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  const start = new Date(year, month - 1, 1);
-  const end   = new Date(year, month, 0, 23, 59, 59, 999);
+  // [C-03 FIX] Dùng +07:00 timezone boundary
+  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
+  const endRaw = new Date(start);
+  endRaw.setMonth(endRaw.getMonth() + 1);
+  endRaw.setMilliseconds(endRaw.getMilliseconds() - 1);
+  const end = endRaw;
 
   const data = await prisma.congNo.findMany({
     where: { ngay_phat_sinh: { gte: start, lte: end } },
@@ -271,34 +300,69 @@ export async function bangKeCongNoTheoThang(thang, nam) {
           ten_hang_hoa: true,
           gia_cuoc: true,
           ngay_bien_nhan: true,
+          don_vi_gui: true,
+          nguoi_gui: true,
+          don_vi_nhan: true,
+          nguoi_nhan: true,
+          dien_thoai_nhan: true,
+          dia_chi_nhan: true,
+          thu_ho: true,
         },
       },
       phieu_thu: { select: { ma_phieu: true } },
+      // [NV-3b] Include KH & DN để group chính xác
+      khach_hang:   { select: { id: true, ten_don_vi: true, doanh_nghiep_id: true } },
+      doanh_nghiep: { select: { id: true, ten: true } },
     },
   });
 
-  // Group theo doi_tuong
+  // [NV-3b] Group key priority:
+  //   1. doanh_nghiep_id   → "DN:{id}" (group toàn bộ thành viên vào DN)
+  //   2. khach_hang_id     → "KH:{id}" (cá nhân có FK)
+  //   3. doi_tuong string  → fallback cho data cũ
   const grouped = {};
+
   for (const cn of data) {
-    const key = cn.doi_tuong || 'Không rõ';
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(cn);
+    let key, label, loai, meta;
+
+    if (cn.doanh_nghiep) {
+      key   = `DN:${cn.doanh_nghiep.id}`;
+      label = cn.doanh_nghiep.ten;
+      loai  = 'doanh_nghiep';
+      meta  = { doanh_nghiep_id: cn.doanh_nghiep.id, ten: cn.doanh_nghiep.ten };
+    } else if (cn.khach_hang) {
+      key   = `KH:${cn.khach_hang.id}`;
+      label = cn.khach_hang.ten_don_vi;
+      loai  = 'ca_nhan';
+      meta  = { khach_hang_id: cn.khach_hang.id, ten: cn.khach_hang.ten_don_vi };
+    } else {
+      key   = cn.doi_tuong || 'Không rõ';
+      label = key;
+      loai  = 'text';
+      meta  = null;
+    }
+
+    if (!grouped[key]) grouped[key] = { doi_tuong: label, loai, meta, items: [] };
+    grouped[key].items.push(cn);
   }
 
-  return Object.entries(grouped).map(([doi_tuong, items]) => {
+  return Object.values(grouped).map((group) => {
+    const { doi_tuong, loai, meta, items } = group;
     const tong   = items.reduce((s, i) => s + Number(i.so_tien_no), 0);
     const da_thu = items
       .filter(i => i.trang_thai === 'da_thu')
       .reduce((s, i) => s + Number(i.so_tien_no), 0);
     return {
       doi_tuong,
+      loai,           // 'doanh_nghiep' | 'ca_nhan' | 'text'
+      meta,           // { doanh_nghiep_id } | { khach_hang_id } | null
       so_cong_no: items.length,
       tong,
       da_thu,
       con_no: tong - da_thu,
       items,
     };
-  });
+  }).sort((a, b) => a.doi_tuong.localeCompare(b.doi_tuong, 'vi'));
 }
 
 /**
@@ -446,52 +510,78 @@ export async function exportCongNoPDF(thang, nam, doiTuong) {
     return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
   }
 
-  // Build table body
+  // Build table body — 10 cột: STT · Ngày · Mã BN · Người gửi · Người nhận · Hàng hoá · ĐC/Thu hộ · ĐT · Số tiền nợ · Trạng thái
+  // Lược bỏ: Ký xác nhận, Hình thức giao (theo yêu cầu khách hàng)
   const headerRow = [
-    { text: 'STT', style: 'th', alignment: 'center' },
-    { text: 'Ngày',     style: 'th', alignment: 'center' },
-    { text: 'Mã BN',    style: 'th', alignment: 'center' },
-    { text: 'Hàng hoá', style: 'th' },
-    { text: 'Số tiền nợ', style: 'th', alignment: 'right' },
-    { text: 'Trạng thái', style: 'th', alignment: 'center' },
+    { text: 'STT',          style: 'th', alignment: 'center' },
+    { text: 'Ngày',         style: 'th', alignment: 'center' },
+    { text: 'Mã BN',        style: 'th', alignment: 'center' },
+    { text: 'Người gửi',    style: 'th' },
+    { text: 'Người nhận',   style: 'th' },
+    { text: 'Hàng hoá',     style: 'th' },
+    { text: 'ĐC/Thu hộ',    style: 'th' },
+    { text: 'Điện thoại',   style: 'th', alignment: 'center' },
+    { text: 'Số tiền nợ',   style: 'th', alignment: 'right' },
+    { text: 'Trạng thái',   style: 'th', alignment: 'center' },
   ];
 
   const dataRows = group.items.map((cn, i) => {
     const trangThai = cn.trang_thai === 'da_thu'
       ? `Đã thu${cn.phieu_thu?.ma_phieu ? '\n(' + cn.phieu_thu.ma_phieu + ')' : ''}`
       : 'Chưa thu';
-    const isUnpaid = cn.trang_thai !== 'da_thu';
+    const isUnpaid  = cn.trang_thai !== 'da_thu';
+    const nguoiGui  = cn.bien_nhan?.don_vi_gui  || cn.bien_nhan?.nguoi_gui  || '—';
+    const nguoiNhan = cn.bien_nhan?.don_vi_nhan || cn.bien_nhan?.nguoi_nhan || '—';
+
+    // Cột Địa chỉ/Thu hộ — kết hợp địa chỉ giao + số tiền COD nếu có
+    const dcContent = [];
+    if (cn.bien_nhan?.dia_chi_nhan) dcContent.push(cn.bien_nhan.dia_chi_nhan + '\n');
+    const thuHoVal = Number(cn.bien_nhan?.thu_ho) || 0;
+    if (thuHoVal > 0) {
+      dcContent.push({ text: `Thu hộ: ${fmtMoney(thuHoVal)}đ`, bold: true, fontSize: 8 });
+    }
+
     return [
-      { text: i + 1, alignment: 'center', fontSize: 9 },
-      { text: fmtDate(cn.ngay_phat_sinh), alignment: 'center', fontSize: 9 },
-      { text: cn.bien_nhan?.ma_so || '—', alignment: 'center', fontSize: 9 },
-      { text: cn.bien_nhan?.ten_hang_hoa || '—', fontSize: 9 },
-      { text: fmtMoney(cn.so_tien_no), alignment: 'right', fontSize: 9 },
-      { text: trangThai, alignment: 'center', fontSize: 8.5, color: isUnpaid ? '#DC2626' : '#16A34A', bold: isUnpaid },
+      { text: i + 1,                                         alignment: 'center', fontSize: 9 },
+      { text: fmtDate(cn.ngay_phat_sinh),                    alignment: 'center', fontSize: 9 },
+      { text: cn.bien_nhan?.ma_so || '—',                    alignment: 'center', fontSize: 9, bold: true },
+      { text: nguoiGui,                                      fontSize: 8.5 },
+      { text: nguoiNhan,                                     fontSize: 8.5, bold: true },
+      { text: cn.bien_nhan?.ten_hang_hoa || '—',             fontSize: 8.5 },
+      { text: dcContent.length ? dcContent : '—',            fontSize: 8 },
+      { text: cn.bien_nhan?.dien_thoai_nhan || '—',          fontSize: 8.5, alignment: 'center' },
+      { text: fmtMoney(cn.so_tien_no),                       alignment: 'right', fontSize: 9, bold: true },
+      { text: trangThai, alignment: 'center', fontSize: 8.5,
+        color: isUnpaid ? '#DC2626' : '#16A34A', bold: isUnpaid },
     ];
   });
 
+  // Footer rows — colSpan phải khớp tổng 10 cột (span 7 cột đầu → merge sang cột số tiền)
   const footerRows = [
     [
-      { text: 'Tổng cộng', colSpan: 4, alignment: 'right', bold: true, fontSize: 9, color: '#1E293B' }, {}, {}, {},
+      { text: 'Tổng cộng', colSpan: 8, alignment: 'right', bold: true, fontSize: 9, color: '#1E293B' },
+      {}, {}, {}, {}, {}, {}, {},
       { text: fmtMoney(group.tong) + 'đ', alignment: 'right', bold: true, fontSize: 9 },
       { text: '', fontSize: 9 },
     ],
     [
-      { text: 'Đã thu', colSpan: 4, alignment: 'right', bold: true, fontSize: 9, color: '#16A34A' }, {}, {}, {},
+      { text: 'Đã thu', colSpan: 8, alignment: 'right', bold: true, fontSize: 9, color: '#16A34A' },
+      {}, {}, {}, {}, {}, {}, {},
       { text: fmtMoney(group.da_thu) + 'đ', alignment: 'right', bold: true, fontSize: 9, color: '#16A34A' },
       { text: '', fontSize: 9 },
     ],
     [
-      { text: 'CÒN NỢ', colSpan: 4, alignment: 'right', bold: true, fontSize: 10, color: '#DC2626' }, {}, {}, {},
+      { text: 'CÒN NỢ', colSpan: 8, alignment: 'right', bold: true, fontSize: 10, color: '#DC2626' },
+      {}, {}, {}, {}, {}, {}, {},
       { text: fmtMoney(group.con_no) + 'đ', alignment: 'right', bold: true, fontSize: 10, color: '#DC2626' },
       { text: '', fontSize: 9 },
     ],
   ];
 
   const docDefinition = {
+    // Xoay ngang A4 để đủ chỗ 10 cột (landscape ~841pt wide, usable ~769pt)
     pageSize: 'A4',
-    pageOrientation: 'portrait',
+    pageOrientation: 'landscape',
     pageMargins: [36, 36, 36, 60],
 
     styles: {
@@ -503,7 +593,7 @@ export async function exportCongNoPDF(thang, nam, doiTuong) {
     },
 
     content: [
-      // Header
+      // Header: Logo + Tiêu đề
       {
         columns: [
           logoDataUrl
@@ -511,7 +601,7 @@ export async function exportCongNoPDF(thang, nam, doiTuong) {
             : { text: '', width: 60 },
           {
             stack: [
-              { text: 'BÁO CÁO CÔNG NỢ CHI TIẾT', style: 'header' },
+              { text: 'PHIẾU TỔNG HỢP CÔNG NỢ CHI TIẾT', style: 'header' },
               { text: `Tháng ${monthStr}`, style: 'subHeader' },
               { text: `Đối tượng: ${doiTuong}`, style: 'subHeader', bold: true, color: '#1E40AF', fontSize: 11 },
             ],
@@ -521,7 +611,7 @@ export async function exportCongNoPDF(thang, nam, doiTuong) {
         margin: [0, 0, 0, 16],
       },
 
-      // Summary strip
+      // Summary strip — 3 ô tổng quan
       {
         table: {
           widths: ['*', '*', '*'],
@@ -535,23 +625,29 @@ export async function exportCongNoPDF(thang, nam, doiTuong) {
         layout: { fillColor: () => '#DBEAFE' },
       },
 
-      // Detail table
+      // Bảng chi tiết 10 cột
+      // Tổng usable width A4 landscape ~769pt (841 - 36*2)
+      // Widths: 22+50+62+80+80+80+90+58+68+58 = 648pt → còn dư, tăng cột ĐC và Hàng hoá
       {
         table: {
           headerRows: 1,
-          widths: [24, 56, 72, '*', 80, 74],
+          widths: [22, 52, 62, 82, 82, 82, '*', 60, 68, 62],
           body: [headerRow, ...dataRows, ...footerRows],
         },
         layout: {
-          hLineWidth: (i, node) => (i === 0 || i === 1 || i === node.table.body.length - 3 ? 1.5 : 0.5),
-          vLineWidth: () => 0.5,
-          hLineColor: () => '#CBD5E1',
+          hLineWidth: (i, node) => (i === 0 || i === 1 || i === node.table.body.length - 3 ? 1.5 : 0.4),
+          vLineWidth: () => 0.4,
+          hLineColor: (i, node) => (i === 0 || i === 1 || i === node.table.body.length - 3) ? '#1E40AF' : '#CBD5E1',
           vLineColor: () => '#CBD5E1',
           fillColor: (rowIndex) => {
             if (rowIndex === 0) return '#1E40AF';
             if (rowIndex > group.items.length) return '#EFF6FF';
             return rowIndex % 2 === 0 ? '#F8FAFC' : null;
           },
+          paddingLeft:   () => 3,
+          paddingRight:  () => 3,
+          paddingTop:    () => 3,
+          paddingBottom: () => 3,
         },
       },
     ],
@@ -590,10 +686,15 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  const start = new Date(year, month - 1, 1);
-  const end   = new Date(year, month, 0, 23, 59, 59, 999);
+  // [C-03 FIX] Dùng +07:00 timezone boundary
+  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
+  const endRaw = new Date(start);
+  endRaw.setMonth(endRaw.getMonth() + 1);
+  endRaw.setMilliseconds(endRaw.getMilliseconds() - 1);
+  const end = endRaw;
 
-  // 1. Lấy tất cả BN trong tháng
+  // 1. Lấy tất cả BN trong tháng (với giới hạn an toàn 10K records/tháng)
+  const MAX_BN = 10_000;
   const bienNhans = await prisma.bienNhan.findMany({
     where: { ngay_bien_nhan: { gte: start, lte: end } },
     select: {
@@ -605,12 +706,16 @@ export async function doiSoatCuocChiTiet(thang, nam) {
       da_vao_bang_ke: true,
       trang_thai_thu: true,
     },
+    take: MAX_BN,
   });
 
-  // 2a. Lấy BangKeChiTiet có bien_nhan_id (Case A — HĐDT từ BN thực)
+  // [C-03 FIX] 2a. Thay WHERE IN (50K IDs) bằng query lọc theo ngày — dùng subquery qua relation
+  // Lấy BangKeChiTiet có bien_nhan_id thuộc BN trong tháng này
+  // Dùng relation filter thay vì truyền array ID lớn
   const bangKeChiTiet = await prisma.bangKeChiTiet.findMany({
     where: {
-      bien_nhan_id: { in: bienNhans.map(bn => bn.id) },
+      bien_nhan_id: { not: null },
+      bien_nhan: { ngay_bien_nhan: { gte: start, lte: end } },
     },
     select: { bien_nhan_id: true, gia_cuoc: true },
   });
