@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
+import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 
 // Whitelist các field được phép sort — tránh injection qua query string
 const ALLOWED_SORT_FIELDS = new Set(['created_at', 'ngay_bien_nhan', 'ma_so', 'gia_cuoc']);
@@ -10,7 +11,7 @@ const ALLOWED_UPDATE_FIELDS = [
   'don_vi_nhan', 'nguoi_nhan', 'dien_thoai_nhan', 'so_cccd_nhan', 'dia_chi_nhan',
   'hang_hoa_json',
   'gia_tri_hang', 'trong_luong',
-  'thu_ho', 'gia_cuoc', 'trang_thai_thu', 'can_xuat_hddt',
+  'thu_ho', 'gia_cuoc', 'trang_thai_thu', 'vai_tro_cong_no', 'can_xuat_hddt',
   'hinh_thuc_giao', 'chanh_id', 'dia_chi_giao', // chanh_id handled specially below
   'hang_hu_khong_den', 'gio_tao',
   'kh_gui_id', 'kh_nhan_id', // [NV-3b] liên kết KH tùy chọn
@@ -65,8 +66,8 @@ export async function listBienNhan({ van_phong_id, role, search, trang_thai, vp_
   if (from || to) {
     where.ngay_bien_nhan = {};
     // [SVC-01] Dùng +07:00 để khớp với giờ VN, tránh lệch 7h khi server chạy UTC
-    if (from) where.ngay_bien_nhan.gte = new Date(from + 'T00:00:00.000+07:00');
-    if (to)   where.ngay_bien_nhan.lte = new Date(to   + 'T23:59:59.999+07:00');
+    if (from) where.ngay_bien_nhan.gte = parseStartOfDayVN(from);
+    if (to)   where.ngay_bien_nhan.lte = parseEndOfDayVN(to);
   }
 
 
@@ -163,8 +164,8 @@ async function _countBNByPrefixAndDate(client, prefix, date) {
   const d = date instanceof Date ? date : new Date(date);
   // Lấy date string theo giờ VN bằng cách dùng toLocaleDateString với timeZone
   const vnDateStr = d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }); // "YYYY-MM-DD"
-  const startOfDay = new Date(`${vnDateStr}T00:00:00.000+07:00`);
-  const endOfDay   = new Date(`${vnDateStr}T23:59:59.999+07:00`);
+  const startOfDay = parseStartOfDayVN(vnDateStr);
+  const endOfDay   = parseEndOfDayVN(vnDateStr);
   return client.bienNhan.count({
     where: {
       ma_so: { startsWith: `${prefix}-` },

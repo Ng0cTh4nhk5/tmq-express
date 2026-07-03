@@ -79,16 +79,19 @@ const filteredList = computed(() => {
 
 const roleOptions = [
   { label: 'Admin', value: 'admin' },
+  { label: 'Quản lý', value: 'quan_ly' },
   { label: 'Nhân viên', value: 'staff' },
 ];
 
 function roleSeverity(role) {
   if (role === 'admin') return 'danger';
+  if (role === 'quan_ly') return 'warn';
   return 'info';
 }
 
 function roleLabel(role) {
   if (role === 'admin') return 'Admin';
+  if (role === 'quan_ly') return 'Quản lý';
   return 'Nhân viên';
 }
 

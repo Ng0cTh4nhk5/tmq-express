@@ -13,7 +13,7 @@ const querySchema = {
 export default async function baoCaoRoutes(fastify) {
   // GET /api/bao-cao/theo-tuyen?thang=6&nam=2026
   fastify.get('/theo-tuyen', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: { querystring: querySchema },
     handler: async (request) => {
       const { thang, nam }      = request.query;
@@ -29,7 +29,7 @@ export default async function baoCaoRoutes(fastify) {
 
   // GET /api/bao-cao/theo-chanh?thang=6&nam=2026
   fastify.get('/theo-chanh', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: { querystring: querySchema },
     handler: async (request) => {
       const { thang, nam }      = request.query;

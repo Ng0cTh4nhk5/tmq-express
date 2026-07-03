@@ -2,6 +2,7 @@ import prisma from '../config/database.js';
 import ExcelJS from 'exceljs';
 import { createWithCode } from '../utils/ma-so-generator.js';
 import { writeAuditLog } from '../plugins/audit-log.js';
+import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 
 /** VAT 8% — gia_cuoc trên BN là SAU thuế */
 const VAT_RATE = 1.08;
@@ -87,8 +88,8 @@ export async function getBienNhanCho({ ngay, page = 1, limit = 100 } = {}) {
   if (ngay) {
     // [SVC-TZ] Dùng +07:00 để boundary chính xác kể cả khi server chạy UTC
     where.ngay_bien_nhan = {
-      gte: new Date(ngay + 'T00:00:00.000+07:00'),
-      lte: new Date(ngay + 'T23:59:59.999+07:00'),
+      gte: parseStartOfDayVN(ngay),
+      lte: parseEndOfDayVN(ngay),
     };
   }
 
@@ -272,8 +273,8 @@ export async function listBangKe({ from, to, page = 1, limit = 20 } = {}) {
   }
   const where = {
     ngay_xuat: {
-      gte: new Date(from + 'T00:00:00.000+07:00'),
-      lte: new Date(to   + 'T23:59:59.999+07:00'),
+      gte: parseStartOfDayVN(from),
+      lte: parseEndOfDayVN(to),
     },
   };
 

@@ -73,6 +73,7 @@ const bnEdits = ref({});
 
 function initBNEdits(bns) {
   const edits = {};
+  if (!Array.isArray(bns)) return; // guard: tránh crash nếu shape sai
   for (const bn of bns) {
     if (Array.isArray(bn.hang_hoa_json) && bn.hang_hoa_json.length > 0) {
       // Lấy TẤT CẢ items từ hang_hoa_json
@@ -229,7 +230,10 @@ async function loadPending() {
   try {
     const ngay = toISODate(selectedDate.value);
     const res = await api.get('/bang-ke/bien-nhan-cho', { params: { ngay } });
-    pendingList.value = res.data.data;
+    // Route trả về { success, data: { data: [], pagination: {} } }
+    // nên res.data.data là object { data, pagination }, không phải array
+    const payload = res.data.data;
+    pendingList.value = Array.isArray(payload) ? payload : (payload?.data ?? []);
     initBNEdits(pendingList.value);
   } catch (err) {
     handleApiError(err, toast, 'Không thể tải danh sách BN chờ');
@@ -240,9 +244,19 @@ async function loadPending() {
 // ── Lịch sử ──────────────────────────────────────────────────
 const historyList = ref([]);
 
+/** Tạo YYYY-MM-DD từ một Date object */
+function toDateStr(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 async function fetchHistory() {
   try {
-    const res = await api.get('/bang-ke?limit=50');
+    const to   = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30); // 30 ngày gần nhất
+    const res = await api.get('/bang-ke', {
+      params: { from: toDateStr(from), to: toDateStr(to), limit: 50 },
+    });
     historyList.value = res.data.data;
   } catch (err) {
     handleApiError(err, toast, 'Không thể tải lịch sử');
@@ -404,10 +418,10 @@ function fmtTruocThue(n) {
 
 onMounted(async () => {
   // Chạy độc lập — lỗi riêng không làm treo trang
-  loadPending().catch(() => {});
-  fetchHistory().catch(() => {});
-  loadDN().catch(() => {});
-  loadVanPhongs().catch(() => {});
+  loadPending().catch(e => console.warn('[BangKe] loadPending:', e.message));
+  fetchHistory().catch(e => console.warn('[BangKe] fetchHistory:', e.message));
+  loadDN().catch(e => console.warn('[BangKe] loadDN:', e.message));
+  loadVanPhongs().catch(e => console.warn('[BangKe] loadVanPhongs:', e.message));
 });
 </script>
 

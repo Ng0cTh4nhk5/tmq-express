@@ -1,4 +1,5 @@
 import prisma from '../config/database.js';
+import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
 
 /**
  * Tính ISO week number cho một ngày
@@ -55,8 +56,8 @@ export async function baoCaoDoanhThu({ from, to, van_phong_id, nhom = 'ngay' }) 
 
   // [C-02] Nếu chỉ có 1 đầu → mặc định range tối đa 366 ngày
   const MAX_RANGE_DAYS = 366;
-  let fromDate = from ? new Date(from + 'T00:00:00.000+07:00') : null;
-  let toDate   = to   ? new Date(to   + 'T23:59:59.999+07:00') : null;
+  let fromDate = from ? parseStartOfDayVN(from) : null;
+  let toDate   = to   ? parseEndOfDayVN(to)     : null;
 
   if (fromDate && !toDate) {
     // Chỉ có from → to = from + MAX_RANGE_DAYS

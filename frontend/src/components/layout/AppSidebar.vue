@@ -35,11 +35,11 @@ const menuGroups = computed(() => {
     label: 'Tài chính',
     items: [
       { label: 'Bảng kê HĐĐT', icon: 'pi pi-file-excel', to: '/bang-ke-hddt', show: auth.isAdmin },
-      { label: 'Bảng kê công nợ', icon: 'pi pi-chart-bar', to: '/cong-no', show: auth.isAdmin },
+      { label: 'Bảng kê công nợ', icon: 'pi pi-chart-bar', to: '/cong-no', show: auth.hasRole('admin', 'quan_ly') },
       { label: 'Thu hộ (COD)', icon: 'pi pi-money-bill', to: '/thu-ho', show: true },
       { label: 'Cước nhận', icon: 'pi pi-wallet', to: '/cuoc-nhan', show: auth.hasRole('admin', 'staff') },
       { label: 'Báo cáo doanh thu', icon: 'pi pi-chart-line', to: '/doanh-thu', show: true },
-      { label: 'Báo cáo tuyến/chành', icon: 'pi pi-map', to: '/bao-cao', show: auth.isAdmin },
+      { label: 'Báo cáo tuyến/chành', icon: 'pi pi-map', to: '/bao-cao', show: auth.hasRole('admin', 'quan_ly', 'staff') },
     ].filter(i => i.show),
   };
   if (taiChinh.items.length) groups.push(taiChinh);
@@ -154,7 +154,7 @@ onUnmounted(() => { clearInterval(badgePollTimer); });
         <div class="user-avatar">{{ auth.user?.ten?.[0] || 'U' }}</div>
         <div class="user-info">
           <span class="user-name">{{ auth.user?.ten }}</span>
-          <span class="user-role">{{ auth.user?.role }} · {{ auth.userVanPhong?.ma_vp }}</span>
+          <span class="user-role">{{ auth.user?.role === 'quan_ly' ? 'Quản lý' : auth.user?.role }} · {{ auth.userVanPhong?.ma_vp }}</span>
         </div>
       </div>
 

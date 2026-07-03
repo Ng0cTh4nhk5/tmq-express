@@ -25,8 +25,8 @@ export const useThuHoStore = defineStore('thu-ho', () => {
       // Badge = BN chờ xử lý COD
       const d = res.data ?? {};
       count.value = (d.cho_thu?.count ?? 0) + (d.da_thu_chanh?.count ?? 0);
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.warn('[ThuHoStore] fetchCount failed:', err.message);
     }
   }
 

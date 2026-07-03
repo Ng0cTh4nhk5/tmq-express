@@ -1,9 +1,17 @@
 import { listKhachHang, autocompleteKhachHang, getKhachHang, createKhachHang, updateKhachHang, toggleKhachHangActive } from '../services/khach-hang.service.js';
 
+// [H-02] Strip PII fields for non-admin users
+function stripPII(obj, role) {
+  if (!obj || role === 'admin') return obj;
+  if (Array.isArray(obj)) return obj.map(item => stripPII(item, role));
+  const { so_cccd, email, ...safe } = obj;
+  return safe;
+}
+
 export default async function khachHangRoutes(fastify) {
   // GET /api/khach-hang
   fastify.get('/', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -26,13 +34,15 @@ export default async function khachHangRoutes(fastify) {
         page: Number(page) || 1,
         limit: Number(limit) || 20,
       });
+      // [H-02] Strip PII for staff
+      if (result.data) result.data = stripPII(result.data, request.user.role);
       return { success: true, ...result };
     },
   });
 
   // GET /api/khach-hang/autocomplete
   fastify.get('/autocomplete', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -48,7 +58,7 @@ export default async function khachHangRoutes(fastify) {
 
   // GET /api/khach-hang/:id
   fastify.get('/:id', {
-    preHandler: [fastify.authenticate],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
     schema: {
       params: {
         type: 'object',
@@ -59,7 +69,7 @@ export default async function khachHangRoutes(fastify) {
     handler: async (request, reply) => {
       const data = await getKhachHang(Number(request.params.id));
       if (!data) return reply.status(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Không tìm thấy khách hàng' } });
-      return { success: true, data };
+      return { success: true, data: stripPII(data, request.user.role) };
     },
   });
 

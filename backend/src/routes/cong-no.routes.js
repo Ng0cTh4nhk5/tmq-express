@@ -3,7 +3,7 @@ import * as congNoService from '../services/cong-no.service.js';
 export default async function congNoRoutes(fastify) {
   // GET /api/cong-no
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -27,7 +27,7 @@ export default async function congNoRoutes(fastify) {
 
   // POST /api/cong-no/:id/xac-nhan-thanh-toan
   fastify.post('/:id/xac-nhan-thanh-toan', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',
@@ -49,7 +49,17 @@ export default async function congNoRoutes(fastify) {
 
   // GET /api/cong-no/report — Báo cáo công nợ chi tiết
   fastify.get('/report', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          doi_tuong: { type: 'string' },
+          from:      { type: 'string' },
+          to:        { type: 'string' },
+        },
+      },
+    },
     handler: async (request) => {
       const { doi_tuong, from, to } = request.query;
       const result = await congNoService.reportCongNo(doi_tuong, from, to);
@@ -59,16 +69,27 @@ export default async function congNoRoutes(fastify) {
 
   // GET /api/cong-no/doi-soat — Đối soát cước tháng
   fastify.get('/doi-soat', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          doi_tuong: { type: 'string' },
+          thang:     { type: 'integer', minimum: 1, maximum: 12 },
+          nam:       { type: 'integer', minimum: 2020, maximum: 2030 },
+        },
+      },
+    },
     handler: async (request) => {
       const { doi_tuong, thang, nam } = request.query;
       const result = await congNoService.doiSoatCuoc(doi_tuong, thang, nam);
       return { success: true, data: result };
     },
   });
+
   // GET /api/cong-no/bang-ke-thang?thang=4&nam=2026
   fastify.get('/bang-ke-thang', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -96,7 +117,7 @@ export default async function congNoRoutes(fastify) {
 
   // GET /api/cong-no/bang-ke-thang/export?thang=4&nam=2026&doi_tuong=Cty+ABC
   fastify.get('/bang-ke-thang/export', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -125,7 +146,7 @@ export default async function congNoRoutes(fastify) {
 
   // GET /api/cong-no/bang-ke-thang/export-pdf?thang=4&nam=2026&doi_tuong=CtyABC
   fastify.get('/bang-ke-thang/export-pdf', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -154,7 +175,7 @@ export default async function congNoRoutes(fastify) {
 
   // GET /api/cong-no/doi-soat-chi-tiet?thang=4&nam=2026
   fastify.get('/doi-soat-chi-tiet', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',

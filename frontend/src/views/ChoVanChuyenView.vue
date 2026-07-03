@@ -345,10 +345,10 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- [NEW-L1] has_more warning — hiển thị khi > 500 BN trong hàng đợi -->
+    <!-- [NEW-L1] has_more warning — hiển thị khi > 50 BN trong hàng đợi -->
     <div v-if="hasMore && !loading" class="has-more-warn">
       <i class="pi pi-exclamation-triangle"></i>
-      Đang hiển thị <strong>500</strong> / <strong>{{ stats.total }}</strong> biên nhận — giao xe các lô đầu để xem phần còn lại.
+      Đang hiển thị <strong>50</strong> / <strong>{{ stats.total }}</strong> biên nhận.
     </div>
 
     <!-- [FIX-ADMIN] Bỏ guard v-if/v-else — admin thấy dữ liệu ngay -->

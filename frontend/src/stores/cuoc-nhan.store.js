@@ -20,8 +20,8 @@ export const useCuocNhanStore = defineStore('cuoc-nhan', () => {
         params: { limit: 1, page: 1 }, // chỉ cần pagination.total
       });
       count.value = res.pagination?.total ?? 0;
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.warn('[CuocNhanStore] fetchCount failed:', err.message);
     }
   }
 

@@ -2,6 +2,9 @@ import PdfPrinter from 'pdfmake/src/printer.js';
 import QRCode from 'qrcode';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database.js';
+import env from '../config/env.js';
+import { parseStartOfDayVN, parseEndOfDayVN } from '../utils/date.js';
+import { renderPDFInWorker } from '../utils/worker-pool.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
@@ -12,15 +15,7 @@ const fontsDir = join(__dirname, '../../fonts');
 const logoPath = join(__dirname, '../assets/logo.jpg');
 
 // ── Timezone helpers (UTC+7 Vietnam) ────────────────────────────────────────
-// VN 00:00 = UTC 17:00 hôm trước, VN 23:59:59.999 = UTC 16:59:59.999 cùng ngày
-function toVNStartOfDay(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - 7 * 60 * 60 * 1000);
-}
-function toVNEndOfDay(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - 7 * 60 * 60 * 1000 + 86400000 - 1);
-}
+// Sử dụng parseStartOfDayVN / parseEndOfDayVN từ utils/date.js
 // Format YYYY-MM-DD → dd/mm/yyyy
 function fmtDateStr(dateStr) {
   const [y, m, d] = dateStr.split('-');
@@ -100,7 +95,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
   // Fix 2.5: Dùng APP_PUBLIC_URL riêng cho QR — không dùng CORS_ORIGIN vốn là biến CORS config
   // Fix 3.0: Dùng bn.id thay vì bn.ma_so — ma_so không unique độc lập (@@unique([ma_so, ngay_bien_nhan]))
   // → cùng ma_so có thể xuất hiện nhiều ngày khác nhau, chỉ id mới đảm bảo định danh duy nhất tuyệt đối
-  const qrUrl = `${process.env.APP_PUBLIC_URL || process.env.CORS_ORIGIN || 'http://localhost:5173'}/scan/${bn.id}`;
+  const qrUrl = `${env.APP_PUBLIC_URL}/scan/${bn.id}`;
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 100, margin: 1 });
 
   // Fix 2.4: Dùng cached logo thay vì readFileSync mỗi lần
@@ -376,46 +371,242 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
     watermark: makeWatermark(nhan_vien_ten),
   };
 
-  return new Promise((resolve, reject) => {
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const chunks = [];
-    pdfDoc.on('data', (chunk) => chunks.push(chunk));
-    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on('error', reject);
-    pdfDoc.end();
-  });
+  // [H-04] Render trong Worker Thread để tránh block event loop
+  try {
+    return await renderPDFInWorker(docDefinition);
+  } catch {
+    // Fallback: render trên main thread nếu worker gặp lỗi
+    return new Promise((resolve, reject) => {
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const chunks = [];
+      pdfDoc.on('data', (chunk) => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+  }
 }
 
-// ---- Phiếu Thu PDF ----
+// ---- Phiếu Thu PDF (nâng cấp: layout A5 landscape 2 cột, giống BNTH) ----
 export async function generatePhieuThuPDF(phieuThuId, { nhan_vien_ten } = {}) {
   const pt = await prisma.phieuThu.findUnique({
     where: { id: phieuThuId },
-    include: { nhan_vien: { select: { ten: true } } },
+    include: {
+      nhan_vien: { select: { ten: true } },
+      van_phong:  { select: { ten: true, dia_chi: true } },
+      bien_nhan:  {
+        select: {
+          ma_so: true, gia_cuoc: true,
+          nguoi_gui: true, don_vi_gui: true, dien_thoai_gui: true,
+          nguoi_nhan: true, don_vi_nhan: true, dien_thoai_nhan: true,
+          dia_chi_nhan: true, dia_chi_giao: true,
+          hang_hoa_json: true, ten_hang_hoa: true,
+          van_phong_gui:  { select: { ma_vp: true, ten: true } },
+          van_phong_nhan: { select: { ma_vp: true, ten: true } },
+        },
+      },
+    },
   });
   if (!pt) throw Object.assign(new Error('Không tìm thấy phiếu thu'), { statusCode: 404 });
 
-  const fmt = (n) => Number(n).toLocaleString('vi-VN');
+  const fmt = (n) => Number(n || 0).toLocaleString('vi-VN');
+  const ngayThu = new Date(pt.ngay_thu);
+  const ngayStr = ngayThu.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const gioStr  = ngayThu.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+  const htLabel = pt.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản';
+  const logoDataUrl = getLogoDataUrl();
+
+  const bn = pt.bien_nhan;
+
+  // Hàng hóa (nếu có BN liên kết)
+  let hangStr = '—';
+  if (bn) {
+    const hangItems = Array.isArray(bn.hang_hoa_json)
+      ? bn.hang_hoa_json.filter(i => Number(i.so_luong) > 0)
+      : [];
+    hangStr = hangItems.length > 0
+      ? hangItems.map(i => `${i.so_luong} ${i.don_vi}${i.ghi_chu ? ` (${i.ghi_chu})` : ''}`).join(', ')
+      : (bn.ten_hang_hoa || '—');
+  }
+
+  const tuyen     = bn ? `${bn.van_phong_gui?.ma_vp || '?'} - ${bn.van_phong_nhan?.ma_vp || '?'}` : '—';
+  const nguoiGui  = bn ? (bn.don_vi_gui  || bn.nguoi_gui  || '—') : '—';
+  const nguoiNhan = bn ? (bn.don_vi_nhan || bn.nguoi_nhan || '—') : pt.doi_tuong;
+
+  // Helper: dòng label + value
+  const infoRow = (label, value, labelWidth = 80) => ({
+    columns: [
+      { text: label, fontSize: 8, color: '#64748b', width: labelWidth },
+      { text: value || '—', fontSize: 8.5, bold: true, color: '#0f172a', width: '*' },
+    ],
+    margin: [0, 0, 0, 3],
+  });
+
+  // A5 landscape usable width
+  const PAGE_W = 563;
+  const LEFT_W  = Math.round(PAGE_W * 0.57);
+  const RIGHT_W = PAGE_W - LEFT_W - 12;
 
   const docDefinition = {
     pageSize: 'A5',
-    pageMargins: [25, 20, 25, 20],
+    pageOrientation: 'landscape',
+    pageMargins: [16, 12, 16, 12],
+
     content: [
-      { text: 'TMQ EXPRESS', fontSize: 12, bold: true, color: '#1E40AF', alignment: 'center' },
-      { text: 'PHIẾU THU', fontSize: 16, bold: true, alignment: 'center', margin: [0, 8, 0, 4] },
-      { text: `Số: ${pt.ma_phieu}`, alignment: 'center', fontSize: 10, color: '#666' },
-      { text: `Ngày: ${new Date(pt.ngay_thu).toLocaleDateString('vi-VN')}`, alignment: 'center', fontSize: 9, color: '#888', margin: [0, 2, 0, 12] },
-      { text: `Đối tượng: ${pt.doi_tuong}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Lý do: ${pt.ly_do}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Số tiền: ${fmt(pt.so_tien)} đ`, fontSize: 12, bold: true, margin: [0, 0, 0, 4] },
-      { text: `Hình thức: ${pt.hinh_thuc === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản'}`, fontSize: 10, margin: [0, 0, 0, 4] },
-      { text: `Người lập: ${pt.nhan_vien.ten}`, fontSize: 9, color: '#666', margin: [0, 8, 0, 0] },
+      // ══ HEADER ══
+      {
+        table: {
+          widths: ['auto', '*'],
+          body: [[
+            logoDataUrl
+              ? { image: logoDataUrl, width: 104, height: 18.66, border: [false, false, false, false], margin: [0, 0, 3, 0] }
+              : { text: '', border: [false, false, false, false] },
+            {
+              border: [false, false, false, false],
+              verticalAlignment: 'middle',
+              text: 'CÔNG TY VẬN TẢI THIÊN MINH QUANG',
+              bold: true, fontSize: 14, color: '#1e40af',
+            },
+          ]],
+        },
+        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 4 },
+        margin: [0, 0, 0, 0],
+      },
+      { text: pt.van_phong?.ten || '', fontSize: 7.5, color: '#475569', margin: [0, 0, 0, 1] },
+      { text: pt.van_phong?.dia_chi || '', fontSize: 7, color: '#94a3b8', margin: [0, 0, 0, 3] },
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: PAGE_W, y2: 0, lineWidth: 0.8, lineColor: '#1e40af' }], margin: [0, 0, 0, 6] },
+
+      // ══ NỘI DUNG 2 CỘT ══
       {
         columns: [
-          { text: 'Người nộp\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
-          { text: 'Người lập phiếu\n\n\n\n_______________', alignment: 'center', fontSize: 9, margin: [0, 20, 0, 0] },
+          // ── CỘT TRÁI ──
+          {
+            width: LEFT_W,
+            stack: [
+              { text: 'PHIẾU THU CÔNG NỢ', fontSize: 12, bold: true, color: '#1e40af', margin: [0, 0, 0, 1] },
+              {
+                columns: [
+                  { text: `Số: ${pt.ma_phieu}`, fontSize: 9, bold: true, color: '#334155' },
+                  { text: `${gioStr} — ${ngayStr}`, fontSize: 8.5, color: '#64748b', alignment: 'right' },
+                ],
+                margin: [0, 0, 0, 6],
+              },
+
+              // Block thông tin biên nhận gốc (chỉ khi có BN liên kết)
+              ...(bn ? [{
+                table: {
+                  widths: ['*'],
+                  body: [[{
+                    stack: [
+                      { text: 'THÔNG TIN BIÊN NHẬN', fontSize: 7, bold: true, color: '#64748b', letterSpacing: 0.5, margin: [0, 0, 0, 4] },
+                      infoRow('Mã biên nhận:', bn.ma_so),
+                      infoRow('Tuyến:', tuyen),
+                      infoRow('Giá cước BN:', `${fmt(bn.gia_cuoc)} đ`),
+                    ],
+                    border: [false, false, false, false],
+                    fillColor: '#f1f5f9',
+                    margin: [6, 4, 6, 4],
+                  }]],
+                },
+                layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                margin: [0, 0, 0, 5],
+              }] : []),
+
+              { text: 'ĐỐI TƯỢNG NỘP TIỀN', fontSize: 7.5, bold: true, color: '#475569', decoration: 'underline', margin: [0, 0, 0, 2] },
+              infoRow('Tên:', pt.doi_tuong),
+              ...(bn ? [
+                infoRow('Người gửi:', nguoiGui),
+                infoRow('Người nhận:', nguoiNhan),
+                infoRow('ĐT người gửi:', bn.dien_thoai_gui),
+              ] : []),
+
+              ...(bn ? [
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: LEFT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 4, 0, 4] },
+                infoRow('Hàng hóa:', hangStr),
+              ] : []),
+
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: LEFT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 4, 0, 4] },
+              infoRow('Lý do thu:', pt.ly_do),
+            ],
+          },
+
+          // ── GAP ──
+          { width: 12, text: '' },
+
+          // ── CỘT PHẢI ──
+          {
+            width: RIGHT_W,
+            stack: [
+              // Box số tiền nổi bật
+              {
+                table: {
+                  widths: ['*'],
+                  body: [[{
+                    stack: [
+                      { text: 'SỐ TIỀN THU', fontSize: 7.5, bold: true, color: '#92400e', alignment: 'center', margin: [0, 0, 0, 4] },
+                      { text: `${fmt(pt.so_tien)} đ`, fontSize: 22, bold: true, color: '#dc2626', alignment: 'center', margin: [0, 0, 0, 4] },
+                      {
+                        table: {
+                          widths: ['*'],
+                          body: [[{ text: htLabel, fontSize: 8, bold: true, alignment: 'center', border: [false, false, false, false], color: '#374151' }]],
+                        },
+                        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                      },
+                    ],
+                    border: [true, true, true, true],
+                    fillColor: '#fff7ed',
+                    margin: [6, 8, 6, 8],
+                  }]],
+                },
+                layout: {
+                  hLineColor: () => '#f97316',
+                  vLineColor: () => '#f97316',
+                  hLineWidth: () => 1.5,
+                  vLineWidth: () => 1.5,
+                  paddingLeft: () => 0,
+                  paddingRight: () => 0,
+                  paddingTop: () => 0,
+                  paddingBottom: () => 0,
+                },
+                margin: [0, 0, 0, 8],
+              },
+
+              infoRow('Người lập:', pt.nhan_vien?.ten, 65),
+
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: RIGHT_W, y2: 0, lineWidth: 0.4, lineColor: '#e2e8f0' }], margin: [0, 6, 0, 8] },
+
+              // Chữ ký 2 cột
+              {
+                columns: [
+                  {
+                    stack: [
+                      { text: 'NGƯỜI NỘP TIỀN', fontSize: 7.5, bold: true, alignment: 'center', color: '#374151' },
+                      { text: '(Ký, ghi rõ họ tên)', fontSize: 6.5, color: '#94a3b8', alignment: 'center', margin: [0, 1, 0, 0] },
+                      { text: '\n\n\n', fontSize: 8 },
+                      { text: '________________', alignment: 'center', color: '#94a3b8', fontSize: 9 },
+                    ],
+                    width: '*',
+                  },
+                  {
+                    stack: [
+                      { text: 'NHÂN VIÊN THU', fontSize: 7.5, bold: true, alignment: 'center', color: '#374151' },
+                      { text: '(Ký, ghi rõ họ tên)', fontSize: 6.5, color: '#94a3b8', alignment: 'center', margin: [0, 1, 0, 0] },
+                      { text: '\n\n\n', fontSize: 8 },
+                      { text: pt.nhan_vien?.ten || '', fontSize: 7.5, alignment: 'center', color: '#1e40af', bold: true },
+                      { text: '________________', alignment: 'center', color: '#94a3b8', fontSize: 9 },
+                    ],
+                    width: '*',
+                  },
+                ],
+                margin: [0, 0, 0, 0],
+              },
+            ],
+          },
         ],
       },
     ],
+
+    defaultStyle: { font: 'Roboto' },
     watermark: makeWatermark(nhan_vien_ten),
   };
 
@@ -728,8 +919,8 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
   const vpNhan = await prisma.vanPhong.findUnique({ where: { id: vpNhanId } });
   if (!vpGui || !vpNhan) throw Object.assign(new Error('Không tìm thấy văn phòng'), { statusCode: 404 });
 
-  const startOfRange = toVNStartOfDay(ngayTu);
-  const endOfRange = toVNEndOfDay(ngayDen);
+  const startOfRange = parseStartOfDayVN(ngayTu);
+  const endOfRange = parseEndOfDayVN(ngayDen);
   const ngayTuStr = fmtDateStr(ngayTu);
   const ngayDenStr = fmtDateStr(ngayDen);
   const isOneDay = ngayTu === ngayDen;
@@ -922,14 +1113,20 @@ export async function generateSoBienNhan(ngayTu, ngayDen, vpGuiId, vpNhanId) {
     defaultStyle: { font: 'Roboto' },
   };
 
-  return new Promise((resolve, reject) => {
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const chunks = [];
-    pdfDoc.on('data', (chunk) => chunks.push(chunk));
-    pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-    pdfDoc.on('error', reject);
-    pdfDoc.end();
-  });
+  // [H-04] Render trong Worker Thread — Sổ BN PDF là document nặng nhất
+  try {
+    return await renderPDFInWorker(docDefinition);
+  } catch {
+    // Fallback: render trên main thread nếu worker gặp lỗi
+    return new Promise((resolve, reject) => {
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const chunks = [];
+      pdfDoc.on('data', (chunk) => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -940,8 +1137,8 @@ export async function generateSoBienNhanExcel(ngayTu, ngayDen, vpGuiId, vpNhanId
   const vpNhan = await prisma.vanPhong.findUnique({ where: { id: vpNhanId } });
   if (!vpGui || !vpNhan) throw Object.assign(new Error('Không tìm thấy văn phòng'), { statusCode: 404 });
 
-  const startOfRange = toVNStartOfDay(ngayTu);
-  const endOfRange = toVNEndOfDay(ngayDen);
+  const startOfRange = parseStartOfDayVN(ngayTu);
+  const endOfRange = parseEndOfDayVN(ngayDen);
   const ngayTuStr = fmtDateStr(ngayTu);
   const ngayDenStr = fmtDateStr(ngayDen);
 

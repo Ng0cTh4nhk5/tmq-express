@@ -23,8 +23,8 @@ export const useChoVanChuyenStore = defineStore('cho-van-chuyen', () => {
         params: { count_all: 'true' },
       });
       count.value = res.count ?? 0;
-    } catch {
-      // Silent fail — badge chỉ ẩn, không crash app
+    } catch (err) {
+      console.warn('[ChoVanChuyenStore] fetchCount failed:', err.message);
     }
   }
 

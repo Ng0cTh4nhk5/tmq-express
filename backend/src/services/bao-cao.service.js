@@ -1,16 +1,5 @@
 import prisma from '../config/database.js';
-
-/**
- * Tạo boundary ngày theo timezone +07:00 để tránh lệch 7h khi server chạy UTC
- */
-function monthBoundary(year, month) {
-  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
-  // Ngày cuối tháng: lấy ngày 1 tháng sau rồi trừ 1ms
-  const endRaw = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
-  endRaw.setMonth(endRaw.getMonth() + 1);
-  endRaw.setMilliseconds(endRaw.getMilliseconds() - 1);
-  return { start, end: endRaw };
-}
+import { monthBoundaryVN } from '../utils/date.js';
 
 /**
  * Báo cáo chi tiết theo Tuyến (VP Gửi → VP Nhận) trong 1 tháng.
@@ -27,7 +16,7 @@ export async function baoCaoTheoTuyen({ thang, nam, van_phong_id, role } = {}) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  const { start, end } = monthBoundary(year, month);
+  const { start, end } = monthBoundaryVN(year, month);
 
   // Staff scope: chỉ thấy tuyến liên quan đến VP mình
   const where = { ngay_bien_nhan: { gte: start, lte: end } };
@@ -144,7 +133,7 @@ export async function baoCaoTheoChanh({ thang, nam, van_phong_id, role } = {}) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  const { start, end } = monthBoundary(year, month);
+  const { start, end } = monthBoundaryVN(year, month);
 
   const where = { ngay_bien_nhan: { gte: start, lte: end } };
   if (role === 'staff' && van_phong_id) {

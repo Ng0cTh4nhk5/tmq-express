@@ -15,6 +15,7 @@ datasource db {
 
 enum Role {
   admin
+  quan_ly
   staff
 }
 
@@ -440,6 +441,7 @@ model LichSuTrangThai {
 
   @@index([bien_nhan_id])
   @@index([nhan_vien_id])
+  @@index([created_at])
   @@map("lich_su_trang_thai")
 }
 

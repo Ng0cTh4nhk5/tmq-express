@@ -28,8 +28,8 @@ export const useHangDenStore = defineStore('hang-den', () => {
       const tabTotal = Object.entries(res.tab_counts ?? {}).reduce((s, [k, v]) =>
         k === 'da_giao_chanh' ? s : s + v, 0);
       count.value = tabTotal + chanhPending.value;
-    } catch {
-      // Silent fail — badge chỉ ẩn, không crash app
+    } catch (err) {
+      console.warn('[HangDenStore] fetchCount failed:', err.message);
     }
   }
 

@@ -42,7 +42,7 @@ export default async function nhanVienRoutes(fastify) {
           // [FE-04] username: chỉ cho phép chữ thường, số, gạch dưới/ngang/chấm
           username: { type: 'string', minLength: 3, pattern: '^[a-z0-9_.\\-]+$' },
           password: { type: 'string', minLength: 6 },
-          role: { type: 'string', enum: ['admin', 'staff'] },
+          role: { type: 'string', enum: ['admin', 'quan_ly', 'staff'] },
           van_phong_id: { type: 'integer' },
           require_password_change: { type: 'boolean' },
         },
@@ -65,7 +65,7 @@ export default async function nhanVienRoutes(fastify) {
         type: 'object',
         properties: {
           ten: { type: 'string', minLength: 1 },
-          role: { type: 'string', enum: ['admin', 'staff'] },
+          role: { type: 'string', enum: ['admin', 'quan_ly', 'staff'] },
           van_phong_id: { type: 'integer' },
         },
         additionalProperties: false,

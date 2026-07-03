@@ -9,6 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!token.value && !!user.value);
   const isAdmin = computed(() => user.value?.role === 'admin');
+  const isQuanLy = computed(() => user.value?.role === 'quan_ly');
   const isStaff = computed(() => user.value?.role === 'staff');
   const userVanPhong = computed(() => user.value?.van_phong || null);
 
@@ -43,7 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, token,
-    isLoggedIn, isAdmin, isStaff, userVanPhong,
+    isLoggedIn, isAdmin, isQuanLy, isStaff, userVanPhong,
     hasRole, login, fetchProfile, logout,
   };
 });

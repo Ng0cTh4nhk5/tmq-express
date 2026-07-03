@@ -127,7 +127,7 @@ export default async function thuHoRoutes(fastify) {
         type: 'object',
         required: ['bien_nhan_ids'],
         properties: {
-          bien_nhan_ids: { type: 'array', items: { type: 'integer' }, minItems: 1 },
+          bien_nhan_ids: { type: 'array', items: { type: 'integer' }, minItems: 1, maxItems: 200 },
           hinh_thuc:     { type: 'string', enum: ['tien_mat', 'chuyen_khoan'] },
           ghi_chu:       { type: 'string' },
         },

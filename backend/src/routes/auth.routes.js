@@ -76,6 +76,9 @@ export default async function authRoutes(fastify) {
 
   // POST /api/auth/change-password — Đổi mật khẩu
   fastify.post('/change-password', {
+    config: {
+      rateLimit: { max: 3, timeWindow: '5 minutes' },
+    },
     preHandler: [fastify.authenticate],
     schema: {
       body: {

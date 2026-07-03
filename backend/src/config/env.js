@@ -22,6 +22,7 @@ const env = {
   HOST: process.env.HOST || '0.0.0.0',
   NODE_ENV: process.env.NODE_ENV || 'development',
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  APP_PUBLIC_URL: process.env.APP_PUBLIC_URL || process.env.CORS_ORIGIN || 'http://localhost:5173',
 };
 
 // ---- Production safety checks ----
@@ -41,6 +42,10 @@ if (env.NODE_ENV === 'production') {
   if (env.CORS_ORIGIN === '*') {
     console.error('🚨 [SECURITY] CORS_ORIGIN=* không được phép trên production. Chỉ định domain cụ thể (VD: https://app.tmq.vn).');
     process.exit(1);
+  }
+
+  if (!process.env.APP_PUBLIC_URL) {
+    console.warn('⚠️  APP_PUBLIC_URL not set. QR codes will use CORS_ORIGIN as fallback.');
   }
 
   if (env.HOST === '0.0.0.0') {

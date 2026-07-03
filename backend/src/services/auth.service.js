@@ -27,7 +27,7 @@ export async function login(username, password, { ip, userAgent } = {}) {
         ip_address: ip || null,
         user_agent: userAgent || null,
       },
-    }).catch(() => {}); // Không block login flow nếu log lỗi
+    }).catch(err => console.error('[LoginLog]', err.message));
 
     return null;
   }
@@ -42,7 +42,7 @@ export async function login(username, password, { ip, userAgent } = {}) {
         ip_address: ip || null,
         user_agent: userAgent || null,
       },
-    }).catch(() => {});
+    }).catch(err => console.error('[LoginLog]', err.message));
 
     return { error: 'ACCOUNT_LOCKED', locked_until: user.locked_until };
   }
@@ -66,7 +66,7 @@ export async function login(username, password, { ip, userAgent } = {}) {
         ip_address: ip || null,
         user_agent: userAgent || null,
       },
-    }).catch(() => {});
+    }).catch(err => console.error('[LoginLog]', err.message));
 
     return null;
   }
@@ -90,7 +90,7 @@ export async function login(username, password, { ip, userAgent } = {}) {
       ip_address: ip || null,
       user_agent: userAgent || null,
     },
-  }).catch(() => {});
+  }).catch(err => console.error('[LoginLog]', err.message));
 
   return formatUser({ ...user, token_version: updated.token_version });
 }

@@ -506,10 +506,10 @@ watch([filterVpGui, filterChanh, filterHinhThucGiao, searchText], () => {
       </div>
     </div>
 
-    <!-- [HD-01] has_more warning — hiển thị khi > 500 BN trong tab -->
+    <!-- [HD-01] has_more warning — hiển thị khi > 50 BN trong tab -->
     <div v-if="hasMore && !loading" class="has-more-warn">
       <i class="pi pi-exclamation-triangle"></i>
-      Đang hiển thị <strong>{{ items.length }}</strong> / <strong>{{ stats.total }}</strong> biên nhận — xử lý các lô đầu để xem phần còn lại.
+      Đang hiển thị <strong>{{ items.length }}</strong> / <strong>{{ stats.total }}</strong> biên nhận.
     </div>
 
     <!-- [FIX-ADMIN] Bỏ guard v-if/v-else — admin thấy dữ liệu ngay -->

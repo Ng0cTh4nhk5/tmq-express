@@ -48,13 +48,9 @@ export default async function doanhNghiepRoutes(fastify) {
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     },
-    handler: async (request, reply) => {
-      try {
-        const data = await getDoanhNghiep(Number(request.params.id));
-        return { success: true, data };
-      } catch (e) {
-        return reply.status(e.statusCode || 500).send({ success: false, error: { message: e.message } });
-      }
+    handler: async (request) => {
+      const data = await getDoanhNghiep(Number(request.params.id));
+      return { success: true, data };
     },
   });
 
@@ -106,13 +102,9 @@ export default async function doanhNghiepRoutes(fastify) {
         additionalProperties: false,
       },
     },
-    handler: async (request, reply) => {
-      try {
-        const data = await updateDoanhNghiep(Number(request.params.id), request.body);
-        return { success: true, data, message: 'Cập nhật thành công' };
-      } catch (e) {
-        return reply.status(e.statusCode || 500).send({ success: false, error: { message: e.message } });
-      }
+    handler: async (request) => {
+      const data = await updateDoanhNghiep(Number(request.params.id), request.body);
+      return { success: true, data, message: 'Cập nhật thành công' };
     },
   });
 
@@ -144,13 +136,9 @@ export default async function doanhNghiepRoutes(fastify) {
         additionalProperties: false,
       },
     },
-    handler: async (request, reply) => {
-      try {
-        const data = await addThanhVien(Number(request.params.id), request.body.khach_hang_id);
-        return { success: true, data, message: 'Thêm thành viên thành công' };
-      } catch (e) {
-        return reply.status(e.statusCode || 500).send({ success: false, error: { message: e.message } });
-      }
+    handler: async (request) => {
+      const data = await addThanhVien(Number(request.params.id), request.body.khach_hang_id);
+      return { success: true, data, message: 'Thêm thành viên thành công' };
     },
   });
 
@@ -164,13 +152,9 @@ export default async function doanhNghiepRoutes(fastify) {
         required: ['id', 'khId'],
       },
     },
-    handler: async (request, reply) => {
-      try {
-        const data = await removeThanhVien(Number(request.params.id), Number(request.params.khId));
-        return { success: true, data, message: 'Gỡ thành viên thành công' };
-      } catch (e) {
-        return reply.status(e.statusCode || 500).send({ success: false, error: { message: e.message } });
-      }
+    handler: async (request) => {
+      const data = await removeThanhVien(Number(request.params.id), Number(request.params.khId));
+      return { success: true, data, message: 'Gỡ thành viên thành công' };
     },
   });
 }

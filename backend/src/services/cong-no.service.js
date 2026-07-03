@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import ExcelJS from 'exceljs';
 import PdfPrinter from 'pdfmake/src/printer.js';
+import { parseStartOfDayVN, parseEndOfDayVN, monthBoundaryVN } from '../utils/date.js';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -164,8 +165,8 @@ export async function reportCongNo(doiTuong, fromDate, toDate, { page = 1, limit
   if (fromDate || toDate) {
     where.ngay_phat_sinh = {};
     // [SVC-TZ] Dùng +07:00 để boundary chính xác
-    if (fromDate) where.ngay_phat_sinh.gte = new Date(fromDate + 'T00:00:00.000+07:00');
-    if (toDate)   where.ngay_phat_sinh.lte = new Date(toDate   + 'T23:59:59.999+07:00');
+    if (fromDate) where.ngay_phat_sinh.gte = parseStartOfDayVN(fromDate);
+    if (toDate)   where.ngay_phat_sinh.lte = parseEndOfDayVN(toDate);
   }
 
   const [data, total, agg] = await Promise.all([
@@ -233,8 +234,12 @@ export async function doiSoatCuoc(doiTuong, thang, nam) {
 
   const bienNhans = await prisma.bienNhan.findMany({
     where: whereBase,
+    take: 10_000, // [C-02] Guard: max 10k records to prevent OOM
     select: { id: true, gia_cuoc: true, can_xuat_hddt: true, da_vao_bang_ke: true },
   });
+  if (bienNhans.length >= 10_000) {
+    console.warn(`[doiSoatCuoc] Hit 10k limit for ${month}/${year}`);
+  }
 
   // Cộng thêm dòng tự kê (Case B — bien_nhan_id = null) trong bảng kê tháng này
   // Lọc theo nguoi_gui nếu có chỉ định doi_tuong
@@ -283,16 +288,13 @@ export async function bangKeCongNoTheoThang(thang, nam) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  // [C-03 FIX] Dùng +07:00 timezone boundary
-  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
-  const endRaw = new Date(start);
-  endRaw.setMonth(endRaw.getMonth() + 1);
-  endRaw.setMilliseconds(endRaw.getMilliseconds() - 1);
-  const end = endRaw;
+  // [C-03 FIX] Dùng monthBoundaryVN từ utils/date.js
+  const { start, end } = monthBoundaryVN(year, month);
 
   const data = await prisma.congNo.findMany({
     where: { ngay_phat_sinh: { gte: start, lte: end } },
     orderBy: [{ doi_tuong: 'asc' }, { ngay_phat_sinh: 'asc' }],
+    take: 10_000, // [C-02] Guard: max 10k records to prevent OOM
     include: {
       bien_nhan: {
         select: {
@@ -315,6 +317,9 @@ export async function bangKeCongNoTheoThang(thang, nam) {
       doanh_nghiep: { select: { id: true, ten: true } },
     },
   });
+  if (data.length >= 10_000) {
+    console.warn(`[bangKeCongNoTheoThang] Hit 10k limit for ${month}/${year}`);
+  }
 
   // [NV-3b] Group key priority:
   //   1. doanh_nghiep_id   → "DN:{id}" (group toàn bộ thành viên vào DN)
@@ -686,12 +691,8 @@ export async function doiSoatCuocChiTiet(thang, nam) {
     throw Object.assign(new Error('Tháng/năm không hợp lệ'), { statusCode: 400 });
   }
 
-  // [C-03 FIX] Dùng +07:00 timezone boundary
-  const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00.000+07:00`);
-  const endRaw = new Date(start);
-  endRaw.setMonth(endRaw.getMonth() + 1);
-  endRaw.setMilliseconds(endRaw.getMilliseconds() - 1);
-  const end = endRaw;
+  // [C-03 FIX] Dùng monthBoundaryVN từ utils/date.js
+  const { start, end } = monthBoundaryVN(year, month);
 
   // 1. Lấy tất cả BN trong tháng (với giới hạn an toàn 10K records/tháng)
   const MAX_BN = 10_000;
