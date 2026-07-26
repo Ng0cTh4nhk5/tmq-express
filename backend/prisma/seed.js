@@ -35,7 +35,7 @@ async function main() {
   }
 
   // ── VAN PHONG ──
-  const vpSG = await prisma.vanPhong.create({ data: { ma_vp:'SG', ten:'VP TP. Hồ Chí Minh', dia_chi:'491 Lê Hồng Phong, Q.10, TP.HCM', dien_thoai:'02838333879' }});
+  const vpSG = await prisma.vanPhong.create({ data: { ma_vp:'SG', ten:'VP TP. Hồ Chí Minh', dia_chi:'400 Lê Hồng Phong, Q.10, TP.HCM', dien_thoai:'02838333879' }});
   const vpCT = await prisma.vanPhong.create({ data: { ma_vp:'CT', ten:'VP Cần Thơ', dia_chi:'20 Đại lộ Hòa Bình, Q.Ninh Kiều, TP Cần Thơ', dien_thoai:'02922223344' }});
   const vpRG = await prisma.vanPhong.create({ data: { ma_vp:'RG', ten:'VP Rạch Giá', dia_chi:'15 Nguyễn Trung Trực, TP Rạch Giá', dien_thoai:'02973866444' }});
   console.log('VP: 3');

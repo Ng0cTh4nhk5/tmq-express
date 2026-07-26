@@ -168,7 +168,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
                 layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 4 },
               },
               { text: 'ĐỊA CHỈ GỬI VÀ NHẬN HÀNG:', bold: true, decoration: 'underline', fontSize: 9, margin: [0, 0, 0, 1] },
-              { text: '491 Lê Hồng Phong - P.Vườn Lài - TP.HCM - ĐT: (028) 383.338.79', fontSize: 8, color: '#222' },
+              { text: '400 Lê Hồng Phong - P.Vườn Lài - TP.HCM - ĐT: (028) 383.338.79', fontSize: 8, color: '#222' },
               { text: '33 Hùng Vương - P. Ninh Kiều - TP.Cần Thơ - ĐT: (0292) 37.687.39', fontSize: 8, color: '#222' },
               { text: '39 Nguyễn Văn Trỗi - P.Rạch Giá - An Giang - ĐT: (0297) 39.622.26', fontSize: 8, color: '#222' },
             ],

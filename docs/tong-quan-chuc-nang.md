@@ -74,6 +74,12 @@
 - **Biểu đồ cột** Tổng cước vs Đã thu
 - Các thẻ KPI: Số BN, Tổng doanh thu, Đã thu, Chưa thu+Nợ, **Tỷ lệ thu hồi %**
 
+### 2.6 Báo Cáo Tuyến & Chành
+- Thống kê biên nhận, tiền cước, COD và công nợ theo Tuyến (Văn phòng gửi → Văn phòng nhận) hoặc theo Chành xe đối tác
+- Bộ lọc theo tháng và năm
+- Xem chi tiết danh sách biên nhận (tối đa 500 bản ghi mỗi tuyến/chành) để kiểm tra mã số, ngày tạo, cước phí, COD và trạng thái giao nhận
+- Tự động giới hạn quyền xem: Staff chỉ xem được các tuyến đi/đến văn phòng mình; Admin/Quản lý xem được toàn bộ
+
 ---
 
 ## ⚙️ PHÂN HỆ 3 — QUẢN TRỊ *(Admin only)*

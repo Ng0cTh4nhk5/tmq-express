@@ -43,7 +43,7 @@ async function main() {
 
   // ── Tạo lại 3 Văn phòng ──────────────────────────────────────
   const vpSG = await prisma.vanPhong.create({
-    data: { ma_vp: 'SG', ten: 'VP Tp.HCM', dia_chi: '491 Lê Hồng Phong, Phường 2, Quận 10, TP.HCM', dien_thoai: '(028) 383.338.79' },
+    data: { ma_vp: 'SG', ten: 'VP Tp.HCM', dia_chi: '400 Lê Hồng Phong, Phường 2, Quận 10, TP.HCM', dien_thoai: '(028) 383.338.79' },
   });
   await prisma.vanPhong.create({
     data: { ma_vp: 'CT', ten: 'VP Cần Thơ', dia_chi: '20 Đại lộ Hòa Bình, Q.Ninh Kiều, TP Cần Thơ', dien_thoai: '(0292) 222.333' },

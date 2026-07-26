@@ -41,7 +41,7 @@ Hệ thống hiện quản lý **3 văn phòng**:
 
 | Mã VP | Tên văn phòng | Địa chỉ |
 |---|---|---|
-| **SG** | Văn phòng TP. Hồ Chí Minh | 491 Lê Hồng Phong, P.2, Q.10, TP.HCM |
+| **SG** | Văn phòng TP. Hồ Chí Minh | 400 Lê Hồng Phong, P.2, Q.10, TP.HCM |
 | **CT** | Văn phòng Cần Thơ | 20 Đại lộ Hòa Bình, P.Tân An, Q.Ninh Kiều, TP Cần Thơ |
 | **RG** | Văn phòng Rạch Giá | 15 Nguyễn Trung Trực, P.Vĩnh Thanh, TP Rạch Giá, Kiên Giang |
 
@@ -519,6 +519,47 @@ Khi khách doanh nghiệp đã thanh toán (cuối tháng), thực hiện:
 **Biểu đồ cột:**
 - 🔵 **Tổng cước** — Tổng cước phát sinh mỗi kỳ
 - 🟢 **Đã thu** — Phần đã được thu
+
+### 6.4 Báo Cáo Tuyến & Chành
+
+Báo cáo tuyến & chành thống kê số liệu biên nhận, doanh thu cước, tiền thu hộ (COD) và công nợ theo hai góc độ: tuyến đường giữa các văn phòng và đối tác chành xe trung chuyển.
+
+#### Phân quyền xem dữ liệu
+- Tài khoản quản trị (Admin) và Quản lý: Xem dữ liệu của tất cả các tuyến và tất cả chành xe trên hệ thống.
+- Nhân viên văn phòng (Staff): Chỉ xem dữ liệu của những tuyến có liên quan trực tiếp đến văn phòng làm việc của mình (văn phòng gửi hoặc văn phòng nhận là văn phòng của nhân viên đó).
+
+#### Bộ lọc báo cáo
+Người dùng chọn **Tháng** và **Năm** cần báo cáo, sau đó nhấn **Tải báo cáo** để cập nhật số liệu mới nhất từ hệ thống.
+
+#### Thống kê Theo Tuyến
+Tab này tổng hợp số liệu vận chuyển giữa các cặp văn phòng gửi và văn phòng nhận trong tháng đã chọn.
+
+Các thông tin thống kê tổng quan:
+- Tổng biên nhận: Tổng số vận đơn được tạo.
+- Tổng cước: Tổng tiền cước vận chuyển.
+- Tổng COD: Tổng số tiền thu hộ.
+
+Bảng số liệu chi tiết theo từng tuyến hiển thị:
+- Tuyến: Văn phòng gửi và văn phòng nhận (Ví dụ: TP. Hồ Chí Minh → Cần Thơ).
+- Số BN: Tổng số biên nhận đã tạo của tuyến.
+- Tổng cước: Tổng tiền cước phát sinh.
+- Tổng COD: Tổng tiền thu hộ phát sinh.
+- Đã giao: Số biên nhận đã hoàn tất giao hàng (gồm cả trạng thái Khách đã nhận và Đã giao Chành) trên tổng số biên nhận.
+- CN cước: Số biên nhận có hình thức thanh toán là công nợ chưa thu tiền.
+
+Người dùng có thể nhấn biểu tượng mở rộng ở đầu dòng để xem danh sách chi tiết (tối đa 500 biên nhận) gồm: Mã biên nhận, Ngày tạo, Tiền cước, Tiền COD và Trạng thái.
+
+#### Thống kê Theo Chành
+Tab này tổng hợp số liệu hàng hóa được gửi qua các đơn vị chành xe đối tác hoặc giao trực tiếp không qua chành.
+
+Bảng số liệu chi tiết hiển thị:
+- Chành: Tên chành xe đối tác kèm địa chỉ, số điện thoại và người liên hệ (Ví dụ: Chành Tàu Thủy Cần Thơ - Phong Điền). Các đơn hàng giao trực tiếp không qua trung gian sẽ gom vào nhóm "Không qua chành".
+- Số BN: Số biên nhận được chuyển qua chành tương ứng.
+- Tổng cước: Tổng tiền cước vận chuyển.
+- Tổng COD: Tổng tiền thu hộ.
+- Đã giao: Số biên nhận đã giao thành công.
+
+Nhấn biểu tượng mở rộng ở đầu dòng để xem chi tiết danh sách biên nhận (tối đa 500 biên nhận) gồm: Mã biên nhận, Tuyến đi, Tên người gửi, Tiền cước và Tiền COD.
 
 ---
 

@@ -195,6 +195,7 @@ Admin có **toàn quyền** trên hệ thống, bao gồm tất cả chức năn
 | **Thu hộ COD** | ✅ | ✅ |
 | **Cước nhận** | ✅ | ✅ |
 | **Báo cáo doanh thu** | ✅ Tất cả VP | ✅ VP của mình |
+| **Báo cáo tuyến/chành** | ✅ Tất cả VP & Chành | ✅ Tuyến liên quan đến VP của mình |
 | **Xuất Excel sổ biên nhận** | ✅ | ✅ |
 | **Bảng kê HĐĐT** | ✅ | ❌ |
 | **Quản lý danh sách DN HDDT** | ✅ | ❌ |
@@ -217,6 +218,7 @@ Admin có **toàn quyền** trên hệ thống, bao gồm tất cả chức năn
 | Xem biên nhận | Tất cả văn phòng | Văn phòng đang đăng nhập + filter |
 | Tạo biên nhận | Từ bất kỳ VP | Từ VP đang đăng nhập |
 | Báo cáo doanh thu | Có thể lọc "Tất cả" | Chỉ VP của mình |
+| Báo cáo tuyến/chành | Tất cả các tuyến & chành | Chỉ các tuyến đi/đến văn phòng mình |
 | Quản lý nhân viên | Tất cả VP | Không có |
 
 ---

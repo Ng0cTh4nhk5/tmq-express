@@ -49,7 +49,7 @@ Khi bạn quét mã QR thành công, bạn có thể sao chép (copy) đường 
 
 Nếu bạn gặp khó khăn khi quét mã QR hoặc muốn hỏi thêm về hàng hóa, xin vui lòng gọi điện thoại trực tiếp cho văn phòng gần nhất của chúng tôi:
 
-*   **Văn phòng TP. Hồ Chí Minh:** 491 Lê Hồng Phong, P.2, Q.10 — Số điện thoại: `[Bổ sung SĐT VP TP.HCM]`
+*   **Văn phòng TP. Hồ Chí Minh:** 400 Lê Hồng Phong, P.2, Q.10 — Số điện thoại: `[Bổ sung SĐT VP TP.HCM]`
 *   **Văn phòng Cần Thơ:** 20 Đại lộ Hòa Bình, P.Tân An, Q.Ninh Kiều — Số điện thoại: `[Bổ sung SĐT VP Cần Thơ]`
 *   **Văn phòng Rạch Giá:** 15 Nguyễn Trung Trực, P.Vĩnh Thanh — Số điện thoại: `[Bổ sung SĐT VP Rạch Giá]`
 

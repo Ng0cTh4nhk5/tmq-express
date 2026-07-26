@@ -83,10 +83,12 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
     throw Object.assign(new Error(msgs.join(' | ')), { statusCode: 400 });
   }
 
-  // Validate: cùng VP Nhận với user
-  const wrongVPNhan = bienNhans.filter(bn => bn.van_phong_nhan_id !== user.van_phong_id);
-  if (wrongVPNhan.length > 0) {
-    throw Object.assign(new Error('Một số BN không thuộc VP của bạn (cần VP Nhận)'), { statusCode: 403 });
+  // Validate: cùng VP Nhận với user — admin bypass check này
+  if (user.role !== 'admin') {
+    const wrongVPNhan = bienNhans.filter(bn => bn.van_phong_nhan_id !== user.van_phong_id);
+    if (wrongVPNhan.length > 0) {
+      throw Object.assign(new Error('Một số BN không thuộc VP của bạn (cần VP Nhận)'), { statusCode: 403 });
+    }
   }
 
   // Validate: cùng VP Gửi với input
@@ -95,6 +97,14 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
   if (wrongVPGui.length > 0) {
     throw Object.assign(new Error('Tất cả BN phải cùng một VP gửi'), { statusCode: 400 });
   }
+
+  // Validate: tất cả BN phải cùng VP Nhận
+  const vpNhanIds = [...new Set(bienNhans.map(bn => bn.van_phong_nhan_id))];
+  if (vpNhanIds.length > 1) {
+    throw Object.assign(new Error('Tất cả BN phải cùng một VP nhận'), { statusCode: 400 });
+  }
+  // Admin: lấy vpNhanId từ BN. Staff: dùng van_phong_id của chính họ
+  const vpNhanId = user.role === 'admin' ? vpNhanIds[0] : user.van_phong_id;
 
   const soTienTong = bienNhans.reduce((sum, bn) => sum + Number(bn.thu_ho || 0), 0);
   const vpGui = bienNhans[0].van_phong_gui;
@@ -110,7 +120,7 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
           ly_do: `Chuyển COD (${bien_nhan_ids.length} BN) về VP ${vpGui.ten}`,
           so_tien: soTienTong,
           hinh_thuc: ht,
-          van_phong_id: user.van_phong_id,
+          van_phong_id: vpNhanId,
           nhan_vien_id: user.id,
         },
       }),
@@ -122,7 +132,7 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
       async (ma_phieu) => tx.phieuChuyenCOD.create({
         data: {
           ma_phieu,
-          van_phong_nhan_id: user.van_phong_id,
+          van_phong_nhan_id: vpNhanId,
           van_phong_gui_id: vpGuiId,
           so_tien_tong: soTienTong,
           hinh_thuc: ht,

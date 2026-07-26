@@ -201,8 +201,9 @@ async function loadVanPhongs() {
 }
 
 // [UX-1] Loại trừ VP của nhân viên (VP Nhận) — không thể chuyển cước về chính mình
+// Admin không gắn với VP cụ thể → hiện toàn bộ danh sách
 const vanPhongsGui = computed(() =>
-  vanPhongs.value.filter(v => v.value !== userVpId.value)
+  isAdmin.value ? vanPhongs.value : vanPhongs.value.filter(v => v.value !== userVpId.value)
 );
 
 function openLapPhieu(bns) {
