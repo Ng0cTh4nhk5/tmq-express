@@ -137,8 +137,8 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
   });
 
   const docDefinition = {
-    pageSize: 'A5',
-    pageOrientation: 'landscape',
+    pageSize: 'A4',
+    pageOrientation: 'portrait',
     pageMargins: [14, 10, 14, 10],
 
     content: [
@@ -186,7 +186,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
       },
 
       // ══ DIVIDER (đường đỏ tưởng tượng) ══
-      { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 580, y2: 3, lineWidth: 1 }], margin: [0, 4, 0, 4] },
+      { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 567, y2: 3, lineWidth: 1 }], margin: [0, 4, 0, 4] },
 
       // ══ BIÊN NHẬN INFO ROW — nằm giữa đường đỏ và đường đen ══
       {
@@ -253,7 +253,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
       },
 
       // ══ DIVIDER (đường đen tưởng tượng) ══
-      { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 580, y2: 3, lineWidth: 0.8 }], margin: [0, 4, 0, 4] },
+      { canvas: [{ type: 'line', x1: 0, y1: 3, x2: 567, y2: 3, lineWidth: 0.8 }], margin: [0, 4, 0, 4] },
 
       // ══ NGƯỜI GỬI | NGƯỜI NHẬN ══
       {
@@ -286,7 +286,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
       },
 
       // DIVIDER NHẸ
-      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 580, y2: 2, lineWidth: 0.5, lineColor: '#ccc' }], margin: [0, 3, 0, 4] },
+      { canvas: [{ type: 'line', x1: 0, y1: 2, x2: 567, y2: 2, lineWidth: 0.5, lineColor: '#ccc' }], margin: [0, 3, 0, 4] },
 
       // ══ HÀNG HÓA (trái) + CHECKBOX GIAO HÀNG (phải) ══
       {
@@ -356,7 +356,7 @@ export async function generateBienNhanPDF(bienNhanId, { nhan_vien_ten } = {}) {
       // ══ CHÚ Ý — dùng dấu + thay bullet ══
       {
         stack: [
-          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 580, y2: 0, lineWidth: 0.5, lineColor: '#aaa' }], margin: [0, 0, 0, 2] },
+          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 567, y2: 0, lineWidth: 0.5, lineColor: '#aaa' }], margin: [0, 0, 0, 2] },
           { text: 'Chú ý:', fontSize: 8, bold: true, margin: [0, 0, 0, 1] },
           { text: '+ Phiếu này chỉ có giá trị trong vòng 10 NGÀY. Quá thời hạn mọi khiếu nại sẽ không được giải quyết.', fontSize: 7.5, margin: [0, 0, 0, 1] },
           { text: '+ KHI ĐẾN NHẬN HÀNG, QUÝ KHÁCH PHẢI MANG THEO GIẤY CMND / GIẤY GIỚI THIỆU.', fontSize: 7.5, bold: true, margin: [0, 0, 0, 1] },
@@ -448,8 +448,8 @@ export async function generatePhieuThuPDF(phieuThuId, { nhan_vien_ten } = {}) {
   const RIGHT_W = PAGE_W - LEFT_W - 12;
 
   const docDefinition = {
-    pageSize: 'A5',
-    pageOrientation: 'landscape',
+    pageSize: 'A4',
+    pageOrientation: 'portrait',
     pageMargins: [16, 12, 16, 12],
 
     content: [
@@ -631,7 +631,8 @@ export async function generatePhieuChiPDF(phieuChiId, { nhan_vien_ten } = {}) {
   const fmt = (n) => Number(n).toLocaleString('vi-VN');
 
   const docDefinition = {
-    pageSize: 'A5',
+    pageSize: 'A4',
+    pageOrientation: 'portrait',
     pageMargins: [25, 20, 25, 20],
     content: [
       { text: 'TMQ EXPRESS', fontSize: 12, bold: true, color: '#1E40AF', alignment: 'center' },
@@ -728,8 +729,8 @@ export async function generateBienNhanThuHoPDF(bienNhanId) {
   const RIGHT_W = PAGE_W - LEFT_W - 12;       // ~230 (gap 12)
 
   const docDefinition = {
-    pageSize: 'A5',
-    pageOrientation: 'landscape',
+    pageSize: 'A4',
+    pageOrientation: 'portrait',
     pageMargins: [16, 12, 16, 12],
 
     content: [
