@@ -12,7 +12,7 @@ export async function listPhieuChuyenCOD({ vp_nhan, vp_gui, trang_thai, from, to
   const where = {};
 
   // Phân quyền: staff chỉ xem phiếu liên quan VP mình (VP Nhận lập hoặc VP Gửi xác nhận)
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     where.OR = [
       { van_phong_nhan_id: user.van_phong_id },
       { van_phong_gui_id:  user.van_phong_id },
@@ -84,7 +84,7 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
   }
 
   // Validate: cùng VP Nhận với user — admin bypass check này
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     const wrongVPNhan = bienNhans.filter(bn => bn.van_phong_nhan_id !== user.van_phong_id);
     if (wrongVPNhan.length > 0) {
       throw Object.assign(new Error('Một số BN không thuộc VP của bạn (cần VP Nhận)'), { statusCode: 403 });
@@ -104,7 +104,7 @@ export async function createPhieuChuyenCOD({ van_phong_gui_id, bien_nhan_ids, hi
     throw Object.assign(new Error('Tất cả BN phải cùng một VP nhận'), { statusCode: 400 });
   }
   // Admin: lấy vpNhanId từ BN. Staff: dùng van_phong_id của chính họ
-  const vpNhanId = user.role === 'admin' ? vpNhanIds[0] : user.van_phong_id;
+  const vpNhanId = (user.role === 'admin' || user.role === 'quan_ly') ? vpNhanIds[0] : user.van_phong_id;
 
   const soTienTong = bienNhans.reduce((sum, bn) => sum + Number(bn.thu_ho || 0), 0);
   const vpGui = bienNhans[0].van_phong_gui;
@@ -178,7 +178,7 @@ export async function xacNhanChuyen(phieuId, { ghi_chu } = {}, user) {
     throw Object.assign(new Error('Phiếu không ở trạng thái chờ chuyển'), { statusCode: 400 });
   }
   // [FIX-ADMIN] Admin không thuộc VP nào — bypass check VP
-  if (user.role !== 'admin' && phieu.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && phieu.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Nhận mới có thể xác nhận đã gửi tiền'), { statusCode: 403 });
   }
 
@@ -211,7 +211,7 @@ export async function xacNhanNhan(phieuId, { hinh_thuc } = {}, user) {
     throw Object.assign(new Error('Phiếu chưa được xác nhận gửi đi'), { statusCode: 400 });
   }
   // [FIX-ADMIN] Admin không thuộc VP nào — bypass check VP
-  if (user.role !== 'admin' && phieu.van_phong_gui_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && phieu.van_phong_gui_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Gửi mới có thể xác nhận nhận tiền'), { statusCode: 403 });
   }
 

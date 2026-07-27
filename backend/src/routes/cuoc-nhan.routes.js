@@ -15,7 +15,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // GET /api/cuoc-nhan
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -40,7 +40,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // GET /api/cuoc-nhan/tong-hop
   fastify.get('/tong-hop', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -65,7 +65,7 @@ export default async function cuocNhanRoutes(fastify) {
   // Cho phép thu khi BN ở bất kỳ trang_thai vận chuyển (kể cả khach_da_nhan)
   // Chỉ kiểm tra trang_thai_cuoc_nhan === 'cho_thu' + gia_cuoc > 0 (trong service)
   fastify.post('/:id/thu', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: {
         type: 'object',
@@ -96,7 +96,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // GET /api/cuoc-nhan/phieu
   fastify.get('/phieu', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -120,7 +120,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // POST /api/cuoc-nhan/phieu — Lập phiếu chuyển cước
   fastify.post('/phieu', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -142,7 +142,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // GET /api/cuoc-nhan/phieu/:id — Chi tiết phiếu
   fastify.get('/phieu/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     },
@@ -154,7 +154,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // PATCH /api/cuoc-nhan/phieu/:id/xac-nhan-chuyen — VP Nhận confirm đã gửi
   fastify.patch('/phieu/:id/xac-nhan-chuyen', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: {
@@ -175,7 +175,7 @@ export default async function cuocNhanRoutes(fastify) {
 
   // PATCH /api/cuoc-nhan/phieu/:id/xac-nhan-nhan — VP Gửi confirm đã nhận
   fastify.patch('/phieu/:id/xac-nhan-nhan', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: {

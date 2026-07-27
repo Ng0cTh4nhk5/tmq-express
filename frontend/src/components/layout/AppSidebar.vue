@@ -23,8 +23,8 @@ const menuGroups = computed(() => {
     items: [
       { label: 'Trang chủ', icon: 'pi pi-home', to: '/', show: true },
       { label: 'Biên nhận', icon: 'pi pi-file-edit', to: '/bien-nhan', show: true },
-      { label: 'Chờ vận chuyển', icon: 'pi pi-truck', to: '/cho-van-chuyen', show: auth.hasRole('admin', 'staff'), badge: 'cvc' },
-      { label: 'Giao nhận hàng', icon: 'pi pi-inbox', to: '/hang-den', show: auth.hasRole('admin', 'staff'), badge: 'hd' },
+      { label: 'Chờ vận chuyển', icon: 'pi pi-truck', to: '/cho-van-chuyen', show: auth.hasRole('admin', 'quan_ly', 'staff'), badge: 'cvc' },
+      { label: 'Giao nhận hàng', icon: 'pi pi-inbox', to: '/hang-den', show: auth.hasRole('admin', 'quan_ly', 'staff'), badge: 'hd' },
       { label: 'Khách hàng', icon: 'pi pi-users', to: '/khach-hang', show: true },
     ].filter(i => i.show),
   };
@@ -34,23 +34,32 @@ const menuGroups = computed(() => {
   const taiChinh = {
     label: 'Tài chính',
     items: [
-      { label: 'Bảng kê HĐĐT', icon: 'pi pi-file-excel', to: '/bang-ke-hddt', show: auth.isAdmin },
+      { label: 'Bảng kê HĐĐT', icon: 'pi pi-file-excel', to: '/bang-ke-hddt', show: auth.hasRole('admin', 'quan_ly') },
       { label: 'Bảng kê công nợ', icon: 'pi pi-chart-bar', to: '/cong-no', show: auth.hasRole('admin', 'quan_ly') },
       { label: 'Thu hộ (COD)', icon: 'pi pi-money-bill', to: '/thu-ho', show: true },
-      { label: 'Cước nhận', icon: 'pi pi-wallet', to: '/cuoc-nhan', show: auth.hasRole('admin', 'staff') },
-      { label: 'Báo cáo doanh thu', icon: 'pi pi-chart-line', to: '/doanh-thu', show: true },
+      { label: 'Cước nhận', icon: 'pi pi-wallet', to: '/cuoc-nhan', show: auth.hasRole('admin', 'quan_ly', 'staff') },
+      { label: 'Báo cáo doanh thu', icon: 'pi pi-chart-line', to: '/doanh-thu', show: auth.hasRole('admin', 'quan_ly', 'staff') },
       { label: 'Báo cáo tuyến/chành', icon: 'pi pi-map', to: '/bao-cao', show: auth.hasRole('admin', 'quan_ly', 'staff') },
     ].filter(i => i.show),
   };
   if (taiChinh.items.length) groups.push(taiChinh);
 
-  // ── QUẢN TRỊ ──
+  // ── QUẢN TRỊ (admin only) ──
   if (auth.isAdmin) {
     groups.push({
       label: 'Quản trị',
       items: [
         { label: 'Văn phòng',    icon: 'pi pi-building',    to: '/van-phong',    show: true },
         { label: 'Nhân viên',    icon: 'pi pi-id-card',     to: '/nhan-vien',    show: true },
+        { label: 'Chành',        icon: 'pi pi-map-marker',  to: '/chanh',        show: true },
+        { label: 'Doanh nghiệp', icon: 'pi pi-briefcase',   to: '/doanh-nghiep', show: true },
+      ],
+    });
+  } else if (auth.isQuanLy) {
+    // Quản lý thấy Chành + Doanh nghiệp, không thấy Nhân viên và Văn phòng
+    groups.push({
+      label: 'Quản lý',
+      items: [
         { label: 'Chành',        icon: 'pi pi-map-marker',  to: '/chanh',        show: true },
         { label: 'Doanh nghiệp', icon: 'pi pi-briefcase',   to: '/doanh-nghiep', show: true },
       ],

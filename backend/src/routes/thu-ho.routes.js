@@ -20,7 +20,7 @@ const xacNhanBody = {
 export default async function thuHoRoutes(fastify) {
   // GET /api/thu-ho
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -45,7 +45,7 @@ export default async function thuHoRoutes(fastify) {
 
   // GET /api/thu-ho/tong-hop
   fastify.get('/tong-hop', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -68,7 +68,7 @@ export default async function thuHoRoutes(fastify) {
   // Cho phép thu khi BN ở bất kỳ trang_thai vận chuyển (kể cả khach_da_nhan)
   // Chỉ kiểm tra trang_thai_cod === 'cho_thu' + thu_ho > 0 (trong service)
   fastify.post('/:id/xac-nhan-thu', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: xacNhanBody,
@@ -81,7 +81,7 @@ export default async function thuHoRoutes(fastify) {
 
   // POST /api/thu-ho/:id/xac-nhan-thu-chanh — Ghi nhận chành đã thu
   fastify.post('/:id/xac-nhan-thu-chanh', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: {
@@ -98,7 +98,7 @@ export default async function thuHoRoutes(fastify) {
 
   // POST /api/thu-ho/:id/xac-nhan-nhan-tu-chanh — VP Nhận nhận tiền từ chành
   fastify.post('/:id/xac-nhan-nhan-tu-chanh', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: xacNhanBody,
@@ -121,7 +121,7 @@ export default async function thuHoRoutes(fastify) {
 
   // POST /api/thu-ho/tra-lo — Trả nhiều BN cho người gửi (gom lô)
   fastify.post('/tra-lo', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',

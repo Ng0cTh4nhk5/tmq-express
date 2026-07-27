@@ -3,7 +3,7 @@ import { listDoanhNghiep, createDoanhNghiep, updateDoanhNghiep, toggleDoanhNghie
 export default async function doanhNghiepHDDTRoutes(fastify) {
   // GET /api/doanh-nghiep-hddt
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     handler: async (request) => {
       const data = await listDoanhNghiep(request.query);
       return { success: true, data };
@@ -12,7 +12,7 @@ export default async function doanhNghiepHDDTRoutes(fastify) {
 
   // POST /api/doanh-nghiep-hddt
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',
@@ -33,7 +33,7 @@ export default async function doanhNghiepHDDTRoutes(fastify) {
 
   // PUT /api/doanh-nghiep-hddt/:id
   fastify.put('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',
@@ -53,7 +53,7 @@ export default async function doanhNghiepHDDTRoutes(fastify) {
 
   // PATCH /api/doanh-nghiep-hddt/:id/active
   fastify.patch('/:id/active', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',

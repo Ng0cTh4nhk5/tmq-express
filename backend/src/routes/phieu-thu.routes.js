@@ -5,7 +5,7 @@ export default async function phieuThuRoutes(fastify) {
   // GET /api/phieu-thu/:id/pdf-preview
   // Trả base64 PDF của PhieuThu — dùng để in xác nhận thu cước nhận / thu công nợ
   fastify.get('/:id/pdf-preview', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: {
         type: 'object',
@@ -23,7 +23,7 @@ export default async function phieuThuRoutes(fastify) {
       }
       // [FIX-VP] Staff chỉ xem phiếu của VP mình
       if (
-        request.user.role !== 'admin' &&
+        request.user.role !== 'admin' && request.user.role !== 'quan_ly' &&
         phieuThu.van_phong_id !== request.user.van_phong_id
       ) {
         throw Object.assign(new Error('Không có quyền xem phiếu này'), { statusCode: 403 });

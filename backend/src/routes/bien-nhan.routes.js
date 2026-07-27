@@ -95,7 +95,7 @@ const VP_TRANSITION_RULE = {
  * - Staff: chỉ được thực hiện bước thuộc VP mình.
  */
 function validateVpPermission(existing, newTrangThai, user) {
-  if (user.role === 'admin') return;
+  if (user.role === 'admin' || user.role === 'quan_ly') return;
 
   const key = `${existing.trang_thai}→${newTrangThai}`;
   const side = VP_TRANSITION_RULE[key];
@@ -443,7 +443,7 @@ export default async function bienNhanRoutes(fastify) {
 
   // POST /api/bien-nhan — Tạo mới
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -506,7 +506,7 @@ export default async function bienNhanRoutes(fastify) {
 
   // PUT /api/bien-nhan/:id — Cập nhật
   fastify.put('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -595,7 +595,7 @@ export default async function bienNhanRoutes(fastify) {
 
   // PATCH /api/bien-nhan/:id/trang-thai — Cập nhật trạng thái
   fastify.patch('/:id/trang-thai', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -716,7 +716,7 @@ export default async function bienNhanRoutes(fastify) {
   // Fastify phân biệt cả method lẫn path structure — không cần đặt thứ tự đặc biệt cho PATCH.
   // (Chỉ GET routes dạng "/hang-den", "/cho-van-chuyen" mới cần đặt TRƯỚC GET "/:id")
   fastify.patch('/batch-trang-thai', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',

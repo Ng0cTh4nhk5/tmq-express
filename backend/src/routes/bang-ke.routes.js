@@ -6,7 +6,7 @@ const DATE_PATTERN = '^\\d{4}-\\d{2}-\\d{2}$';
 export default async function bangKeRoutes(fastify) {
   // GET /api/bang-ke/bien-nhan-cho?ngay=YYYY-MM-DD
   fastify.get('/bien-nhan-cho', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -29,7 +29,7 @@ export default async function bangKeRoutes(fastify) {
 
   // POST /api/bang-ke — Tạo bảng kê (Case A + B)
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',
@@ -76,7 +76,7 @@ export default async function bangKeRoutes(fastify) {
   // GET /api/bang-ke — Lịch sử
   // [H-SEC-04] Thêm date guard bắt buộc để tránh load toàn bộ lịch sử
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       querystring: {
         type: 'object',
@@ -98,7 +98,7 @@ export default async function bangKeRoutes(fastify) {
 
   // GET /api/bang-ke/:id/download
   fastify.get('/:id/download', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     handler: async (request) => {
       const { buffer, ten_file } = await downloadBangKe(Number(request.params.id));
       return {

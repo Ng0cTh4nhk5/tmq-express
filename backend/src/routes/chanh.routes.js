@@ -31,7 +31,7 @@ export default async function chanhRoutes(fastify) {
 
   // POST /api/chanh — Tạo chành mới
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       body: {
         type: 'object',
@@ -55,7 +55,7 @@ export default async function chanhRoutes(fastify) {
 
   // PUT /api/chanh/:id — Cập nhật chành
   fastify.put('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       params: paramsIdSchema,
       body: {
@@ -79,7 +79,7 @@ export default async function chanhRoutes(fastify) {
 
   // PATCH /api/chanh/:id/active — Bật/tắt trạng thái
   fastify.patch('/:id/active', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly'])],
     schema: {
       params: paramsIdSchema,
       body: {

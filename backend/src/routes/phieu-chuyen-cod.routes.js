@@ -9,7 +9,7 @@ import {
 export default async function phieuChuyenCodRoutes(fastify) {
   // GET /api/phieu-chuyen-cod
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -33,7 +33,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
 
   // POST /api/phieu-chuyen-cod — Lập phiếu chuyển COD (gom lô)
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -55,7 +55,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
 
   // GET /api/phieu-chuyen-cod/:id — Chi tiết
   fastify.get('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     },
@@ -67,7 +67,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
 
   // PATCH /api/phieu-chuyen-cod/:id/xac-nhan-chuyen — VP Nhận xác nhận đã gửi tiền
   fastify.patch('/:id/xac-nhan-chuyen', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: {
@@ -84,7 +84,7 @@ export default async function phieuChuyenCodRoutes(fastify) {
 
   // PATCH /api/phieu-chuyen-cod/:id/xac-nhan-nhan — VP Gửi xác nhận đã nhận tiền
   fastify.patch('/:id/xac-nhan-nhan', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
       body: {

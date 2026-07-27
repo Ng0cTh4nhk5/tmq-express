@@ -14,7 +14,7 @@ export async function listThuHo({ trang_thai_cod, vp_gui, vp_nhan, from, to, pag
   // Phân quyền: staff xem BN thuộc VP nhận của mình,
   // CỘNG THÊM BN da_chuyen/da_tra thuộc VP gửi của mình
   // (chành gửi cần thấy để "Trả người gửi" và xem lịch sử)
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     const vpId = user.van_phong_id;
     where.OR = [
       // BN mà VP mình là bên nhận hàng (mọi trạng thái)
@@ -84,7 +84,7 @@ export async function tongHopThuHo({ vp_gui, vp_nhan, from, to } = {}, user) {
 
   // Phân quyền: staff xem BN thuộc VP nhận của mình,
   // CỘNG THÊM BN da_chuyen/da_tra thuộc VP gửi của mình
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     const vpId = user.van_phong_id;
     baseWhere.OR = [
       { van_phong_nhan_id: vpId },
@@ -146,7 +146,7 @@ export async function xacNhanThuCOD(bienNhanId, { hinh_thuc, ghi_chu, nguoi_nop 
   }
 
   // [FIX-VP] Staff chỉ được thu COD của BN thuộc VP nhận của mình
-  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && bn.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được thu COD của biên nhận này'), { statusCode: 403 });
   }
 
@@ -235,7 +235,7 @@ export async function xacNhanThuChanh(bienNhanId, { ghi_chu } = {}, user) {
   }
 
   // [FIX-VP] Staff chỉ được ghi nhận chành thu tại VP nhận của mình
-  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && bn.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được ghi nhận chành thu'), { statusCode: 403 });
   }
 
@@ -269,7 +269,7 @@ export async function xacNhanNhanTuChanh(bienNhanId, { hinh_thuc, ghi_chu, nguoi
   }
 
   // [FIX-VP] Staff chỉ được xác nhận nhận từ chành tại VP nhận của mình
-  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && bn.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được xác nhận nhận tiền từ chành'), { statusCode: 403 });
   }
 

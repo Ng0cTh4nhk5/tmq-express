@@ -4,7 +4,7 @@ import { generateBienNhanThuHoPDF } from '../services/pdf.service.js';
 export default async function bienNhanThuHoRoutes(fastify) {
   // GET /api/bien-nhan-thu-ho/:id — Xem BNTH theo bien_nhan_id
   fastify.get('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     },
@@ -26,7 +26,7 @@ export default async function bienNhanThuHoRoutes(fastify) {
   // GET /api/bien-nhan-thu-ho/:id/pdf-preview — PDF phiếu thu hộ dạng base64
   // :id = bien_nhan_id (nhất quán với route GET /:id)
   fastify.get('/:id/pdf-preview', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] },
     },

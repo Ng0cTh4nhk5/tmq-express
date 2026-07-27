@@ -2,7 +2,7 @@ import { listKhachHang, autocompleteKhachHang, getKhachHang, createKhachHang, up
 
 // [H-02] Strip PII fields for non-admin users
 function stripPII(obj, role) {
-  if (!obj || role === 'admin') return obj;
+  if (!obj || role === 'admin' || role === 'quan_ly') return obj;
   if (Array.isArray(obj)) return obj.map(item => stripPII(item, role));
   const { so_cccd, email, ...safe } = obj;
   return safe;
@@ -11,7 +11,7 @@ function stripPII(obj, role) {
 export default async function khachHangRoutes(fastify) {
   // GET /api/khach-hang
   fastify.get('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -42,7 +42,7 @@ export default async function khachHangRoutes(fastify) {
 
   // GET /api/khach-hang/autocomplete
   fastify.get('/autocomplete', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       querystring: {
         type: 'object',
@@ -58,7 +58,7 @@ export default async function khachHangRoutes(fastify) {
 
   // GET /api/khach-hang/:id
   fastify.get('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: {
         type: 'object',
@@ -75,7 +75,7 @@ export default async function khachHangRoutes(fastify) {
 
   // POST /api/khach-hang
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -102,7 +102,7 @@ export default async function khachHangRoutes(fastify) {
 
   // PUT /api/khach-hang/:id
   fastify.put('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',

@@ -65,7 +65,7 @@ export default async function doanhNghiepRoutes(fastify) {
 
   // POST /api/doanh-nghiep
   fastify.post('/', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -88,7 +88,7 @@ export default async function doanhNghiepRoutes(fastify) {
 
   // PUT /api/doanh-nghiep/:id
   fastify.put('/:id', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -127,7 +127,7 @@ export default async function doanhNghiepRoutes(fastify) {
 
   // POST /api/doanh-nghiep/:id/thanh-vien — thêm KhachHang vào DN
   fastify.post('/:id/thanh-vien', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       body: {
         type: 'object',
@@ -144,7 +144,7 @@ export default async function doanhNghiepRoutes(fastify) {
 
   // DELETE /api/doanh-nghiep/:id/thanh-vien/:khId — gỡ KhachHang khỏi DN
   fastify.delete('/:id/thanh-vien/:khId', {
-    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'staff'])],
+    preHandler: [fastify.authenticate, fastify.authorize(['admin', 'quan_ly', 'staff'])],
     schema: {
       params: {
         type: 'object',

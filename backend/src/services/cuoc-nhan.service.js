@@ -21,7 +21,7 @@ export async function listBNCuocNhan(
   const where = { trang_thai_thu: 'chua_thu' };
 
   // Phân quyền: staff chỉ xem VP Nhận của mình
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     where.van_phong_nhan_id = user.van_phong_id;
   } else {
     if (vp_nhan) where.van_phong_nhan_id = Number(vp_nhan);
@@ -73,7 +73,7 @@ export async function listBNCuocNhan(
 export async function tongHopCuocNhan({ vp_gui, vp_nhan, from, to } = {}, user) {
   const baseWhere = { trang_thai_thu: 'chua_thu' };
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     baseWhere.van_phong_nhan_id = user.van_phong_id;
   } else {
     if (vp_nhan) baseWhere.van_phong_nhan_id = Number(vp_nhan);
@@ -146,7 +146,7 @@ export async function xacNhanThuCuocNhan(
   }
 
   // [FIX-VP] Staff chỉ được thu cước của BN thuộc VP nhận của mình
-  if (user.role !== 'admin' && bn.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && bn.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ nhân viên VP Nhận mới được thu cước của biên nhận này'), { statusCode: 403 });
   }
 
@@ -216,7 +216,7 @@ export async function listPhieuChuyenCuoc(
   const l = Math.min(parseInt(limit, 10) || 20, 100);
   const where = {};
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     // Staff chỉ xem phiếu liên quan VP mình (VP Nhận lập hoặc VP Gửi xác nhận)
     where.OR = [
       { van_phong_nhan_id: user.van_phong_id },
@@ -320,7 +320,7 @@ export async function createPhieuChuyenCuoc(
   }
 
   // Validate: cùng VP Nhận với user (staff) hoặc bất kỳ (admin)
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'quan_ly') {
     const wrongVPNhan = bienNhans.filter(bn => bn.van_phong_nhan_id !== user.van_phong_id);
     if (wrongVPNhan.length > 0) {
       throw Object.assign(new Error('Một số BN không thuộc VP của bạn (cần VP Nhận)'), { statusCode: 403 });
@@ -409,7 +409,7 @@ export async function xacNhanChuyenCuoc(phieuId, { ghi_chu } = {}, user) {
   if (phieu.trang_thai !== 'cho_chuyen') {
     throw Object.assign(new Error('Phiếu không ở trạng thái chờ chuyển'), { statusCode: 400 });
   }
-  if (user.role !== 'admin' && phieu.van_phong_nhan_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && phieu.van_phong_nhan_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Nhận mới có thể xác nhận đã gửi tiền'), { statusCode: 403 });
   }
 
@@ -442,7 +442,7 @@ export async function xacNhanNhanCuoc(phieuId, { hinh_thuc } = {}, user) {
   if (phieu.trang_thai !== 'da_chuyen') {
     throw Object.assign(new Error('Phiếu chưa được xác nhận gửi đi'), { statusCode: 400 });
   }
-  if (user.role !== 'admin' && phieu.van_phong_gui_id !== user.van_phong_id) {
+  if (user.role !== 'admin' && user.role !== 'quan_ly' && phieu.van_phong_gui_id !== user.van_phong_id) {
     throw Object.assign(new Error('Chỉ VP Gửi mới có thể xác nhận nhận tiền'), { statusCode: 403 });
   }
 
